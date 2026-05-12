@@ -1,0 +1,87 @@
+import { Link } from 'react-router-dom'
+import { useAppStore } from '../stores/appStore'
+
+const badgeColors = {
+  cyan: 'text-[#B8A060] border-[#B8A060]',
+  blue: 'text-[#B8A060] border-[#B8A060]',
+  indigo: 'text-[#888] border-[#888]',
+  amber: 'text-[#B8A060] border-[#B8A060]',
+  rose: 'text-[#FF0000] border-[#FF0000]',
+  violet: 'text-white border-white',
+}
+
+export default function ModuleCard({ module }) {
+  const activeModule = useAppStore((s) => s.activeModule)
+  const isActive = activeModule === module.id
+  const hasPage = module.id === 'worldview'
+
+  const card = (
+    <article
+      id={`card-${module.id}`}
+      className={`group border-r-2 border-b-2 border-[#333] p-4 flex flex-col bg-black ${
+        module.highlight ? 'border-white' : ''
+      } ${isActive ? 'border-[#B8A060]' : ''}`}
+    >
+      <div className="flex items-start justify-between mb-2">
+        <span
+          className={`inline-block px-2 py-0.5 text-sm font-bold tracking-widest uppercase border ${
+            badgeColors[module.color] || badgeColors.cyan
+          }`}
+        >
+          {module.part}
+        </span>
+        {hasPage && (
+          <span className="text-sm text-[#555] font-mono">[EXT]</span>
+        )}
+      </div>
+
+      <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-1">{module.name}</h3>
+      <p className="text-sm text-[#888] leading-snug mb-3">{module.tagline}</p>
+
+      <div className="space-y-2 mb-3 p-3 border border-[#333]">
+        <div>
+          <span className="block text-sm font-bold text-[#555] tracking-widest uppercase mb-1">
+            INPUT
+          </span>
+          <p className="text-sm text-[#888] leading-snug">{module.input}</p>
+        </div>
+        <div className="border-t border-[#333] pt-2">
+          <span className="block text-sm font-bold text-[#555] tracking-widest uppercase mb-1">
+            OUTPUT
+          </span>
+          <p className="text-sm text-[#888] leading-snug">{module.output}</p>
+        </div>
+      </div>
+
+      <ul className="space-y-1 mb-3 flex-1">
+        {module.features.map((feat) => (
+          <li key={feat} className="flex items-start gap-2 text-sm text-[#888]">
+            <span className="mt-1 w-1 h-1 bg-[#B8A060] shrink-0" />
+            {feat}
+          </li>
+        ))}
+      </ul>
+
+      <div className="pt-2 border-t-2 border-[#333]">
+        <span className="inline-flex items-center gap-1.5 font-mono text-sm text-[#555]">
+          {'->'} {module.downstream}
+        </span>
+      </div>
+    </article>
+  )
+
+  if (hasPage) {
+    return (
+      <Link to="/world-view" className="block">
+        {card}
+      </Link>
+    )
+  }
+
+  return card
+}
+
+
+
+
+

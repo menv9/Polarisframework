@@ -1,0 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,100..900;1,100..900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Exo 2', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Exo 2', ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+
+  --color-bg-primary: #000000;
+  --color-bg-secondary: #000000;
+  --color-bg-tertiary: #111111;
+  --color-bg-card: #000000;
+  --color-bg-card-hover: #111111;
+
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #888888;
+  --color-text-muted: #555555;
+
+  --color-accent-cyan: #FFD700;
+  --color-accent-blue: #FFD700;
+  --color-accent-indigo: #888888;
+  --color-accent-violet: #ffffff;
+  --color-accent-emerald: #FFD700;
+  --color-accent-amber: #FFD700;
+  --color-accent-rose: #FF0000;
+}
+
+html {
+  scroll-behavior: auto;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #000000;
+  color: #ffffff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+/* Force remove all default rounded corners */
+*, *::before, *::after {
+  border-radius: 0 !important;
+}
+
+/* Custom selection color */
+::selection {
+  background-color: #FFD700;
+  color: #000000;
+}
+
+/* Scrollbar - brutalist */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333333;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555555;
+}
+
+/* Table defaults */
+table {
+  border-collapse: collapse;
+}
+
+/* Input defaults */
+input, select, textarea, button {
+  border-radius: 0;
+}
