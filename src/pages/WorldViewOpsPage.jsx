@@ -39,12 +39,12 @@ export default function WorldViewOpsPage() {
         <WorldViewSidebar mode="ops" />
         <main className="flex-1">
           <div className="max-w-4xl mx-auto px-4 py-4">
-            <h1 className="text-xl font-bold uppercase tracking-widest mb-3 pb-2 border-b-2 border-[#333]">OPERATIVA — WORLD VIEW</h1>
+            <h1 className="text-2xl font-bold uppercase tracking-widest mb-3 pb-2 border-b-2 border-[#333]">OPERATIVA — WORLD VIEW</h1>
 
             {/* ===== HERO: RESULTADOS DERIVADOS ===== */}
             <div className="border-2 border-[#333] mb-4">
               <div className="px-3 py-2 bg-[#1a1a0d] border-b-2 border-[#ecd987]">
-                <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">WorldView State Vector</span>
+                <span className="text-base font-bold uppercase tracking-widest text-[#ecd987]">WorldView State Vector</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-0">
                 {[
@@ -55,25 +55,25 @@ export default function WorldViewOpsPage() {
                   { label: 'INFLACION', value: inflation, color: inflation === 'INFLACIONARIO' ? 'text-[#f59e0b]' : inflation === 'DESINFLACIONARIO' ? 'text-[#60a5fa]' : 'text-[#e5e5e5]' },
                 ].map((item) => (
                   <div key={item.label} className="p-3 border-r border-b border-[#222]">
-                    <div className="text-[10px] text-[#777] uppercase tracking-wider mb-1">{item.label}</div>
-                    <div className={`text-lg font-mono font-bold ${item.color}`}>{item.value}</div>
+                    <div className="text-xs text-[#777] uppercase tracking-wider mb-1">{item.label}</div>
+                    <div className={`text-xl font-mono font-bold ${item.color}`}>{item.value}</div>
                   </div>
                 ))}
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
                 <div className="p-3 border-r border-[#222] lg:col-span-2">
-                  <div className="text-[10px] text-[#777] uppercase tracking-wider mb-1">Decision</div>
-                  <div className="text-sm font-bold text-white uppercase tracking-wide">{decision}</div>
+                  <div className="text-xs text-[#777] uppercase tracking-wider mb-1">Decision</div>
+                  <div className="text-base font-bold text-white uppercase tracking-wide">{decision}</div>
                 </div>
                 <div className="p-3">
-                  <div className="text-[10px] text-[#777] uppercase tracking-wider mb-1">Vetos</div>
+                  <div className="text-xs text-[#777] uppercase tracking-wider mb-1">Vetos</div>
                   {hasVeto ? (
                     <div className="space-y-0.5">
-                      {vetoRiskOff && <div className="text-xs text-[#ef4444] font-bold">[!] RISK-OFF</div>}
-                      {vetoUSD && <div className="text-xs text-[#ef4444] font-bold">[!] USD FUERTE</div>}
+                      {vetoRiskOff && <div className="text-sm text-[#ef4444] font-bold">[!] RISK-OFF</div>}
+                      {vetoUSD && <div className="text-sm text-[#ef4444] font-bold">[!] USD FUERTE</div>}
                     </div>
                   ) : (
-                    <div className="text-xs text-[#4ade80] font-bold">[OK] SIN VETOS</div>
+                    <div className="text-sm text-[#4ade80] font-bold">[OK] SIN VETOS</div>
                   )}
                 </div>
               </div>
@@ -82,21 +82,21 @@ export default function WorldViewOpsPage() {
             {/* ===== TABLA DE INPUTS ===== */}
             <div className="border-2 border-[#333] overflow-hidden">
               <div className="px-3 py-2 bg-[#1a1a0d] border-b-2 border-[#ecd987]">
-                <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Parametros de Entrada</span>
+                <span className="text-base font-bold uppercase tracking-widest text-[#ecd987]">Parametros de Entrada</span>
               </div>
               <table className="w-full text-sm table-fixed">
                 <thead>
                   <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#777]">
-                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest w-1/3">Parametro</th>
-                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest w-1/3">Valor</th>
-                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest w-1/3">Fuente</th>
+                    <th className="px-3 py-2 text-xs font-bold uppercase tracking-widest w-1/3">Parametro</th>
+                    <th className="px-3 py-2 text-xs font-bold uppercase tracking-widest w-1/3">Valor</th>
+                    <th className="px-3 py-2 text-xs font-bold uppercase tracking-widest w-1/3">Fuente</th>
                   </tr>
                 </thead>
                 <tbody>
                   {/* GDP */}
                   <tr className="border-y border-[#333] bg-[#161616]">
                     <td colSpan={3} className="px-3 py-2">
-                      <span className="text-sm font-bold uppercase tracking-widest text-[#ecd987]">GDP Gap por region (pp)</span>
+                      <span className="text-base font-bold uppercase tracking-widest text-[#ecd987]">GDP Gap por region (pp)</span>
                     </td>
                   </tr>
                   {[
@@ -108,7 +108,7 @@ export default function WorldViewOpsPage() {
                   ].map((row) => (
                     <tr key={row.key} className="border-b border-[#222]">
                       <td className="px-3 py-2">
-                        <span className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
+                        <span className="text-sm font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
                       </td>
                       <td className="px-3 py-2">
                         <div className="relative inline-flex items-center">
@@ -117,7 +117,7 @@ export default function WorldViewOpsPage() {
                             className="w-32 bg-[#111] border-b-2 border-[#ecd987] text-base font-mono font-bold text-white px-2 py-1 text-right outline-none focus:border-white" />
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-xs text-[#888]">
+                      <td className="px-3 py-2 text-sm text-[#888]">
                         {row.url ? (
                           <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#ecd987] hover:underline">{row.source}</a>
                         ) : (
@@ -130,7 +130,7 @@ export default function WorldViewOpsPage() {
                   {/* Regimen */}
                   <tr className="border-y border-[#333] bg-[#161616]">
                     <td colSpan={3} className="px-3 py-2">
-                      <span className="text-sm font-bold uppercase tracking-widest text-[#ecd987]">Regimen (percentil 5Y)</span>
+                      <span className="text-base font-bold uppercase tracking-widest text-[#ecd987]">Regimen (percentil 5Y)</span>
                     </td>
                   </tr>
                   {[
@@ -141,7 +141,7 @@ export default function WorldViewOpsPage() {
                   ].map((row) => (
                     <tr key={row.key} className="border-b border-[#222]">
                       <td className="px-3 py-2">
-                        <span className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
+                        <span className="text-sm font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
                       </td>
                       <td className="px-3 py-2">
                         {row.type === 'select' ? (
@@ -160,7 +160,7 @@ export default function WorldViewOpsPage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-xs text-[#888]">
+                      <td className="px-3 py-2 text-sm text-[#888]">
                         {row.url ? (
                           <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#ecd987] hover:underline">{row.source}</a>
                         ) : (
@@ -173,7 +173,7 @@ export default function WorldViewOpsPage() {
                   {/* WoC */}
                   <tr className="border-y border-[#333] bg-[#161616]">
                     <td colSpan={3} className="px-3 py-2">
-                      <span className="text-sm font-bold uppercase tracking-widest text-[#ecd987]">Wisdom of the Crowd (z)</span>
+                      <span className="text-base font-bold uppercase tracking-widest text-[#ecd987]">Wisdom of the Crowd (z)</span>
                     </td>
                   </tr>
                   {[
@@ -182,7 +182,7 @@ export default function WorldViewOpsPage() {
                   ].map((row) => (
                     <tr key={row.key} className="border-b border-[#222]">
                       <td className="px-3 py-2">
-                        <span className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
+                        <span className="text-sm font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
                       </td>
                       <td className="px-3 py-2">
                         <div className="relative inline-flex items-center">
@@ -191,7 +191,7 @@ export default function WorldViewOpsPage() {
                             className="w-32 bg-[#111] border-b-2 border-[#ecd987] text-base font-mono font-bold text-white px-2 py-1 text-right outline-none focus:border-white" />
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-xs text-[#888]">
+                      <td className="px-3 py-2 text-sm text-[#888]">
                         {row.url ? (
                           <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#ecd987] hover:underline">{row.source}</a>
                         ) : (
@@ -204,7 +204,7 @@ export default function WorldViewOpsPage() {
                   {/* USD */}
                   <tr className="border-y border-[#333] bg-[#161616]">
                     <td colSpan={3} className="px-3 py-2">
-                      <span className="text-sm font-bold uppercase tracking-widest text-[#ecd987]">USD Bias</span>
+                      <span className="text-base font-bold uppercase tracking-widest text-[#ecd987]">USD Bias</span>
                     </td>
                   </tr>
                   {[
@@ -214,7 +214,7 @@ export default function WorldViewOpsPage() {
                   ].map((row) => (
                     <tr key={row.key} className="border-b border-[#222]">
                       <td className="px-3 py-2">
-                        <span className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
+                        <span className="text-sm font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
                       </td>
                       <td className="px-3 py-2">
                         {row.type === 'select' ? (
@@ -233,7 +233,7 @@ export default function WorldViewOpsPage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-xs text-[#888]">
+                      <td className="px-3 py-2 text-sm text-[#888]">
                         {row.url ? (
                           <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#ecd987] hover:underline">{row.source}</a>
                         ) : (
@@ -246,7 +246,7 @@ export default function WorldViewOpsPage() {
                   {/* Inflacion */}
                   <tr className="border-y border-[#333] bg-[#161616]">
                     <td colSpan={3} className="px-3 py-2">
-                      <span className="text-sm font-bold uppercase tracking-widest text-[#f59e0b]">Inflacion Global (%)</span>
+                      <span className="text-base font-bold uppercase tracking-widest text-[#f59e0b]">Inflacion Global (%)</span>
                     </td>
                   </tr>
                   {[
@@ -255,7 +255,7 @@ export default function WorldViewOpsPage() {
                   ].map((row) => (
                     <tr key={row.key} className="border-b border-[#222]">
                       <td className="px-3 py-2">
-                        <span className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
+                        <span className="text-sm font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
                       </td>
                       <td className="px-3 py-2">
                         <div className="relative inline-flex items-center">
@@ -264,7 +264,7 @@ export default function WorldViewOpsPage() {
                             className="w-32 bg-[#111] border-b-2 border-[#ecd987] text-base font-mono font-bold text-white px-2 py-1 text-right outline-none focus:border-white" />
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-xs text-[#888]">
+                      <td className="px-3 py-2 text-sm text-[#888]">
                         {row.url ? (
                           <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#ecd987] hover:underline">{row.source}</a>
                         ) : (
