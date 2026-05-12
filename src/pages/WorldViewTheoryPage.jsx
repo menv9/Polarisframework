@@ -25,7 +25,7 @@ export default function WorldViewTheoryPage() {
           <div className="max-w-4xl mx-auto px-4 py-6">
             {/* Header */}
             <div className="mb-6 pb-4 border-b-2 border-[#333]">
-              <div className="text-sm text-[#555] uppercase tracking-widest mb-2">
+              <div className="text-sm text-[#777] uppercase tracking-widest mb-2">
                 PARTE I — WORLD VIEW MODULE
               </div>
               <h1 className="text-3xl font-bold uppercase tracking-tighter text-white mb-2">WORLD VIEW</h1>
@@ -48,21 +48,21 @@ export default function WorldViewTheoryPage() {
                   { sec: '§7', comp: 'Sintesis', out: 'Vector de estado integrado' },
                 ].map((item) => (
                   <div key={item.sec} className="p-2 border-r border-b border-[#333]">
-                    <div className="text-sm text-[#B8A060] font-mono font-bold mb-1">{item.sec}</div>
+                    <div className="text-sm text-[#ecd987] font-mono font-bold mb-1">{item.sec}</div>
                     <div className="text-sm font-bold text-white uppercase tracking-wider mb-0.5">{item.comp}</div>
-                    <div className="text-sm text-[#555]">{item.out}</div>
+                    <div className="text-sm text-[#777]">{item.out}</div>
                   </div>
                 ))}
               </div>
 
               <div className="space-y-0">
-                <div className="p-3 border-2 border-[#B8A060]">
-                  <span className="text-sm font-mono font-bold text-[#B8A060] uppercase tracking-wider mb-1 block">INPUT</span>
+                <div className="p-3 border-2 border-[#ecd987]">
+                  <span className="text-sm font-mono font-bold text-[#ecd987] uppercase tracking-wider mb-1 block">INPUT</span>
                   <p className="text-sm text-[#888]">
                     VIX, HY OAS, S&P 200dma, EMBI, GDP forecasts, CESI, SPF, Tankan, CFTC, EPFR, SSI, DXY, breakevens, CPI G7.
                   </p>
                 </div>
-                <div className="flex justify-center py-1"><span className="text-sm text-[#555]">v</span></div>
+                <div className="flex justify-center py-1"><span className="text-sm text-[#777]">v</span></div>
                 <div className="p-3 border-2 border-[#333]">
                   <span className="text-sm font-mono font-bold text-white uppercase tracking-wider mb-1 block">CALCULO</span>
                   <p className="text-sm text-[#888]">
@@ -70,7 +70,7 @@ export default function WorldViewTheoryPage() {
                     Cada componente modula los siguientes.
                   </p>
                 </div>
-                <div className="flex justify-center py-1"><span className="text-sm text-[#555]">v</span></div>
+                <div className="flex justify-center py-1"><span className="text-sm text-[#777]">v</span></div>
                 <div className="p-3 border-2 border-white">
                   <span className="text-sm font-mono font-bold text-white uppercase tracking-wider mb-1 block">OUTPUT: WORLDVIEW_STATE</span>
                   <div className="text-sm text-[#888] font-mono space-y-0.5">
@@ -102,10 +102,10 @@ export default function WorldViewTheoryPage() {
                   { sec: '§9', title: 'Parametros', file: 'WorldView_Module §9 Parametros.md', desc: 'Defaults, rangos, calibracion' },
                 ].map((doc) => (
                   <div key={doc.sec} className="flex items-start gap-3 p-3 border-b border-[#222] last:border-b-0">
-                    <span className="text-sm text-[#B8A060] font-mono font-bold shrink-0 w-8">{doc.sec}</span>
+                    <span className="text-sm text-[#ecd987] font-mono font-bold shrink-0 w-8">{doc.sec}</span>
                     <div className="flex-1">
                       <div className="text-sm font-bold text-white uppercase tracking-wider">{doc.title}</div>
-                      <div className="text-xs text-[#555] font-mono mt-0.5">{doc.file}</div>
+                      <div className="text-xs text-[#777] font-mono mt-0.5">{doc.file}</div>
                       <div className="text-sm text-[#888] mt-1">{doc.desc}</div>
                     </div>
                   </div>
@@ -117,7 +117,7 @@ export default function WorldViewTheoryPage() {
             <Section id="cheatsheet" title="CHEATSHEET OPERATIVO">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 border-2 border-[#333] mb-4">
                 <div className="p-3 border-b sm:border-b-0 sm:border-r border-[#333]">
-                  <div className="text-sm font-bold text-[#B8A060] mb-2 uppercase tracking-wider">Risk-ON</div>
+                  <div className="text-sm font-bold text-[#4ade80] mb-2 uppercase tracking-wider">Risk-ON</div>
                   <ul className="space-y-1 text-sm text-[#888]">
                     <li>VIX &lt; P30, HY &lt; P30, S&P &gt; 200dma, EMBI &lt; P40</li>
                     <li>Favor: pro-ciclicas (AUD, NZD, CAD, NOK, SEK, EM)</li>
@@ -125,7 +125,7 @@ export default function WorldViewTheoryPage() {
                   </ul>
                 </div>
                 <div className="p-3">
-                  <div className="text-sm font-bold text-[#FF0000] mb-2 uppercase tracking-wider">Risk-OFF</div>
+                  <div className="text-sm font-bold text-[#ef4444] mb-2 uppercase tracking-wider">Risk-OFF</div>
                   <ul className="space-y-1 text-sm text-[#888]">
                     <li>VIX &gt; P70 OR HY &gt; P70 OR S&P &lt; 200dma OR EMBI &gt; P70</li>
                     <li>Favor: refugios (USD, JPY, CHF)</li>
@@ -143,15 +143,15 @@ export default function WorldViewTheoryPage() {
                 </div>
               </div>
 
-              <div className="p-3 border-2 border-[#FF0000]">
-                <p className="text-sm text-[#FF0000] font-bold mb-2 uppercase">World View VETA si:</p>
+              <div className="p-3 border-2 border-[#ef4444]">
+                <p className="text-sm text-[#ef4444] font-bold mb-2 uppercase">World View VETA si:</p>
                 <ul className="space-y-1 text-sm text-[#888]">
                   <li>Risk-OFF severo (4/4 en P&gt;P80) + trade pro-ciclica</li>
                   <li>Risk-ON euforico (4/4 en P&lt;P20) + trade refugio largo</li>
                   <li>USD strong bullish (4σ) + short USD</li>
                   <li>Inflacion cambia bruscamente (&gt;1pp breakevens en 1 mes)</li>
                 </ul>
-                <p className="mt-2 text-sm text-[#FF0000] font-bold uppercase">Esperar normalizacion.</p>
+                <p className="mt-2 text-sm text-[#ef4444] font-bold uppercase">Esperar normalizacion.</p>
               </div>
             </Section>
 
@@ -160,7 +160,7 @@ export default function WorldViewTheoryPage() {
 
             {/* Footer */}
             <div className="pt-4 border-t-2 border-[#333] mt-8">
-              <p className="text-sm text-[#555]">
+              <p className="text-sm text-[#777]">
                 World View no se opera directamente. Filtra y modula el resto.
                 Documentacion completa en Obsidian vault.
               </p>

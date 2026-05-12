@@ -89,8 +89,8 @@ export default function WorldViewSources() {
   return (
     <section id="sources" className="mb-8 scroll-mt-16">
       {/* Key */}
-      <div className="flex items-center gap-4 mb-3 text-sm text-[#555]">
-        <span className="flex items-center gap-1"><span className="w-3 h-0 border-b-2 border-[#B8A060] inline-block" /> EDITABLE</span>
+      <div className="flex items-center gap-4 mb-3 text-sm text-[#777]">
+        <span className="flex items-center gap-1"><span className="w-3 h-0 border-b-2 border-[#ecd987] inline-block" /> EDITABLE</span>
         <span className="flex items-center gap-1"><span className="w-3 h-0 border-b-2 border-[#333] inline-block" /> SOLO LECTURA</span>
       </div>
 
@@ -100,23 +100,23 @@ export default function WorldViewSources() {
             onClick={() => setActiveTier('mvp')}
             className={`px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 ${
               activeTier === 'mvp'
-                ? 'text-[#B8A060] border-[#B8A060]'
-                : 'text-[#555] border-[#333] hover:text-white'
+                ? 'text-[#ecd987] border-[#ecd987]'
+                : 'text-[#777] border-[#333] hover:text-white'
             }`}
           >
             MINIMO VIABLE (MVP)
-            <span className="ml-2 text-sm font-normal text-[#555]">{mvpCount}/{mvpTotal}</span>
+            <span className="ml-2 text-sm font-normal text-[#777]">{mvpCount}/{mvpTotal}</span>
           </button>
           <button
             onClick={() => setActiveTier('nice')}
             className={`px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 ${
               activeTier === 'nice'
                 ? 'text-white border-white'
-                : 'text-[#555] border-[#333] hover:text-white'
+                : 'text-[#777] border-[#333] hover:text-white'
             }`}
           >
             NICE TO HAVE
-            <span className="ml-2 text-sm font-normal text-[#555]">{niceCount}/{niceTotal}</span>
+            <span className="ml-2 text-sm font-normal text-[#777]">{niceCount}/{niceTotal}</span>
           </button>
         </div>
         <div className="flex items-center gap-2">
@@ -124,17 +124,17 @@ export default function WorldViewSources() {
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="appearance-none bg-[#111] border-b-2 border-[#B8A060] text-sm text-white px-3 py-1 pr-8 outline-none uppercase tracking-wider focus:border-white"
+              className="appearance-none bg-[#111] border-b-2 border-[#ecd987] text-sm text-white px-3 py-1 pr-8 outline-none uppercase tracking-wider focus:border-white"
             >
               {categories.map((c) => (
                 <option key={c} value={c}>{c === 'todas' ? 'TODAS LAS CATEGORIAS' : c}</option>
               ))}
             </select>
-            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#B8A060] text-sm pointer-events-none">v</span>
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#ecd987] text-sm pointer-events-none">v</span>
           </div>
           <button
             onClick={addRow}
-            className="px-3 py-1 border-b-2 border-[#B8A060] text-[#B8A060] text-sm font-bold uppercase tracking-wider hover:text-white hover:border-white"
+            className="px-3 py-1 border-b-2 border-[#ecd987] text-[#ecd987] text-sm font-bold uppercase tracking-wider hover:text-white hover:border-white"
           >
             + ANADIR FILA
           </button>
@@ -151,7 +151,7 @@ export default function WorldViewSources() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#555]">
+              <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#777]">
                 <th className="px-2 py-1.5 font-bold uppercase tracking-wider w-8"></th>
                 <th className="px-2 py-1.5 font-bold uppercase tracking-wider">Indicador</th>
                 <th className="px-2 py-1.5 font-bold uppercase tracking-wider">Categoria</th>
@@ -170,7 +170,7 @@ export default function WorldViewSources() {
                     <button
                       onClick={() => moveTier(s.id)}
                       title={`Mover a ${s.tier === 'mvp' ? 'Nice to Have' : 'Minimo Viable'}`}
-                      className="text-sm px-1.5 py-0.5 border-b-2 border-[#B8A060] text-[#B8A060] hover:text-white hover:border-white font-bold"
+                      className="text-sm px-1.5 py-0.5 border-b-2 border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white font-bold"
                     >
                       {s.tier === 'mvp' ? 'v' : '^'}
                     </button>
@@ -183,13 +183,13 @@ export default function WorldViewSources() {
                       <select
                         value={s.category}
                         onChange={(e) => updateField(s.id, 'category', e.target.value)}
-                        className="appearance-none bg-[#111] border-b border-[#B8A060] text-white outline-none uppercase text-sm tracking-wider px-2 py-0.5 pr-6 focus:border-white"
+                        className="appearance-none bg-[#111] border-b border-[#ecd987] text-white outline-none uppercase text-sm tracking-wider px-2 py-0.5 pr-6 focus:border-white"
                       >
                         {categories.filter((c) => c !== 'todas').map((c) => (
                           <option key={c} value={c}>{c}</option>
                         ))}
                       </select>
-                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#B8A060] text-[10px] pointer-events-none">v</span>
+                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#ecd987] text-[10px] pointer-events-none">v</span>
                     </div>
                   </td>
                   <td className="px-2 py-1.5">
@@ -197,7 +197,7 @@ export default function WorldViewSources() {
                       type="text"
                       value={s.source}
                       onChange={(e) => updateField(s.id, 'source', e.target.value)}
-                      className="w-full bg-[#111] border-b border-[#B8A060] text-white outline-none text-sm px-1 py-0.5 focus:border-white"
+                      className="w-full bg-[#111] border-b border-[#ecd987] text-white outline-none text-sm px-1 py-0.5 focus:border-white"
                       placeholder="Fuente"
                     />
                   </td>
@@ -207,11 +207,11 @@ export default function WorldViewSources() {
                         type="text"
                         value={s.url}
                         onChange={(e) => updateField(s.id, 'url', e.target.value)}
-                        className="flex-1 bg-[#111] border-b border-[#B8A060] text-white font-mono outline-none text-sm px-1 py-0.5 focus:border-white"
+                        className="flex-1 bg-[#111] border-b border-[#ecd987] text-white font-mono outline-none text-sm px-1 py-0.5 focus:border-white"
                         placeholder="URL"
                       />
                       {s.url && (
-                        <a href={s.url} target="_blank" rel="noopener noreferrer" title="Abrir fuente" className="text-[#555] hover:text-[#B8A060] text-sm">
+                        <a href={s.url} target="_blank" rel="noopener noreferrer" title="Abrir fuente" className="text-[#777] hover:text-[#ecd987] text-sm">
                           [EXT]
                         </a>
                       )}
@@ -222,7 +222,7 @@ export default function WorldViewSources() {
                       type="text"
                       value={s.frequency}
                       onChange={(e) => updateField(s.id, 'frequency', e.target.value)}
-                      className="w-20 bg-[#111] border-b border-[#B8A060] text-white outline-none text-sm px-1 py-0.5 focus:border-white"
+                      className="w-20 bg-[#111] border-b border-[#ecd987] text-white outline-none text-sm px-1 py-0.5 focus:border-white"
                       placeholder="Freq."
                     />
                   </td>
@@ -231,8 +231,8 @@ export default function WorldViewSources() {
                       onClick={() => toggleStatus(s.id)}
                       className={`px-2 py-0.5 text-sm font-bold uppercase tracking-wider border-2 ${
                         s.status === 'activo'
-                          ? 'text-[#B8A060] border-[#B8A060]'
-                          : 'text-[#FF0000] border-[#FF0000]'
+                          ? 'text-[#ecd987] border-[#ecd987]'
+                          : 'text-[#ef4444] border-[#ef4444]'
                       }`}
                     >
                       {s.status}
@@ -243,14 +243,14 @@ export default function WorldViewSources() {
                       type="text"
                       value={s.notes}
                       onChange={(e) => updateField(s.id, 'notes', e.target.value)}
-                      className="w-full bg-[#111] border-b border-[#B8A060] text-white outline-none text-sm px-1 py-0.5 focus:border-white"
+                      className="w-full bg-[#111] border-b border-[#ecd987] text-white outline-none text-sm px-1 py-0.5 focus:border-white"
                       placeholder="Notas"
                     />
                   </td>
                   <td className="px-2 py-1.5">
                     <button
                       onClick={() => deleteRow(s.id)}
-                      className="text-sm px-1.5 py-0.5 border-b-2 border-[#FF0000] text-[#FF0000] hover:text-white hover:border-white font-bold"
+                      className="text-sm px-1.5 py-0.5 border-b-2 border-[#ef4444] text-[#ef4444] hover:text-white hover:border-white font-bold"
                     >
                       X
                     </button>
@@ -262,10 +262,10 @@ export default function WorldViewSources() {
         </div>
       </div>
 
-      <div className="mt-2 flex items-center gap-3 text-sm text-[#555]">
+      <div className="mt-2 flex items-center gap-3 text-sm text-[#777]">
         <span>{filtered.filter((s) => s.status === 'activo').length} ACTIVAS / {filtered.length} EN VISTA</span>
         <span className="text-[#333]">|</span>
-        <span className="text-[#B8A060]">{mvpCount} MVP ACTIVAS</span>
+        <span className="text-[#ecd987]">{mvpCount} MVP ACTIVAS</span>
         <span className="text-[#333]">|</span>
         <span className="text-white">{niceCount} NICE ACTIVAS</span>
       </div>

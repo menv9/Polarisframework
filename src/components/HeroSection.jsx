@@ -16,13 +16,13 @@ export default function HeroSection() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-0 border-2 border-[#333]">
           {/* Left: Title & desc */}
           <div className="lg:col-span-2 p-6 border-b-2 lg:border-b-0 lg:border-r-2 border-[#333]">
-            <div className="text-sm text-[#555] uppercase tracking-widest mb-4">
+            <div className="text-sm text-[#777] uppercase tracking-widest mb-4">
               Capa 1 — FX Macro
             </div>
             <h1 className="text-5xl md:text-7xl font-bold tracking-tighter leading-none mb-4 text-white">
               POLARIS
             </h1>
-            <div className="text-2xl md:text-3xl font-bold tracking-tighter text-[#B8A060] mb-6">
+            <div className="text-2xl md:text-3xl font-bold tracking-tighter text-[#ecd987] mb-6">
               FRAMEWORK
             </div>
             <p className="text-sm text-[#888] max-w-md leading-relaxed">
@@ -33,7 +33,7 @@ export default function HeroSection() {
 
           {/* Right: Stats ticker */}
           <div className="p-6 flex flex-col justify-between">
-            <div className="text-sm text-[#555] uppercase tracking-widest mb-4">
+            <div className="text-sm text-[#777] uppercase tracking-widest mb-4">
               Resumen del Sistema
             </div>
             <div className="space-y-4">
@@ -43,14 +43,14 @@ export default function HeroSection() {
                 { value: '6', label: 'CAPAS' },
               ].map((stat) => (
                 <div key={stat.label} className="flex items-baseline justify-between border-b border-[#333] pb-2">
-                  <span className="text-sm text-[#555] uppercase tracking-wider">{stat.label}</span>
+                  <span className="text-sm text-[#777] uppercase tracking-wider">{stat.label}</span>
                   <span className="text-3xl font-bold text-white">{stat.value}</span>
                 </div>
               ))}
             </div>
             <div className="mt-4 pt-4 border-t-2 border-[#333]">
-              <div className="text-sm text-[#555] uppercase tracking-widest">Estado</div>
-              <div className="text-sm text-[#B8A060] font-bold mt-1">DEMO V0.1</div>
+              <div className="text-sm text-[#777] uppercase tracking-widest">Estado</div>
+              <div className="text-sm text-[#ecd987] font-bold mt-1">DEMO V0.1</div>
             </div>
           </div>
         </div>

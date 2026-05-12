@@ -43,37 +43,37 @@ export default function WorldViewOpsPage() {
 
             {/* ===== HERO: RESULTADOS DERIVADOS ===== */}
             <div className="border-2 border-[#333] mb-4">
-              <div className="px-3 py-2 bg-[#111] border-b-2 border-[#333]">
-                <span className="text-xs font-bold uppercase tracking-widest text-[#B8A060]">WorldView State Vector</span>
+              <div className="px-3 py-2 bg-[#1a1a0d] border-b-2 border-[#ecd987]">
+                <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">WorldView State Vector</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-0">
                 {[
-                  { label: 'REGIMEN', value: regime, color: regime === 'RISK-ON' ? 'text-[#B8A060]' : regime === 'RISK-OFF' ? 'text-[#FF0000]' : 'text-white' },
-                  { label: 'MOMENTUM', value: scoreGDP.toFixed(2), color: scoreGDP > 0 ? 'text-[#B8A060]' : scoreGDP < 0 ? 'text-[#FF0000]' : 'text-white' },
-                  { label: 'WOC', value: wocScore.toFixed(2), color: wocScore > 0 ? 'text-[#B8A060]' : wocScore < 0 ? 'text-[#FF0000]' : 'text-white' },
-                  { label: 'USD BIAS', value: usdBias, color: usdBias === 'BULLISH' ? 'text-[#B8A060]' : usdBias === 'BEARISH' ? 'text-[#FF0000]' : 'text-white' },
-                  { label: 'INFLACION', value: inflation, color: inflation === 'INFLACIONARIO' ? 'text-[#FF0000]' : inflation === 'DESINFLACIONARIO' ? 'text-[#B8A060]' : 'text-white' },
+                  { label: 'REGIMEN', value: regime, color: regime === 'RISK-ON' ? 'text-[#4ade80]' : regime === 'RISK-OFF' ? 'text-[#ef4444]' : 'text-[#e5e5e5]' },
+                  { label: 'MOMENTUM', value: scoreGDP.toFixed(2), color: scoreGDP > 0 ? 'text-[#4ade80]' : scoreGDP < 0 ? 'text-[#ef4444]' : 'text-[#e5e5e5]' },
+                  { label: 'WOC', value: wocScore.toFixed(2), color: wocScore > 0 ? 'text-[#4ade80]' : wocScore < 0 ? 'text-[#ef4444]' : 'text-[#e5e5e5]' },
+                  { label: 'USD BIAS', value: usdBias, color: usdBias === 'BULLISH' ? 'text-[#4ade80]' : usdBias === 'BEARISH' ? 'text-[#ef4444]' : 'text-[#e5e5e5]' },
+                  { label: 'INFLACION', value: inflation, color: inflation === 'INFLACIONARIO' ? 'text-[#f59e0b]' : inflation === 'DESINFLACIONARIO' ? 'text-[#60a5fa]' : 'text-[#e5e5e5]' },
                 ].map((item) => (
                   <div key={item.label} className="p-3 border-r border-b border-[#222]">
-                    <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">{item.label}</div>
+                    <div className="text-[10px] text-[#777] uppercase tracking-wider mb-1">{item.label}</div>
                     <div className={`text-lg font-mono font-bold ${item.color}`}>{item.value}</div>
                   </div>
                 ))}
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
                 <div className="p-3 border-r border-[#222] lg:col-span-2">
-                  <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Decision</div>
+                  <div className="text-[10px] text-[#777] uppercase tracking-wider mb-1">Decision</div>
                   <div className="text-sm font-bold text-white uppercase tracking-wide">{decision}</div>
                 </div>
                 <div className="p-3">
-                  <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Vetos</div>
+                  <div className="text-[10px] text-[#777] uppercase tracking-wider mb-1">Vetos</div>
                   {hasVeto ? (
                     <div className="space-y-0.5">
-                      {vetoRiskOff && <div className="text-xs text-[#FF0000] font-bold">[!] RISK-OFF</div>}
-                      {vetoUSD && <div className="text-xs text-[#FF0000] font-bold">[!] USD FUERTE</div>}
+                      {vetoRiskOff && <div className="text-xs text-[#ef4444] font-bold">[!] RISK-OFF</div>}
+                      {vetoUSD && <div className="text-xs text-[#ef4444] font-bold">[!] USD FUERTE</div>}
                     </div>
                   ) : (
-                    <div className="text-xs text-[#B8A060] font-bold">[OK] SIN VETOS</div>
+                    <div className="text-xs text-[#4ade80] font-bold">[OK] SIN VETOS</div>
                   )}
                 </div>
               </div>
@@ -81,22 +81,22 @@ export default function WorldViewOpsPage() {
 
             {/* ===== TABLA DE INPUTS ===== */}
             <div className="border-2 border-[#333] overflow-hidden">
-              <div className="px-3 py-2 bg-[#111] border-b-2 border-[#333]">
-                <span className="text-xs font-bold uppercase tracking-widest text-[#555]">Parametros de Entrada</span>
+              <div className="px-3 py-2 bg-[#1a1a0d] border-b-2 border-[#ecd987]">
+                <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Parametros de Entrada</span>
               </div>
               <table className="w-full text-sm table-fixed">
                 <thead>
-                  <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#555]">
-                    <th className="px-2 py-1 font-bold uppercase tracking-wider w-1/3">Parametro</th>
-                    <th className="px-2 py-1 font-bold uppercase tracking-wider w-1/3">Valor</th>
-                    <th className="px-2 py-1 font-bold uppercase tracking-wider w-1/3">Fuente</th>
+                  <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#777]">
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest w-1/3">Parametro</th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest w-1/3">Valor</th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest w-1/3">Fuente</th>
                   </tr>
                 </thead>
                 <tbody>
                   {/* GDP */}
-                  <tr className="border-b border-[#222] bg-[#0a0a0a]">
-                    <td colSpan={3} className="px-3 py-1">
-                      <span className="text-xs font-bold uppercase tracking-widest text-[#B8A060]">GDP Gap por region (pp)</span>
+                  <tr className="border-y border-[#333] bg-[#161616]">
+                    <td colSpan={3} className="px-3 py-2">
+                      <span className="text-sm font-bold uppercase tracking-widest text-[#ecd987]">GDP Gap por region (pp)</span>
                     </td>
                   </tr>
                   {[
@@ -107,20 +107,19 @@ export default function WorldViewOpsPage() {
                     { key: 'gdpResto', label: 'Resto', step: 0.1, min: -2, max: 2, source: 'IMF WEO, OECD' },
                   ].map((row) => (
                     <tr key={row.key} className="border-b border-[#222]">
-                      <td className="px-2 py-1">
-                        <span className="text-sm font-bold text-white uppercase tracking-wider">{row.label}</span>
+                      <td className="px-3 py-2">
+                        <span className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
                       </td>
-                      <td className="px-2 py-1">
+                      <td className="px-3 py-2">
                         <div className="relative inline-flex items-center">
-                          <span className="absolute left-2 text-[#B8A060] text-xs font-bold">{'>'}</span>
                           <input type="number" value={data[row.key]} min={row.min} max={row.max} step={row.step}
                             onChange={(e) => handleChange(row.key, Number(e.target.value))}
-                            className="w-32 bg-[#111] border-b-2 border-[#B8A060] text-sm font-mono text-white pl-5 pr-2 py-0.5 text-right outline-none focus:border-white" />
+                            className="w-32 bg-[#111] border-b-2 border-[#ecd987] text-base font-mono font-bold text-white px-2 py-1 text-right outline-none focus:border-white" />
                         </div>
                       </td>
-                      <td className="px-2 py-1 text-xs text-[#888]">
+                      <td className="px-3 py-2 text-xs text-[#888]">
                         {row.url ? (
-                          <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#B8A060] hover:underline">{row.source}</a>
+                          <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#ecd987] hover:underline">{row.source}</a>
                         ) : (
                           row.source
                         )}
@@ -129,9 +128,9 @@ export default function WorldViewOpsPage() {
                   ))}
 
                   {/* Regimen */}
-                  <tr className="border-b border-[#222] bg-[#0a0a0a]">
-                    <td colSpan={3} className="px-3 py-1">
-                      <span className="text-xs font-bold uppercase tracking-widest text-white">Regimen (percentil 5Y)</span>
+                  <tr className="border-y border-[#333] bg-[#161616]">
+                    <td colSpan={3} className="px-3 py-2">
+                      <span className="text-sm font-bold uppercase tracking-widest text-[#ecd987]">Regimen (percentil 5Y)</span>
                     </td>
                   </tr>
                   {[
@@ -141,30 +140,29 @@ export default function WorldViewOpsPage() {
                     { key: 'embi', label: 'EMBI', step: 1, min: 0, max: 100, source: 'JPMorgan / Bloomberg' },
                   ].map((row) => (
                     <tr key={row.key} className="border-b border-[#222]">
-                      <td className="px-2 py-1">
-                        <span className="text-sm font-bold text-white uppercase tracking-wider">{row.label}</span>
+                      <td className="px-3 py-2">
+                        <span className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
                       </td>
-                      <td className="px-2 py-1">
+                      <td className="px-3 py-2">
                         {row.type === 'select' ? (
                           <div className="relative inline-block w-32">
                             <select value={data[row.key]} onChange={(e) => handleChange(row.key, Number(e.target.value))}
-                              className="w-32 appearance-none bg-[#111] border-b-2 border-[#B8A060] text-sm text-white px-2 py-0.5 pr-6 outline-none focus:border-white">
+                              className="w-32 appearance-none bg-[#111] border-b-2 border-[#ecd987] text-base font-bold text-white px-2 py-1 pr-6 outline-none focus:border-white">
                               {row.options.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
                             </select>
-                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#B8A060] text-xs pointer-events-none">v</span>
+                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#ecd987] text-xs pointer-events-none">v</span>
                           </div>
                         ) : (
                           <div className="relative inline-flex items-center">
-                            <span className="absolute left-2 text-[#B8A060] text-xs font-bold">{'>'}</span>
                             <input type="number" value={data[row.key]} min={row.min} max={row.max} step={row.step}
                               onChange={(e) => handleChange(row.key, Number(e.target.value))}
-                              className="w-32 bg-[#111] border-b-2 border-[#B8A060] text-sm font-mono text-white pl-5 pr-2 py-0.5 text-right outline-none focus:border-white" />
+                              className="w-32 bg-[#111] border-b-2 border-[#ecd987] text-base font-mono font-bold text-white px-2 py-1 text-right outline-none focus:border-white" />
                           </div>
                         )}
                       </td>
-                      <td className="px-2 py-1 text-xs text-[#888]">
+                      <td className="px-3 py-2 text-xs text-[#888]">
                         {row.url ? (
-                          <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#B8A060] hover:underline">{row.source}</a>
+                          <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#ecd987] hover:underline">{row.source}</a>
                         ) : (
                           row.source
                         )}
@@ -173,9 +171,9 @@ export default function WorldViewOpsPage() {
                   ))}
 
                   {/* WoC */}
-                  <tr className="border-b border-[#222] bg-[#0a0a0a]">
-                    <td colSpan={3} className="px-3 py-1">
-                      <span className="text-xs font-bold uppercase tracking-widest text-[#888]">Wisdom of the Crowd (z)</span>
+                  <tr className="border-y border-[#333] bg-[#161616]">
+                    <td colSpan={3} className="px-3 py-2">
+                      <span className="text-sm font-bold uppercase tracking-widest text-[#ecd987]">Wisdom of the Crowd (z)</span>
                     </td>
                   </tr>
                   {[
@@ -183,20 +181,19 @@ export default function WorldViewOpsPage() {
                     { key: 'retailZ', label: 'Retail Extremo', step: 0.1, min: -3, max: 3, source: 'DailyFX SSI, IG Sentiment' },
                   ].map((row) => (
                     <tr key={row.key} className="border-b border-[#222]">
-                      <td className="px-2 py-1">
-                        <span className="text-sm font-bold text-white uppercase tracking-wider">{row.label}</span>
+                      <td className="px-3 py-2">
+                        <span className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
                       </td>
-                      <td className="px-2 py-1">
+                      <td className="px-3 py-2">
                         <div className="relative inline-flex items-center">
-                          <span className="absolute left-2 text-[#B8A060] text-xs font-bold">{'>'}</span>
                           <input type="number" value={data[row.key]} min={row.min} max={row.max} step={row.step}
                             onChange={(e) => handleChange(row.key, Number(e.target.value))}
-                            className="w-32 bg-[#111] border-b-2 border-[#B8A060] text-sm font-mono text-white pl-5 pr-2 py-0.5 text-right outline-none focus:border-white" />
+                            className="w-32 bg-[#111] border-b-2 border-[#ecd987] text-base font-mono font-bold text-white px-2 py-1 text-right outline-none focus:border-white" />
                         </div>
                       </td>
-                      <td className="px-2 py-1 text-xs text-[#888]">
+                      <td className="px-3 py-2 text-xs text-[#888]">
                         {row.url ? (
-                          <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#B8A060] hover:underline">{row.source}</a>
+                          <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#ecd987] hover:underline">{row.source}</a>
                         ) : (
                           row.source
                         )}
@@ -205,9 +202,9 @@ export default function WorldViewOpsPage() {
                   ))}
 
                   {/* USD */}
-                  <tr className="border-b border-[#222] bg-[#0a0a0a]">
-                    <td colSpan={3} className="px-3 py-1">
-                      <span className="text-xs font-bold uppercase tracking-widest text-[#B8A060]">USD Bias</span>
+                  <tr className="border-y border-[#333] bg-[#161616]">
+                    <td colSpan={3} className="px-3 py-2">
+                      <span className="text-sm font-bold uppercase tracking-widest text-[#ecd987]">USD Bias</span>
                     </td>
                   </tr>
                   {[
@@ -216,30 +213,29 @@ export default function WorldViewOpsPage() {
                     { key: 'dxyRising', label: 'Tendencia', type: 'select', options: [{ value: 1, label: 'RISING' }, { value: 0, label: 'FALLING' }], source: 'Bloomberg / ICE' },
                   ].map((row) => (
                     <tr key={row.key} className="border-b border-[#222]">
-                      <td className="px-2 py-1">
-                        <span className="text-sm font-bold text-white uppercase tracking-wider">{row.label}</span>
+                      <td className="px-3 py-2">
+                        <span className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
                       </td>
-                      <td className="px-2 py-1">
+                      <td className="px-3 py-2">
                         {row.type === 'select' ? (
                           <div className="relative inline-block w-32">
                             <select value={data[row.key]} onChange={(e) => handleChange(row.key, Number(e.target.value))}
-                              className="w-32 appearance-none bg-[#111] border-b-2 border-[#B8A060] text-sm text-white px-2 py-0.5 pr-6 outline-none focus:border-white">
+                              className="w-32 appearance-none bg-[#111] border-b-2 border-[#ecd987] text-base font-bold text-white px-2 py-1 pr-6 outline-none focus:border-white">
                               {row.options.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
                             </select>
-                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#B8A060] text-xs pointer-events-none">v</span>
+                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#ecd987] text-xs pointer-events-none">v</span>
                           </div>
                         ) : (
                           <div className="relative inline-flex items-center">
-                            <span className="absolute left-2 text-[#B8A060] text-xs font-bold">{'>'}</span>
                             <input type="number" value={data[row.key]} min={row.min} max={row.max} step={row.step}
                               onChange={(e) => handleChange(row.key, Number(e.target.value))}
-                              className="w-32 bg-[#111] border-b-2 border-[#B8A060] text-sm font-mono text-white pl-5 pr-2 py-0.5 text-right outline-none focus:border-white" />
+                              className="w-32 bg-[#111] border-b-2 border-[#ecd987] text-base font-mono font-bold text-white px-2 py-1 text-right outline-none focus:border-white" />
                           </div>
                         )}
                       </td>
-                      <td className="px-2 py-1 text-xs text-[#888]">
+                      <td className="px-3 py-2 text-xs text-[#888]">
                         {row.url ? (
-                          <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#B8A060] hover:underline">{row.source}</a>
+                          <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#ecd987] hover:underline">{row.source}</a>
                         ) : (
                           row.source
                         )}
@@ -248,9 +244,9 @@ export default function WorldViewOpsPage() {
                   ))}
 
                   {/* Inflacion */}
-                  <tr className="border-b border-[#222] bg-[#0a0a0a]">
-                    <td colSpan={3} className="px-3 py-1">
-                      <span className="text-xs font-bold uppercase tracking-widest text-[#FF0000]">Inflacion Global (%)</span>
+                  <tr className="border-y border-[#333] bg-[#161616]">
+                    <td colSpan={3} className="px-3 py-2">
+                      <span className="text-sm font-bold uppercase tracking-widest text-[#f59e0b]">Inflacion Global (%)</span>
                     </td>
                   </tr>
                   {[
@@ -258,20 +254,19 @@ export default function WorldViewOpsPage() {
                     { key: 'breakevens', label: 'Breakevens 5Y5Y', step: 0.1, min: 0, max: 5, source: 'Bloomberg / Refinitiv' },
                   ].map((row) => (
                     <tr key={row.key} className="border-b border-[#222]">
-                      <td className="px-2 py-1">
-                        <span className="text-sm font-bold text-white uppercase tracking-wider">{row.label}</span>
+                      <td className="px-3 py-2">
+                        <span className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
                       </td>
-                      <td className="px-2 py-1">
+                      <td className="px-3 py-2">
                         <div className="relative inline-flex items-center">
-                          <span className="absolute left-2 text-[#B8A060] text-xs font-bold">{'>'}</span>
                           <input type="number" value={data[row.key]} min={row.min} max={row.max} step={row.step}
                             onChange={(e) => handleChange(row.key, Number(e.target.value))}
-                            className="w-32 bg-[#111] border-b-2 border-[#B8A060] text-sm font-mono text-white pl-5 pr-2 py-0.5 text-right outline-none focus:border-white" />
+                            className="w-32 bg-[#111] border-b-2 border-[#ecd987] text-base font-mono font-bold text-white px-2 py-1 text-right outline-none focus:border-white" />
                         </div>
                       </td>
-                      <td className="px-2 py-1 text-xs text-[#888]">
+                      <td className="px-3 py-2 text-xs text-[#888]">
                         {row.url ? (
-                          <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#B8A060] hover:underline">{row.source}</a>
+                          <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:text-[#ecd987] hover:underline">{row.source}</a>
                         ) : (
                           row.source
                         )}
@@ -284,7 +279,7 @@ export default function WorldViewOpsPage() {
 
             {/* Link a fuentes */}
             <div className="mt-3">
-              <Link to="/world-view#sources" className="text-sm text-[#B8A060] hover:underline uppercase tracking-wider">
+              <Link to="/world-view#sources" className="text-sm text-[#ecd987] hover:underline uppercase tracking-wider">
                 VER TABLA COMPLETA DE FUENTES {'->'}
               </Link>
             </div>

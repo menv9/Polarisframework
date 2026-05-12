@@ -6,7 +6,7 @@ export default function ModulesGrid() {
     <section id="modules" className="py-12 border-b-2 border-[#333]">
       <div className="max-w-6xl mx-auto px-4">
         <div className="mb-6">
-          <div className="text-sm text-[#555] uppercase tracking-widest mb-2">
+          <div className="text-sm text-[#777] uppercase tracking-widest mb-2">
             03_CAPA_1_FX_Macro
           </div>
           <h2 className="text-xl font-bold uppercase tracking-wider text-white mb-2">

@@ -28,7 +28,7 @@ export default function WorldViewSidebar({ mode }) {
       {/* Mobile toggle */}
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
-        className="lg:hidden fixed bottom-6 right-6 z-50 w-12 h-12 bg-[#B8A060] text-black flex items-center justify-center border-2 border-white font-bold text-sm"
+        className="lg:hidden fixed bottom-6 right-6 z-50 w-12 h-12 bg-[#ecd987] text-black flex items-center justify-center border-2 border-white font-bold text-sm"
       >
         {mobileOpen ? 'X' : 'MENU'}
       </button>
@@ -50,17 +50,17 @@ export default function WorldViewSidebar({ mode }) {
         <div className="p-4">
           <Link
             to="/"
-            className="inline-flex items-center gap-2 text-sm text-[#555] hover:text-[#B8A060] mb-4 uppercase tracking-wider"
+            className="inline-flex items-center gap-2 text-sm text-[#777] hover:text-[#ecd987] mb-4 uppercase tracking-wider"
           >
             {'<-'} Volver a Polaris
           </Link>
 
           <div className="mb-4 pb-4 border-b-2 border-[#333]">
-            <span className="text-sm font-bold tracking-widest uppercase text-[#B8A060] mb-1 block">
+            <span className="text-sm font-bold tracking-widest uppercase text-[#ecd987] mb-1 block">
               PARTE I
             </span>
             <h2 className="text-sm font-bold uppercase tracking-wider">WORLD VIEW</h2>
-            <p className="text-sm text-[#555] mt-1 uppercase tracking-wider">Regimen macro global</p>
+            <p className="text-sm text-[#777] mt-1 uppercase tracking-wider">Regimen macro global</p>
           </div>
 
           {/* Mode tabs */}
@@ -69,8 +69,8 @@ export default function WorldViewSidebar({ mode }) {
               to="/world-view"
               className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-bold uppercase tracking-wider ${
                 mode === 'theory'
-                  ? 'bg-[#111] text-[#B8A060]'
-                  : 'text-[#555] hover:text-white'
+                  ? 'bg-[#111] text-[#ecd987]'
+                  : 'text-[#777] hover:text-white'
               }`}
             >
               TEORIA
@@ -79,8 +79,8 @@ export default function WorldViewSidebar({ mode }) {
               to="/world-view/operativa"
               className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-bold uppercase tracking-wider ${
                 mode === 'ops'
-                  ? 'bg-[#111] text-[#B8A060]'
-                  : 'text-[#555] hover:text-white'
+                  ? 'bg-[#111] text-[#ecd987]'
+                  : 'text-[#777] hover:text-white'
               }`}
             >
               OPERATIVA

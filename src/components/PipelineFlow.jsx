@@ -12,7 +12,7 @@ export default function PipelineFlow() {
     <section id="pipeline" className="py-12 border-b-2 border-[#333]">
       <div className="max-w-6xl mx-auto px-4">
         <div className="mb-6">
-          <div className="text-sm text-[#555] uppercase tracking-widest mb-2">
+          <div className="text-sm text-[#777] uppercase tracking-widest mb-2">
             Flujo de Datos
           </div>
           <h2 className="text-xl font-bold uppercase tracking-wider text-white mb-2">
@@ -28,53 +28,53 @@ export default function PipelineFlow() {
           <StageCard stage={pipelineStages[0]} activeModule={activeModule} onEnter={handleEnter} onLeave={handleLeave} />
 
           <div className="hidden lg:flex items-center justify-center w-8 h-24">
-            <span className="text-[#555] text-sm font-bold">{'->'}</span>
+            <span className="text-[#777] text-sm font-bold">{'->'}</span>
           </div>
           <div className="flex lg:hidden items-center justify-center h-8 w-full border-l-2 border-[#333] ml-6">
-            <span className="text-[#555] text-sm font-bold">v</span>
+            <span className="text-[#777] text-sm font-bold">v</span>
           </div>
 
           <div className="flex flex-col sm:flex-row items-start gap-0 p-0 border-2 border-[#333] bg-black">
             <StageCard stage={pipelineStages[1]} activeModule={activeModule} onEnter={handleEnter} onLeave={handleLeave} />
             <div className="hidden sm:flex items-center justify-center w-8 h-24">
-              <span className="text-[#555] text-sm font-bold">{'->'}</span>
+              <span className="text-[#777] text-sm font-bold">{'->'}</span>
             </div>
             <div className="flex sm:hidden items-center justify-center h-8 w-full border-l-2 border-[#333] ml-6">
-              <span className="text-[#555] text-sm font-bold">v</span>
+              <span className="text-[#777] text-sm font-bold">v</span>
             </div>
             <StageCard stage={pipelineStages[2]} activeModule={activeModule} onEnter={handleEnter} onLeave={handleLeave} />
           </div>
 
           <div className="hidden lg:flex items-center justify-center w-8 h-24">
-            <span className="text-[#555] text-sm font-bold">{'->'}</span>
+            <span className="text-[#777] text-sm font-bold">{'->'}</span>
           </div>
           <div className="flex lg:hidden items-center justify-center h-8 w-full border-l-2 border-[#333] ml-6">
-            <span className="text-[#555] text-sm font-bold">v</span>
+            <span className="text-[#777] text-sm font-bold">v</span>
           </div>
 
           <StageCard stage={pipelineStages[3]} activeModule={activeModule} onEnter={handleEnter} onLeave={handleLeave} />
 
           <div className="hidden lg:flex items-center justify-center w-8 h-24">
-            <span className="text-[#555] text-sm font-bold">{'->'}</span>
+            <span className="text-[#777] text-sm font-bold">{'->'}</span>
           </div>
           <div className="flex lg:hidden items-center justify-center h-8 w-full border-l-2 border-[#333] ml-6">
-            <span className="text-[#555] text-sm font-bold">v</span>
+            <span className="text-[#777] text-sm font-bold">v</span>
           </div>
 
           <StageCard stage={pipelineStages[4]} activeModule={activeModule} onEnter={handleEnter} onLeave={handleLeave} />
 
           <div className="hidden lg:flex items-center justify-center w-8 h-24">
-            <span className="text-[#555] text-sm font-bold">{'->'}</span>
+            <span className="text-[#777] text-sm font-bold">{'->'}</span>
           </div>
           <div className="flex lg:hidden items-center justify-center h-8 w-full border-l-2 border-[#333] ml-6">
-            <span className="text-[#555] text-sm font-bold">v</span>
+            <span className="text-[#777] text-sm font-bold">v</span>
           </div>
 
           <StageCard stage={pipelineStages[5]} activeModule={activeModule} onEnter={handleEnter} onLeave={handleLeave} />
         </div>
 
         {/* Feedback Loop */}
-        <div className="relative flex flex-col items-start gap-0 p-4 border-2 border-dashed border-[#555] bg-black mt-4">
+        <div className="relative flex flex-col items-start gap-0 p-4 border-2 border-dashed border-[#666] bg-black mt-4">
           <div className="absolute -top-2 left-6 w-4 h-2 bg-black" />
           <StageCard
             stage={{ id: 'selfawareness', label: 'SELF-AWARENESS', part: 'VI', desc: 'Feedback loop continuo' }}
@@ -83,7 +83,7 @@ export default function PipelineFlow() {
             onLeave={handleLeave}
             isFeedback
           />
-          <span className="font-mono text-sm text-[#555] tracking-wider mt-2">
+          <span className="font-mono text-sm text-[#777] tracking-wider mt-2">
             {'<-- FEEDBACK A TODOS LOS MODULOS <--'}
           </span>
         </div>
@@ -101,12 +101,12 @@ function StageCard({ stage, activeModule, onEnter, onLeave, isFeedback }) {
       isActive
         ? isFeedback
           ? 'border-white bg-[#111]'
-          : 'border-[#B8A060] bg-[#111]'
-        : 'border-[#333] bg-black hover:border-[#555]'
+          : 'border-[#ecd987] bg-[#111]'
+        : 'border-[#333] bg-black hover:border-[#666]'
     }`}>
-      <div className="font-mono text-sm text-[#555] mb-1">{stage.part}</div>
+      <div className="font-mono text-sm text-[#777] mb-1">{stage.part}</div>
       <h4 className="text-sm font-bold text-white uppercase tracking-wider">{stage.label}</h4>
-      <p className="text-sm text-[#555] mt-1">{stage.desc}</p>
+      <p className="text-sm text-[#777] mt-1">{stage.desc}</p>
     </div>
   )
 
