@@ -3,6 +3,7 @@ import Navbar from './components/Navbar'
 import HomePage from './pages/HomePage'
 import WorldViewTheoryPage from './pages/WorldViewTheoryPage'
 import WorldViewOpsPage from './pages/WorldViewOpsPage'
+import DataPage from './pages/DataPage'
 
 export default function AppRoutes() {
   return (
@@ -12,6 +13,7 @@ export default function AppRoutes() {
         <Route path="/" element={<HomePage />} />
         <Route path="/world-view" element={<WorldViewTheoryPage />} />
         <Route path="/world-view/operativa" element={<WorldViewOpsPage />} />
+        <Route path="/data" element={<DataPage />} />
       </Routes>
     </div>
   )

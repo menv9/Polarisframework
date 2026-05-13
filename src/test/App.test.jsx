@@ -58,6 +58,18 @@ describe('App', () => {
     expect(screen.getByText('OPERATIVA — WORLD VIEW')).toBeInTheDocument()
     expect(screen.getByText('WorldView State Vector')).toBeInTheDocument()
   })
+
+  it('renders data control center page', () => {
+    render(
+      <MemoryRouter initialEntries={['/data']}>
+        <AppRoutes />
+      </MemoryRouter>
+    )
+    expect(screen.getByText('CENTRO DE CONTROL — DATOS')).toBeInTheDocument()
+    expect(screen.getByText('REFRESH DESACTUALIZADOS')).toBeInTheDocument()
+    expect(screen.getByText('Actualizados')).toBeInTheDocument()
+    expect(screen.getByText('Desactualizados')).toBeInTheDocument()
+  })
 })
 
 
