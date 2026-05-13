@@ -523,6 +523,23 @@ async function fetchImfLatest(dataset, seriesKey, startPeriod = '2000') {
   })
 }
 
+async function fetchWorldBankLatest(country, indicator) {
+  const url = `https://api.worldbank.org/v2/country/${encodeURIComponent(country)}/indicator/${encodeURIComponent(indicator)}?format=json&per_page=20&date=2010:2026`
+  const { data } = await axios.get(url, { timeout: 20000 })
+  const observations = Array.isArray(data) ? data[1] : null
+  if (!Array.isArray(observations)) throw new Error(`No World Bank data for ${country}/${indicator}`)
+  const latest = observations.find((obs) => obs && obs.value !== null && obs.value !== undefined)
+  if (!latest) throw new Error(`No World Bank observations for ${country}/${indicator}`)
+  return normalizeLatest({
+    provider: 'worldbank',
+    seriesId: `${indicator}/${country}`,
+    date: latest.date,
+    value: Number(latest.value),
+    raw: latest.value,
+    meta: { indicator, country, countryName: latest.country?.value },
+  })
+}
+
 async function fetchBankOfCanadaPolicyRate() {
   const url = 'https://www.bankofcanada.ca/valet/observations/V39079/json'
   const { data } = await axios.get(url, { timeout: 15000 })
@@ -764,6 +781,17 @@ app.get('/api/source/imf/latest', async (req, res) => {
     res.json(await fetchImfLatest(String(req.query.dataset), String(req.query.seriesKey), String(req.query.startPeriod || '2000')))
   } catch (err) {
     res.status(502).json({ error: 'IMF fetch failed', message: err.message })
+  }
+})
+
+app.get('/api/source/worldbank/latest', async (req, res) => {
+  try {
+    if (!req.query.country || !req.query.indicator) {
+      return res.status(400).json({ error: 'country and indicator required' })
+    }
+    res.json(await fetchWorldBankLatest(String(req.query.country), String(req.query.indicator)))
+  } catch (err) {
+    res.status(502).json({ error: 'World Bank fetch failed', message: err.message })
   }
 })
 

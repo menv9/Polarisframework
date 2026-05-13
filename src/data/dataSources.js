@@ -2277,27 +2277,27 @@ const SOURCE_OVERRIDES = {
   // Policy rates — 7 países vía FRED (series OECD immediate rates o tasa oficial)
   endo_jpn_policy: { scraper: 'fred', fredSeriesId: 'IRSTCI01JPM156N' },
   endo_gbr_policy: { scraper: 'fred', fredSeriesId: 'IRSTCI01GBM156N' },
-  endo_che_policy: { apiPath: '/api/source/oecd/latest?url=https%3A%2F%2Fstats.oecd.org%2FSDMX-JSON%2Fdata%2FMEI_FIN%2FIRSTCI01%2BCHE.M%2FOECD%3FlastObservations%3D1' },
+  endo_che_policy: { scraper: 'fred', fredSeriesId: 'IRSTCI01CHM156N' },
   endo_aus_policy: { scraper: 'fred', fredSeriesId: 'IRSTCI01AUM156N' },
   endo_nzl_policy: { scraper: 'fred', fredSeriesId: 'IRSTCI01NZM156N' },
-  endo_swe_policy: { apiPath: '/api/source/oecd/latest?url=https%3A%2F%2Fstats.oecd.org%2FSDMX-JSON%2Fdata%2FMEI_FIN%2FIRSTCI01%2BSWE.M%2FOECD%3FlastObservations%3D1' },
+  endo_swe_policy: { scraper: 'fred', fredSeriesId: 'IRSTCI01SEM156N' },
   endo_nor_policy: { scraper: 'fred', fredSeriesId: 'IRSTCI01NOM156N' },
   // Unemployment rate (OECD harmonized) — 9 países vía FRED
   endo_eur_empl: { scraper: 'fred', fredSeriesId: 'LRHUTTTTEZM156S' },
   endo_jpn_empl: { scraper: 'fred', fredSeriesId: 'LRHUTTTTJPM156S' },
   endo_gbr_empl: { scraper: 'fred', fredSeriesId: 'LRHUTTTTGBM156S' },
-  endo_che_empl: { apiPath: '/api/source/oecd/latest?url=https%3A%2F%2Fstats.oecd.org%2FSDMX-JSON%2Fdata%2FLRHUTTTT%2FCHE.TOT.PC_LB.M%2FOECD%3FlastObservations%3D1' },
+  endo_che_empl: { scraper: 'fred', fredSeriesId: 'LRHUTTTTCHQ156S' },
   endo_can_empl: { scraper: 'fred', fredSeriesId: 'LRHUTTTTCAM156S' },
   endo_aus_empl: { scraper: 'fred', fredSeriesId: 'LRHUTTTTAUM156S' },
-  endo_nzl_empl: { apiPath: '/api/source/oecd/latest?url=https%3A%2F%2Fstats.oecd.org%2FSDMX-JSON%2Fdata%2FLRHUTTTT%2FNZL.TOT.PC_LB.M%2FOECD%3FlastObservations%3D1' },
+  endo_nzl_empl: { scraper: 'fred', fredSeriesId: 'LRHUTTTTNZQ156S' },
   endo_swe_empl: { scraper: 'fred', fredSeriesId: 'LRHUTTTTSEM156S' },
   endo_nor_empl: { scraper: 'fred', fredSeriesId: 'LRHUTTTTNOM156S' },
   // JPN CPI — World Bank annual YoY via FRED (JPNCPIALLMINMEI doesn't exist in FRED)
   endo_jpn_cpi: { scraper: 'fred', fredSeriesId: 'FPCPITOTLZGJPN' },
   // EUR Debt/GDP via Eurostat
   endo_eur_debt: { apiPath: '/api/source/eurostat/latest/gov_10dd_edpt1?geo=EA20&na_item=GD&sector=S13&unit=PC_GDP' },
-  // USA CA/GDP via IMF
-  endo_usa_ca_gdp: { apiPath: '/api/source/imf/latest?dataset=IFS&seriesKey=A.US.BCA_NGDPD' },
+  // USA CA/GDP via World Bank
+  endo_usa_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=USA&indicator=BN.CAB.XOKA.GD.ZS' },
   // 10Y nominal govt bond yields como proxy de 10Y real yield (9 países)
   endo_eur_10y_real: { scraper: 'fred', fredSeriesId: 'IRLTLT01EZM156N' },
   endo_jpn_10y_real: { scraper: 'fred', fredSeriesId: 'IRLTLT01JPM156N' },
@@ -2316,25 +2316,25 @@ const SOURCE_OVERRIDES = {
   endo_nzl_real_2y: { apiPath: '/api/fred/real-rate?policy=IRSTCI01NZM156N&cpi=CPALTT01NZQ659N&cpiraw=true' },
   endo_nor_real_2y: { apiPath: '/api/fred/real-rate?policy=IRSTCI01NOM156N&cpi=NORCPIALLMINMEI' },
   endo_che_real_2y: { apiPath: '/api/fred/real-rate?policy=IRSTCI01CHM156N&cpi=CHECPIALLMINMEI' },
-  // IMF CA/GDP (IFS, annual, % of GDP)
-  endo_eur_ca_gdp: { apiPath: '/api/source/imf/latest?dataset=IFS&seriesKey=A.U2.BCA_NGDPD' },
-  endo_jpn_ca_gdp: { apiPath: '/api/source/imf/latest?dataset=IFS&seriesKey=A.JP.BCA_NGDPD' },
-  endo_gbr_ca_gdp: { apiPath: '/api/source/imf/latest?dataset=IFS&seriesKey=A.GB.BCA_NGDPD' },
-  endo_che_ca_gdp: { apiPath: '/api/source/imf/latest?dataset=IFS&seriesKey=A.CH.BCA_NGDPD' },
-  endo_can_ca_gdp: { apiPath: '/api/source/imf/latest?dataset=IFS&seriesKey=A.CA.BCA_NGDPD' },
-  endo_aus_ca_gdp: { apiPath: '/api/source/imf/latest?dataset=IFS&seriesKey=A.AU.BCA_NGDPD' },
-  endo_nzl_ca_gdp: { apiPath: '/api/source/imf/latest?dataset=IFS&seriesKey=A.NZ.BCA_NGDPD' },
-  endo_swe_ca_gdp: { apiPath: '/api/source/imf/latest?dataset=IFS&seriesKey=A.SE.BCA_NGDPD' },
-  endo_nor_ca_gdp: { apiPath: '/api/source/imf/latest?dataset=IFS&seriesKey=A.NO.BCA_NGDPD' },
-  // IMF Govt Debt/GDP (HPDD, annual)
-  endo_jpn_debt: { apiPath: '/api/source/imf/latest?dataset=HPDD&seriesKey=A.JPN.GGXWDG_NGDP' },
-  endo_gbr_debt: { apiPath: '/api/source/imf/latest?dataset=HPDD&seriesKey=A.GBR.GGXWDG_NGDP' },
-  endo_che_debt: { apiPath: '/api/source/imf/latest?dataset=HPDD&seriesKey=A.CHE.GGXWDG_NGDP' },
-  endo_can_debt: { apiPath: '/api/source/imf/latest?dataset=HPDD&seriesKey=A.CAN.GGXWDG_NGDP' },
-  endo_aus_debt: { apiPath: '/api/source/imf/latest?dataset=HPDD&seriesKey=A.AUS.GGXWDG_NGDP' },
-  endo_nzl_debt: { apiPath: '/api/source/imf/latest?dataset=HPDD&seriesKey=A.NZL.GGXWDG_NGDP' },
-  endo_swe_debt: { apiPath: '/api/source/imf/latest?dataset=HPDD&seriesKey=A.SWE.GGXWDG_NGDP' },
-  endo_nor_debt: { apiPath: '/api/source/imf/latest?dataset=HPDD&seriesKey=A.NOR.GGXWDG_NGDP' },
+  // World Bank CA/GDP (annual, % of GDP)
+  endo_eur_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=EMU&indicator=BN.CAB.XOKA.GD.ZS' },
+  endo_jpn_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=JPN&indicator=BN.CAB.XOKA.GD.ZS' },
+  endo_gbr_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=GBR&indicator=BN.CAB.XOKA.GD.ZS' },
+  endo_che_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=CHE&indicator=BN.CAB.XOKA.GD.ZS' },
+  endo_can_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=CAN&indicator=BN.CAB.XOKA.GD.ZS' },
+  endo_aus_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=AUS&indicator=BN.CAB.XOKA.GD.ZS' },
+  endo_nzl_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=NZL&indicator=BN.CAB.XOKA.GD.ZS' },
+  endo_swe_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=SWE&indicator=BN.CAB.XOKA.GD.ZS' },
+  endo_nor_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=NOR&indicator=BN.CAB.XOKA.GD.ZS' },
+  // World Bank Central Govt Debt/GDP (annual)
+  endo_jpn_debt: { apiPath: '/api/source/worldbank/latest?country=JPN&indicator=GC.DOD.TOTL.GD.ZS' },
+  endo_gbr_debt: { apiPath: '/api/source/worldbank/latest?country=GBR&indicator=GC.DOD.TOTL.GD.ZS' },
+  endo_che_debt: { apiPath: '/api/source/worldbank/latest?country=CHE&indicator=GC.DOD.TOTL.GD.ZS' },
+  endo_can_debt: { apiPath: '/api/source/worldbank/latest?country=CAN&indicator=GC.DOD.TOTL.GD.ZS' },
+  endo_aus_debt: { apiPath: '/api/source/worldbank/latest?country=AUS&indicator=GC.DOD.TOTL.GD.ZS' },
+  endo_nzl_debt: { apiPath: '/api/source/worldbank/latest?country=NZL&indicator=GC.DOD.TOTL.GD.ZS' },
+  endo_swe_debt: { apiPath: '/api/source/worldbank/latest?country=SWE&indicator=GC.DOD.TOTL.GD.ZS' },
+  endo_nor_debt: { apiPath: '/api/source/worldbank/latest?country=NOR&indicator=GC.DOD.TOTL.GD.ZS' },
 }
 
 const DATA_QUALITY_OVERRIDES = {
