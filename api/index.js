@@ -650,15 +650,16 @@ app.get('/api/fred/real-rate', async (req, res) => {
   const cpiraw = req.query.cpiraw === 'true' // CPI series is already a YoY rate — use latest value directly
   if (!policy || !cpi) return res.status(400).json({ error: 'policy and cpi required' })
   try {
-    const policyObs = await fetchFredObservations(policy, 2)
-    const policyVal = Number.parseFloat(policyObs[0]?.value)
-    if (!Number.isFinite(policyVal)) throw new Error(`No valid policy rate for ${policy}`)
+    const policyObs = await fetchFredObservations(policy, 12)
+    const policyLatest = policyObs.find((obs) => Number.isFinite(Number.parseFloat(obs.value)))
+    if (!policyLatest) throw new Error(`No valid policy rate for ${policy}`)
+    const policyVal = Number.parseFloat(policyLatest.value)
     let cpiYoY
     if (cpiraw) {
-      const cpiObs = await fetchFredObservations(cpi, 2)
-      const cpiVal = Number.parseFloat(cpiObs[0]?.value)
-      if (!Number.isFinite(cpiVal)) throw new Error(`No valid CPI value for ${cpi}`)
-      cpiYoY = { value: cpiVal, date: cpiObs[0]?.date }
+      const cpiObs = await fetchFredObservations(cpi, 12)
+      const cpiLatest = cpiObs.find((obs) => Number.isFinite(Number.parseFloat(obs.value)))
+      if (!cpiLatest) throw new Error(`No valid CPI value for ${cpi}`)
+      cpiYoY = { value: Number.parseFloat(cpiLatest.value), date: cpiLatest.date }
     } else {
       cpiYoY = await (quarterly ? fetchFredYoYChangeQuarterly(cpi) : fetchFredYoYChange(cpi))
     }
@@ -666,7 +667,7 @@ app.get('/api/fred/real-rate', async (req, res) => {
     const realRate = Number((policyVal - cpiYoY.value).toFixed(2))
     res.json({
       value: realRate,
-      date: policyObs[0]?.date,
+      date: policyLatest.date,
       seriesId: `${policy}-real`,
       meta: { policyRate: policyVal, cpiYoY: cpiYoY.value },
     })
