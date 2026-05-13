@@ -4,6 +4,7 @@ import HomePage from './pages/HomePage'
 import WorldViewTheoryPage from './pages/WorldViewTheoryPage'
 import WorldViewOpsPage from './pages/WorldViewOpsPage'
 import DataPage from './pages/DataPage'
+import DashboardPage from './pages/DashboardPage'
 
 export default function AppRoutes() {
   return (
@@ -11,6 +12,7 @@ export default function AppRoutes() {
       <Navbar />
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/world-view" element={<WorldViewTheoryPage />} />
         <Route path="/world-view/operativa" element={<WorldViewOpsPage />} />
         <Route path="/data" element={<DataPage />} />

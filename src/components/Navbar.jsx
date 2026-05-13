@@ -26,6 +26,9 @@ export default function Navbar() {
               <a href="#architecture" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
                 Arquitectura
               </a>
+              <Link to="/dashboard" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
+                Dashboard
+              </Link>
               <Link to="/data" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
                 Data
               </Link>
@@ -34,6 +37,9 @@ export default function Navbar() {
             <>
               <Link to="/" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
                 Inicio
+              </Link>
+              <Link to="/dashboard" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
+                Dashboard
               </Link>
               <Link to="/data" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
                 Data
