@@ -83,7 +83,16 @@ async function fetchViaScrapingAnt(targetUrl) {
 
 async function scrapeTradingEconomics(countrySlug) {
   const url = `https://tradingeconomics.com/${countrySlug}/indicators`
-  const { data: html } = await axios.get(url, { headers: browserHeaders, timeout: 5000 })
+
+  let html
+  try {
+    html = await fetchViaScrapingAnt(url)
+  } catch (antErr) {
+    console.log(`[SCRAPINGANT] Failed for country ${countrySlug}: ${antErr.message}. Falling back.`)
+    const { data } = await axios.get(url, { headers: browserHeaders, timeout: 5000 })
+    html = data
+  }
+
   const $ = cheerio.load(html)
 
   const indicators = []
