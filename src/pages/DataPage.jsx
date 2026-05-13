@@ -375,14 +375,15 @@ export default function DataPage() {
           <table className="w-full text-sm table-fixed">
             <thead>
               <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#777]">
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[20%]">Indicador</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[10%]">Categoria</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[18%]">Indicador</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[8%]">Categoria</th>
                 <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[8%]">Scraper</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[10%]">Frec</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[10%]">Ultima</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[10%]">Proxima</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[8%]">Estado</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[24%]">Fuente / Accion</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[8%]">Frec</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[9%]">Ultima</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[9%]">Proxima</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[7%]">Estado</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[8%]">Dato</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[25%]">Fuente / Accion</th>
               </tr>
             </thead>
             {Object.entries(topGroups).map(([topGroup, subModules]) => {
@@ -395,7 +396,7 @@ export default function DataPage() {
                     className="bg-[#000] border-b-2 border-[#333] cursor-pointer select-none hover:bg-[#0a0a0a]"
                     onClick={() => toggleGroup(topGroup)}
                   >
-                    <td colSpan={8} className="px-3 py-2.5">
+                    <td colSpan={9} className="px-3 py-2.5">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <span className="text-sm font-bold uppercase tracking-widest text-white">
@@ -419,7 +420,7 @@ export default function DataPage() {
                         {/* Submodule header */}
                         <tr className="bg-[#0a0a0a] border-b border-[#333]">
                           <td
-                            colSpan={8}
+                            colSpan={9}
                             className="px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-[#a3a3a3]"
                           >
                             {moduleName.replace(topGroup + ' — ', '')}
@@ -461,6 +462,11 @@ export default function DataPage() {
                               <td className="px-2 py-1.5">
                                 <span className={`text-xs font-bold uppercase tracking-wider ${status.color}`}>
                                   {status.label}
+                                </span>
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <span className="text-xs font-mono font-bold text-white">
+                                  {source._scrapedValue ? source._scrapedValue.split(': ')[1] || source._scrapedValue : '--'}
                                 </span>
                               </td>
                               <td className="px-2 py-1.5">
