@@ -80,14 +80,23 @@ export default function DataPage() {
     return matchModule && matchCategory
   })
 
-  // Group filtered results by module for table rendering
-  const grouped = useMemo(() => {
-    return filtered.reduce((acc, s) => {
-      if (!acc[s.module]) acc[s.module] = []
-      acc[s.module].push(s)
+  // Extract top-level module groups (World View, Endogenous, Exogenous)
+  const topGroups = useMemo(() => {
+    const groups = filtered.reduce((acc, s) => {
+      const top = s.module.split(' — ')[0]
+      if (!acc[top]) acc[top] = {}
+      if (!acc[top][s.module]) acc[top][s.module] = []
+      acc[top][s.module].push(s)
       return acc
     }, {})
+    return groups
   }, [filtered])
+
+  // Collapsible state for top-level groups
+  const [collapsed, setCollapsed] = useState({})
+  const toggleGroup = (group) => {
+    setCollapsed((prev) => ({ ...prev, [group]: !prev[group] }))
+  }
 
   const updateField = (id, field, value) => {
     setSources((prev) => prev.map((s) => (s.id === id ? { ...s, [field]: value } : s)))
@@ -333,114 +342,146 @@ export default function DataPage() {
                 <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[24%]">Fuente / Accion</th>
               </tr>
             </thead>
-            {Object.entries(grouped).map(([moduleName, items]) => (
-              <tbody key={moduleName}>
-                {/* Module section header */}
-                <tr className="bg-[#0a0a0a] border-b border-[#333]">
-                  <td
-                    colSpan={8}
-                    className="px-3 py-2 text-xs font-bold uppercase tracking-widest text-[#ecd987]"
+            {Object.entries(topGroups).map(([topGroup, subModules]) => {
+              const isCollapsed = collapsed[topGroup]
+              const groupCount = Object.values(subModules).flat().length
+              return (
+                <tbody key={topGroup}>
+                  {/* TOP-LEVEL ACCORDION HEADER */}
+                  <tr
+                    className="bg-[#000] border-b-2 border-[#333] cursor-pointer select-none hover:bg-[#0a0a0a]"
+                    onClick={() => toggleGroup(topGroup)}
                   >
-                    {moduleName}
-                    <span className="ml-2 text-[#555]">({items.length})</span>
-                  </td>
-                </tr>
-                {items.map((source) => {
-                  const status = getStatus(source)
-                  const nextUpdate = getNextUpdate(source.lastUpdate, source.frequencyDays)
-                  const isStale = status.code === 'stale'
-                  const isLoading = loadingId === source.id
-
-                  return (
-                    <tr
-                      key={source.id}
-                      className={`border-b border-[#222] ${isStale ? 'bg-[#1a0a0a]' : ''}`}
-                    >
-                      <td className="px-2 py-1.5">
-                        <span className="text-sm font-bold text-white uppercase tracking-wider">{source.indicator}</span>
-                        <div className="text-[10px] text-[#555] mt-0.5">{source.notes}</div>
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <span className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider">{source.category}</span>
-                      </td>
-                      <td className="px-2 py-1.5">
-                        {scraperBadge(source.scraper)}
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <span className="text-xs text-[#888] uppercase">{source.frequency}</span>
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <span className="text-xs font-mono text-[#888]">{source.lastUpdate}</span>
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <span className={`text-xs font-mono ${isStale ? 'text-[#ef4444]' : 'text-[#888]'}`}>
-                          {nextUpdate}
-                        </span>
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <span className={`text-xs font-bold uppercase tracking-wider ${status.color}`}>
-                          {status.label}
-                        </span>
-                      </td>
-                      <td className="px-2 py-1.5">
-                        {/* Editable URL */}
-                        <div className="mb-1.5">
-                          <input
-                            type="text"
-                            value={source.scrapeUrl || ''}
-                            onChange={(e) => {
-                              const val = e.target.value
-                              const isTE = isTradingEconomicsUrl(val)
-                              setSources((prev) =>
-                                prev.map((s) =>
-                                  s.id === source.id
-                                    ? { ...s, scrapeUrl: val, scraper: isTE ? 'trading-economics' : s.scraper }
-                                    : s
-                                )
-                              )
-                            }}
-                            placeholder="https://tradingeconomics.com/..."
-                            className="w-full bg-[#111] border-b-2 border-[#ecd987] text-xs text-white font-mono px-1.5 py-1 outline-none focus:border-white focus:bg-[#1a1a0d]"
-                          />
+                    <td colSpan={8} className="px-3 py-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-bold uppercase tracking-widest text-white">
+                            {isCollapsed ? '[+]' : '[-]'}
+                          </span>
+                          <span className="text-sm font-bold uppercase tracking-widest text-[#ecd987]">
+                            {topGroup}
+                          </span>
+                          <span className="text-xs text-[#555]">({groupCount})</span>
                         </div>
-                        {/* Scrape preview */}
-                        {source._scrapedValue && (
-                          <div className="text-[10px] text-[#4ade80] font-mono mb-1">
-                            {source._scrapedValue}
-                          </div>
-                        )}
-                        {/* Action buttons */}
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => refreshSource(source.id)}
-                            disabled={isLoading}
-                            className={`text-xs font-bold uppercase tracking-wider border-b-2 px-2 py-0.5 ${
-                              isLoading
-                                ? 'border-[#333] text-[#555] cursor-not-allowed'
-                                : isStale
-                                  ? 'border-[#ef4444] text-[#ef4444] hover:text-white hover:border-white'
-                                  : 'border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white'
-                            }`}
+                        <span className="text-[10px] text-[#555] uppercase tracking-wider">
+                          {isCollapsed ? 'Click para expandir' : 'Click para colapsar'}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                  {/* SUB-MODULES (only when not collapsed) */}
+                  {!isCollapsed &&
+                    Object.entries(subModules).map(([moduleName, items]) => (
+                      <>
+                        {/* Submodule header */}
+                        <tr className="bg-[#0a0a0a] border-b border-[#333]">
+                          <td
+                            colSpan={8}
+                            className="px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-[#a3a3a3]"
                           >
-                            {isLoading ? '...' : 'REFRESH'}
-                          </button>
-                          {source.scrapeUrl && (
-                            <a
-                              href={source.scrapeUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[10px] text-[#777] hover:text-[#ecd987] border-b border-[#333] hover:border-[#ecd987]"
+                            {moduleName.replace(topGroup + ' — ', '')}
+                            <span className="ml-2 text-[#555]">({items.length})</span>
+                          </td>
+                        </tr>
+                        {items.map((source) => {
+                          const status = getStatus(source)
+                          const nextUpdate = getNextUpdate(source.lastUpdate, source.frequencyDays)
+                          const isStale = status.code === 'stale'
+                          const isLoading = loadingId === source.id
+
+                          return (
+                            <tr
+                              key={source.id}
+                              className={`border-b border-[#222] ${isStale ? 'bg-[#1a0a0a]' : ''}`}
                             >
-                              [EXT]
-                            </a>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            ))}
+                              <td className="px-2 py-1.5">
+                                <span className="text-sm font-bold text-white uppercase tracking-wider">{source.indicator}</span>
+                                <div className="text-[10px] text-[#555] mt-0.5">{source.notes}</div>
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <span className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider">{source.category}</span>
+                              </td>
+                              <td className="px-2 py-1.5">
+                                {scraperBadge(source.scraper)}
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <span className="text-xs text-[#888] uppercase">{source.frequency}</span>
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <span className="text-xs font-mono text-[#888]">{source.lastUpdate}</span>
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <span className={`text-xs font-mono ${isStale ? 'text-[#ef4444]' : 'text-[#888]'}`}>
+                                  {nextUpdate}
+                                </span>
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <span className={`text-xs font-bold uppercase tracking-wider ${status.color}`}>
+                                  {status.label}
+                                </span>
+                              </td>
+                              <td className="px-2 py-1.5">
+                                {/* Editable URL */}
+                                <div className="mb-1.5">
+                                  <input
+                                    type="text"
+                                    value={source.scrapeUrl || ''}
+                                    onChange={(e) => {
+                                      const val = e.target.value
+                                      const isTE = isTradingEconomicsUrl(val)
+                                      setSources((prev) =>
+                                        prev.map((s) =>
+                                          s.id === source.id
+                                            ? { ...s, scrapeUrl: val, scraper: isTE ? 'trading-economics' : s.scraper }
+                                            : s
+                                        )
+                                      )
+                                    }}
+                                    placeholder="https://tradingeconomics.com/..."
+                                    className="w-full bg-[#111] border-b-2 border-[#ecd987] text-xs text-white font-mono px-1.5 py-1 outline-none focus:border-white focus:bg-[#1a1a0d]"
+                                  />
+                                </div>
+                                {/* Scrape preview */}
+                                {source._scrapedValue && (
+                                  <div className="text-[10px] text-[#4ade80] font-mono mb-1">
+                                    {source._scrapedValue}
+                                  </div>
+                                )}
+                                {/* Action buttons */}
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => refreshSource(source.id)}
+                                    disabled={isLoading}
+                                    className={`text-xs font-bold uppercase tracking-wider border-b-2 px-2 py-0.5 ${
+                                      isLoading
+                                        ? 'border-[#333] text-[#555] cursor-not-allowed'
+                                        : isStale
+                                          ? 'border-[#ef4444] text-[#ef4444] hover:text-white hover:border-white'
+                                          : 'border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white'
+                                    }`}
+                                  >
+                                    {isLoading ? '...' : 'REFRESH'}
+                                  </button>
+                                  {source.scrapeUrl && (
+                                    <a
+                                      href={source.scrapeUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-[10px] text-[#777] hover:text-[#ecd987] border-b border-[#333] hover:border-[#ecd987]"
+                                    >
+                                      [EXT]
+                                    </a>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </>
+                    ))}
+                </tbody>
+              )
+            })}
           </table>
         </div>
 
