@@ -2,11 +2,25 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { dataSources, getNextUpdate, getStatus, countByStatus } from '../data/dataSources'
 
+async function scrapeTradingEconomics(url) {
+  const res = await fetch('/api/scrape', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || res.statusText)
+  }
+  return res.json()
+}
+
 export default function DataPage() {
   const [sources, setSources] = useState(dataSources)
   const [loadingAll, setLoadingAll] = useState(false)
   const [loadingId, setLoadingId] = useState(null)
   const [lastGlobalRefresh, setLastGlobalRefresh] = useState(null)
+  const [scrapeLog, setScrapeLog] = useState(null)
 
   const counts = useMemo(() => countByStatus(sources), [sources])
 
@@ -17,31 +31,79 @@ export default function DataPage() {
     ? sources
     : sources.filter((s) => s.category === activeFilter)
 
-  const refreshSource = (id) => {
-    setLoadingId(id)
-    setTimeout(() => {
-      setSources((prev) =>
-        prev.map((s) =>
-          s.id === id ? { ...s, lastUpdate: new Date().toISOString().split('T')[0] } : s
-        )
-      )
-      setLoadingId(null)
-    }, 800)
+  const updateField = (id, field, value) => {
+    setSources((prev) => prev.map((s) => (s.id === id ? { ...s, [field]: value } : s)))
   }
 
-  const refreshAllStale = () => {
+  const refreshSource = async (id) => {
+    const source = sources.find((s) => s.id === id)
+    if (!source) return
+
+    setLoadingId(id)
+    setScrapeLog(null)
+
+    try {
+      if (source.scraper === 'trading-economics' && source.scrapeUrl) {
+        const result = await scrapeTradingEconomics(source.scrapeUrl)
+        const today = new Date().toISOString().split('T')[0]
+        setSources((prev) =>
+          prev.map((s) =>
+            s.id === id
+              ? { ...s, lastUpdate: today, _lastScrape: result }
+              : s
+          )
+        )
+        setScrapeLog({ id, result })
+      } else {
+        // Para API/manual: solo marca como actualizado (hoy)
+        const today = new Date().toISOString().split('T')[0]
+        setSources((prev) =>
+          prev.map((s) =>
+            s.id === id ? { ...s, lastUpdate: today } : s
+          )
+        )
+      }
+    } catch (err) {
+      console.error('Refresh failed:', err)
+      setScrapeLog({ id, error: err.message })
+    } finally {
+      setLoadingId(null)
+    }
+  }
+
+  const refreshAllStale = async () => {
     setLoadingAll(true)
-    setTimeout(() => {
-      const today = new Date().toISOString().split('T')[0]
-      setSources((prev) =>
-        prev.map((s) => {
-          const st = getStatus(s)
-          return st.code !== 'ok' ? { ...s, lastUpdate: today } : s
-        })
-      )
-      setLastGlobalRefresh(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }))
-      setLoadingAll(false)
-    }, 1200)
+    setScrapeLog(null)
+    const today = new Date().toISOString().split('T')[0]
+
+    const staleSources = sources.filter((s) => getStatus(s).code !== 'ok')
+
+    for (const source of staleSources) {
+      try {
+        if (source.scraper === 'trading-economics' && source.scrapeUrl) {
+          await scrapeTradingEconomics(source.scrapeUrl)
+        }
+      } catch (err) {
+        console.warn(`Failed to refresh ${source.id}:`, err.message)
+      }
+    }
+
+    setSources((prev) =>
+      prev.map((s) => {
+        const st = getStatus(s)
+        return st.code !== 'ok' ? { ...s, lastUpdate: today } : s
+      })
+    )
+
+    setLastGlobalRefresh(
+      new Date().toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      })
+    )
+    setLoadingAll(false)
   }
 
   const scraperBadge = (scraper) => {
@@ -100,6 +162,31 @@ export default function DataPage() {
           </div>
         </div>
 
+        {/* ===== SCRAPE LOG ===== */}
+        {scrapeLog && (
+          <div className={`border-2 mb-4 p-3 ${scrapeLog.error ? 'border-[#ef4444] bg-[#1a0a0a]' : 'border-[#4ade80] bg-[#0a1a0a]'}`}>
+            <div className="text-xs font-bold uppercase tracking-wider mb-1">
+              {scrapeLog.error ? (
+                <span className="text-[#ef4444]">[!] ERROR: {scrapeLog.error}</span>
+              ) : (
+                <span className="text-[#4ade80]">[OK] SCRAPE EXITOSO</span>
+              )}
+            </div>
+            {scrapeLog.result && scrapeLog.result.indicators && (
+              <div className="text-xs text-[#888] font-mono space-y-0.5">
+                <div>URL: {scrapeLog.result.url}</div>
+                <div>Indicadores: {scrapeLog.result.indicators.length}</div>
+                {scrapeLog.result.indicators.slice(0, 3).map((ind, i) => (
+                  <div key={i}>• {ind.name}: {ind.last} {ind.unit}</div>
+                ))}
+                {scrapeLog.result.indicators.length > 3 && (
+                  <div className="text-[#555]">... y {scrapeLog.result.indicators.length - 3} mas</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ===== FILTROS ===== */}
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           {categories.map((cat) => (
@@ -122,14 +209,14 @@ export default function DataPage() {
           <table className="w-full text-sm table-fixed">
             <thead>
               <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#777]">
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[22%]">Indicador</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[20%]">Indicador</th>
                 <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[10%]">Categoria</th>
                 <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[8%]">Scraper</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[12%]">Frecuencia</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[12%]">Ultima</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[12%]">Proxima</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[10%]">Estado</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[14%]">Accion</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[10%]">Frec</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[10%]">Ultima</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[10%]">Proxima</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[8%]">Estado</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[24%]">Fuente / Accion</th>
               </tr>
             </thead>
             <tbody>
@@ -138,6 +225,7 @@ export default function DataPage() {
                 const nextUpdate = getNextUpdate(source.lastUpdate, source.frequencyDays)
                 const isStale = status.code === 'stale'
                 const isLoading = loadingId === source.id
+                const lastScrape = source._lastScrape
 
                 return (
                   <tr
@@ -145,20 +233,7 @@ export default function DataPage() {
                     className={`border-b border-[#222] ${isStale ? 'bg-[#1a0a0a]' : ''}`}
                   >
                     <td className="px-2 py-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-white uppercase tracking-wider">{source.indicator}</span>
-                        {source.scrapeUrl && (
-                          <a
-                            href={source.scrapeUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[10px] text-[#777] hover:text-[#ecd987] border-b border-[#333] hover:border-[#ecd987]"
-                            title="Abrir fuente"
-                          >
-                            [EXT]
-                          </a>
-                        )}
-                      </div>
+                      <span className="text-sm font-bold text-white uppercase tracking-wider">{source.indicator}</span>
                       <div className="text-[10px] text-[#555] mt-0.5">{source.notes}</div>
                     </td>
                     <td className="px-2 py-1.5">
@@ -184,19 +259,48 @@ export default function DataPage() {
                       </span>
                     </td>
                     <td className="px-2 py-1.5">
-                      <button
-                        onClick={() => refreshSource(source.id)}
-                        disabled={isLoading}
-                        className={`text-xs font-bold uppercase tracking-wider border-b-2 px-2 py-0.5 ${
-                          isLoading
-                            ? 'border-[#333] text-[#555] cursor-not-allowed'
-                            : isStale
-                              ? 'border-[#ef4444] text-[#ef4444] hover:text-white hover:border-white'
-                              : 'border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white'
-                        }`}
-                      >
-                        {isLoading ? '...' : 'REFRESH'}
-                      </button>
+                      {/* Editable URL */}
+                      <div className="mb-1">
+                        <input
+                          type="text"
+                          value={source.scrapeUrl || ''}
+                          onChange={(e) => updateField(source.id, 'scrapeUrl', e.target.value)}
+                          placeholder="URL de fuente..."
+                          className="w-full bg-[#111] border-b border-[#ecd987] text-[10px] text-[#888] font-mono px-1 py-0.5 outline-none focus:border-white"
+                        />
+                      </div>
+                      {/* Scrape preview */}
+                      {lastScrape && lastScrape.indicators && lastScrape.indicators.length > 0 && (
+                        <div className="text-[10px] text-[#4ade80] font-mono mb-1">
+                          {lastScrape.indicators[0].name}: {lastScrape.indicators[0].last}
+                        </div>
+                      )}
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => refreshSource(source.id)}
+                          disabled={isLoading}
+                          className={`text-xs font-bold uppercase tracking-wider border-b-2 px-2 py-0.5 ${
+                            isLoading
+                              ? 'border-[#333] text-[#555] cursor-not-allowed'
+                              : isStale
+                                ? 'border-[#ef4444] text-[#ef4444] hover:text-white hover:border-white'
+                                : 'border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white'
+                          }`}
+                        >
+                          {isLoading ? '...' : 'REFRESH'}
+                        </button>
+                        {source.scrapeUrl && (
+                          <a
+                            href={source.scrapeUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-[#777] hover:text-[#ecd987] border-b border-[#333] hover:border-[#ecd987]"
+                          >
+                            [EXT]
+                          </a>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )

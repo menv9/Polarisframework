@@ -222,6 +222,80 @@ app.get('/api/polaris/worldview', async (_req, res) => {
   }
 })
 
+// Endpoint dinamico: scrapea cualquier URL de Trading Economics
+app.post('/api/scrape', express.json(), async (req, res) => {
+  const { url, indicatorName } = req.body
+  if (!url) {
+    return res.status(400).json({ error: 'URL required' })
+  }
+
+  // Validar que sea dominio de Trading Economics (seguridad basica)
+  if (!url.includes('tradingeconomics.com')) {
+    return res.status(400).json({ error: 'Only tradingeconomics.com URLs allowed' })
+  }
+
+  try {
+    const result = await scrapeTradingEconomicsFromUrl(url)
+    res.json({
+      success: true,
+      url,
+      indicatorName: indicatorName || null,
+      scrapedAt: new Date().toISOString(),
+      ...result,
+    })
+  } catch (err) {
+    console.error('Error en /api/scrape:', err.message)
+    res.status(502).json({
+      success: false,
+      error: 'Scraping failed',
+      message: err.message,
+    })
+  }
+})
+
+async function scrapeTradingEconomicsFromUrl(url) {
+  const { data: html } = await axios.get(url, { headers: browserHeaders, timeout: 5000 })
+  const $ = cheerio.load(html)
+
+  const indicators = []
+
+  $('.table-responsive table tbody tr').each((_, row) => {
+    const cells = $(row).find('td')
+    if (cells.length >= 3) {
+      const name = $(cells[0]).text().trim()
+      const last = $(cells[1]).text().trim().replace(/,/g, '')
+      const previous = $(cells[2]).text().trim().replace(/,/g, '')
+      const unit = $(cells[3]).text().trim() || ''
+
+      if (name && last) {
+        indicators.push({
+          name,
+          last: parseFloat(last) || last,
+          previous: parseFloat(previous) || previous,
+          unit,
+        })
+      }
+    }
+  })
+
+  // Fallback
+  if (indicators.length === 0) {
+    $('table tbody tr').each((_, row) => {
+      const cells = $(row).find('td')
+      if (cells.length >= 3) {
+        const name = $(cells[0]).text().trim()
+        const last = $(cells[1]).text().trim().replace(/,/g, '')
+        const previous = $(cells[2]).text().trim().replace(/,/g, '')
+        if (name && last && !isNaN(parseFloat(last))) {
+          indicators.push({ name, last: parseFloat(last), previous: parseFloat(previous) || null, unit: '' })
+        }
+      }
+    })
+  }
+
+  return { indicators }
+}
+
 // Solo iniciar servidor si se ejecuta directamente (desarrollo local)
 if (require.main === module) {
   app.listen(PORT, () => {
