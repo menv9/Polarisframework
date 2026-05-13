@@ -612,8 +612,9 @@ app.get('/api/fred/latest/:seriesId', async (req, res) => {
 
 app.get('/api/fred/yoy/:seriesId', async (req, res) => {
   const { seriesId } = req.params
+  const quarterly = req.query.quarterly === 'true'
   try {
-    const result = await fetchFredYoYChange(seriesId)
+    const result = await (quarterly ? fetchFredYoYChangeQuarterly(seriesId) : fetchFredYoYChange(seriesId))
     if (!result || result.value === null) {
       return res.status(404).json({ error: 'Not enough data for YoY', seriesId })
     }
