@@ -61,25 +61,35 @@ export default function WorldViewOpsPage() {
   const [data, setData] = useState(loadWorldViewData)
   const [loading, setLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(null)
-  const [scrapeLog, setScrapeLog] = useState(null)
   const [refreshingId, setRefreshingId] = useState(null)
+
+  // Estado de refresh por indicador: { [key]: { ok: boolean, ts: number, msg: string } }
+  const [refreshStatus, setRefreshStatus] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('polaris_wv_refresh_status') || '{}')
+    } catch { return {} }
+  })
 
   // Persistir cambios en localStorage
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_WV, JSON.stringify(data))
   }, [data])
 
+  useEffect(() => {
+    localStorage.setItem('polaris_wv_refresh_status', JSON.stringify(refreshStatus))
+  }, [refreshStatus])
+
   const handleChange = (key, value) => setData((prev) => ({ ...prev, [key]: value }))
 
   const refreshIndicator = async (key) => {
     const cfg = indicatorScrapeConfig[key]
     if (!cfg) {
-      setScrapeLog({ key, error: 'No hay scraper configurado para este indicador. Edita manualmente o ve a /data' })
+      setRefreshStatus((prev) => ({ ...prev, [key]: { ok: false, ts: Date.now(), msg: 'No scraper' } }))
       return
     }
 
     setRefreshingId(key)
-    setScrapeLog({ key, loading: true })
+    setRefreshStatus((prev) => ({ ...prev, [key]: { ok: false, ts: Date.now(), msg: '...' } }))
 
     try {
       const res = await fetch('/api/scrape', {
@@ -94,20 +104,26 @@ export default function WorldViewOpsPage() {
       const result = await res.json()
 
       let newValue = data[key]
+      let parsedFrom = 'fallback'
       if (result.matchedIndicator?.last) {
         const parsed = parseFloat(result.matchedIndicator.last.replace(/,/g, ''))
-        if (!isNaN(parsed)) newValue = parsed
+        if (!isNaN(parsed)) { newValue = parsed; parsedFrom = 'matched' }
       } else if (result.indicators?.length > 0) {
-        // Fallback: usa el primer indicador si no hay matchedIndicator
         const first = result.indicators[0]
         const parsed = parseFloat(first.last?.replace(/,/g, ''))
-        if (!isNaN(parsed)) newValue = parsed
+        if (!isNaN(parsed)) { newValue = parsed; parsedFrom = 'first' }
       }
 
       setData((prev) => ({ ...prev, [key]: newValue }))
-      setScrapeLog({ key, result, value: newValue, ok: true })
+      setRefreshStatus((prev) => ({
+        ...prev,
+        [key]: { ok: true, ts: Date.now(), msg: parsedFrom === 'matched' ? 'OK' : 'OK (approx)' },
+      }))
     } catch (err) {
-      setScrapeLog({ key, error: err.message, isNetworkError: err.message.includes('fetch') || err.message.includes('Network') })
+      setRefreshStatus((prev) => ({
+        ...prev,
+        [key]: { ok: false, ts: Date.now(), msg: err.message },
+      }))
     } finally {
       setRefreshingId(null)
     }
@@ -173,48 +189,6 @@ export default function WorldViewOpsPage() {
                 </button>
               </div>
             </div>
-
-            {/* ===== SCRAPE LOG ===== */}
-            {scrapeLog && (
-              <div className={`border-2 mb-4 p-3 ${
-                scrapeLog.error ? 'border-[#ef4444] bg-[#1a0a0a]' 
-                : scrapeLog.loading ? 'border-[#f59e0b] bg-[#1a1500]'
-                : 'border-[#4ade80] bg-[#0a1a0a]'
-              }`}>
-                <div className="text-xs font-bold uppercase tracking-wider mb-1">
-                  {scrapeLog.loading ? (
-                    <span className="text-[#f59e0b]">[...] SCRAPEANDO {scrapeLog.key.toUpperCase()}...</span>
-                  ) : scrapeLog.error ? (
-                    <span className="text-[#ef4444]">
-                      [!] ERROR ({scrapeLog.key.toUpperCase()}): {scrapeLog.error}
-                      {scrapeLog.isNetworkError && (
-                        <span className="block mt-1 text-[#888] normal-case">
-                          El backend no responde. En Vercel Hobby el scraping de Trading Economics esta bloqueado.
-                          Usa localhost o introduce el valor manualmente.
-                        </span>
-                      )}
-                    </span>
-                  ) : (
-                    <span className="text-[#4ade80]">[OK] {scrapeLog.key.toUpperCase()} ACTUALIZADO: {scrapeLog.value}</span>
-                  )}
-                </div>
-                {!scrapeLog.loading && scrapeLog.result && (
-                  <div className="text-xs text-[#888] font-mono">
-                    <div>URL: {scrapeLog.result.url}</div>
-                    {scrapeLog.result.matchedIndicator && (
-                      <div className="text-[#4ade80]">
-                        {scrapeLog.result.matchedIndicator.name}: {scrapeLog.result.matchedIndicator.last} {scrapeLog.result.matchedIndicator.unit}
-                      </div>
-                    )}
-                    {scrapeLog.result.indicators?.length > 0 && !scrapeLog.result.matchedIndicator && (
-                      <div className="text-[#f59e0b]">
-                        No match exacto. Usando primer valor: {scrapeLog.result.indicators[0].name}: {scrapeLog.result.indicators[0].last}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* ===== HERO: RESULTADOS DERIVADOS ===== */}
             <div className="border-2 border-[#333] mb-4">
@@ -305,6 +279,13 @@ export default function WorldViewOpsPage() {
                               {refreshingId === row.key ? '...' : '[REF]'}
                             </button>
                           )}
+                          {refreshStatus[row.key] && refreshStatus[row.key].msg !== '...' && (
+                            <span className={`text-[10px] font-bold uppercase ${
+                              refreshStatus[row.key].ok ? 'text-[#4ade80]' : 'text-[#ef4444]'
+                            }`}>
+                              {refreshStatus[row.key].ok ? '[OK]' : '[ERR]'}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-2 py-1.5 text-sm text-[#888]">
@@ -364,6 +345,13 @@ export default function WorldViewOpsPage() {
                               {refreshingId === row.key ? '...' : '[REF]'}
                             </button>
                           )}
+                          {refreshStatus[row.key] && refreshStatus[row.key].msg !== '...' && (
+                            <span className={`text-[10px] font-bold uppercase ${
+                              refreshStatus[row.key].ok ? 'text-[#4ade80]' : 'text-[#ef4444]'
+                            }`}>
+                              {refreshStatus[row.key].ok ? '[OK]' : '[ERR]'}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-2 py-1.5 text-sm text-[#888]">
@@ -409,6 +397,13 @@ export default function WorldViewOpsPage() {
                             >
                               {refreshingId === row.key ? '...' : '[REF]'}
                             </button>
+                          )}
+                          {refreshStatus[row.key] && refreshStatus[row.key].msg !== '...' && (
+                            <span className={`text-[10px] font-bold uppercase ${
+                              refreshStatus[row.key].ok ? 'text-[#4ade80]' : 'text-[#ef4444]'
+                            }`}>
+                              {refreshStatus[row.key].ok ? '[OK]' : '[ERR]'}
+                            </span>
                           )}
                         </div>
                       </td>
@@ -467,6 +462,13 @@ export default function WorldViewOpsPage() {
                               {refreshingId === row.key ? '...' : '[REF]'}
                             </button>
                           )}
+                          {refreshStatus[row.key] && refreshStatus[row.key].msg !== '...' && (
+                            <span className={`text-[10px] font-bold uppercase ${
+                              refreshStatus[row.key].ok ? 'text-[#4ade80]' : 'text-[#ef4444]'
+                            }`}>
+                              {refreshStatus[row.key].ok ? '[OK]' : '[ERR]'}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-2 py-1.5 text-sm text-[#888]">
@@ -512,6 +514,13 @@ export default function WorldViewOpsPage() {
                             >
                               {refreshingId === row.key ? '...' : '[REF]'}
                             </button>
+                          )}
+                          {refreshStatus[row.key] && refreshStatus[row.key].msg !== '...' && (
+                            <span className={`text-[10px] font-bold uppercase ${
+                              refreshStatus[row.key].ok ? 'text-[#4ade80]' : 'text-[#ef4444]'
+                            }`}>
+                              {refreshStatus[row.key].ok ? '[OK]' : '[ERR]'}
+                            </span>
                           )}
                         </div>
                       </td>
