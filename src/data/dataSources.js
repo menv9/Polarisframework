@@ -2317,7 +2317,7 @@ const SOURCE_OVERRIDES = {
   endo_nor_real_2y: { apiPath: '/api/fred/real-rate?policy=IRSTCI01NOM156N&cpi=NORCPIALLMINMEI' },
   endo_che_real_2y: { apiPath: '/api/fred/real-rate?policy=IRSTCI01CHM156N&cpi=CHECPIALLMINMEI' },
   // World Bank CA/GDP (annual, % of GDP)
-  endo_eur_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=EMU&indicator=BN.CAB.XOKA.GD.ZS' },
+  endo_eur_ca_gdp: { apiPath: '/api/source/imf-datamapper/latest?indicator=BCA_NGDPD&country=EUQ' },
   endo_jpn_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=JPN&indicator=BN.CAB.XOKA.GD.ZS' },
   endo_gbr_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=GBR&indicator=BN.CAB.XOKA.GD.ZS' },
   endo_che_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=CHE&indicator=BN.CAB.XOKA.GD.ZS' },
@@ -2327,14 +2327,14 @@ const SOURCE_OVERRIDES = {
   endo_swe_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=SWE&indicator=BN.CAB.XOKA.GD.ZS' },
   endo_nor_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=NOR&indicator=BN.CAB.XOKA.GD.ZS' },
   // World Bank Central Govt Debt/GDP (annual)
-  endo_jpn_debt: { apiPath: '/api/source/worldbank/latest?country=JPN&indicator=GC.DOD.TOTL.GD.ZS' },
-  endo_gbr_debt: { apiPath: '/api/source/worldbank/latest?country=GBR&indicator=GC.DOD.TOTL.GD.ZS' },
-  endo_che_debt: { apiPath: '/api/source/worldbank/latest?country=CHE&indicator=GC.DOD.TOTL.GD.ZS' },
-  endo_can_debt: { apiPath: '/api/source/worldbank/latest?country=CAN&indicator=GC.DOD.TOTL.GD.ZS' },
-  endo_aus_debt: { apiPath: '/api/source/worldbank/latest?country=AUS&indicator=GC.DOD.TOTL.GD.ZS' },
-  endo_nzl_debt: { apiPath: '/api/source/worldbank/latest?country=NZL&indicator=GC.DOD.TOTL.GD.ZS' },
-  endo_swe_debt: { apiPath: '/api/source/worldbank/latest?country=SWE&indicator=GC.DOD.TOTL.GD.ZS' },
-  endo_nor_debt: { apiPath: '/api/source/worldbank/latest?country=NOR&indicator=GC.DOD.TOTL.GD.ZS' },
+  endo_jpn_debt: { apiPath: '/api/source/imf-datamapper/latest?indicator=GGXWDG_NGDP&country=JPN' },
+  endo_gbr_debt: { apiPath: '/api/source/imf-datamapper/latest?indicator=GGXWDG_NGDP&country=GBR' },
+  endo_che_debt: { apiPath: '/api/source/imf-datamapper/latest?indicator=GGXWDG_NGDP&country=CHE' },
+  endo_can_debt: { apiPath: '/api/source/imf-datamapper/latest?indicator=GGXWDG_NGDP&country=CAN' },
+  endo_aus_debt: { apiPath: '/api/source/imf-datamapper/latest?indicator=GGXWDG_NGDP&country=AUS' },
+  endo_nzl_debt: { apiPath: '/api/source/imf-datamapper/latest?indicator=GGXWDG_NGDP&country=NZL' },
+  endo_swe_debt: { apiPath: '/api/source/imf-datamapper/latest?indicator=GGXWDG_NGDP&country=SWE' },
+  endo_nor_debt: { apiPath: '/api/source/imf-datamapper/latest?indicator=GGXWDG_NGDP&country=NOR' },
 }
 
 const DATA_QUALITY_OVERRIDES = {

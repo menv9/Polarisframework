@@ -523,6 +523,29 @@ async function fetchImfLatest(dataset, seriesKey, startPeriod = '2000') {
   })
 }
 
+async function fetchImfDataMapperLatest(indicator, country) {
+  const url = `https://www.imf.org/external/datamapper/api/v1/${encodeURIComponent(indicator)}/${encodeURIComponent(country)}`
+  const { data } = await axios.get(url, { timeout: 20000 })
+  const series = data?.values?.[indicator]?.[country]
+  if (!series || typeof series !== 'object') {
+    throw new Error(`No IMF DataMapper data for ${indicator}/${country}`)
+  }
+  const entries = Object.entries(series)
+    .map(([year, value]) => ({ year, value: Number(value) }))
+    .filter((entry) => Number.isFinite(entry.value))
+    .sort((a, b) => Number(a.year) - Number(b.year))
+  const latest = entries.at(-1)
+  if (!latest) throw new Error(`No IMF DataMapper observations for ${indicator}/${country}`)
+  return normalizeLatest({
+    provider: 'imf-datamapper',
+    seriesId: `${indicator}/${country}`,
+    date: latest.year,
+    value: latest.value,
+    raw: latest.value,
+    meta: { indicator, country },
+  })
+}
+
 async function fetchWorldBankLatest(country, indicator) {
   const url = `https://api.worldbank.org/v2/country/${encodeURIComponent(country)}/indicator/${encodeURIComponent(indicator)}?format=json&per_page=20&date=2010:2026`
   const { data } = await axios.get(url, { timeout: 20000 })
@@ -781,6 +804,17 @@ app.get('/api/source/imf/latest', async (req, res) => {
     res.json(await fetchImfLatest(String(req.query.dataset), String(req.query.seriesKey), String(req.query.startPeriod || '2000')))
   } catch (err) {
     res.status(502).json({ error: 'IMF fetch failed', message: err.message })
+  }
+})
+
+app.get('/api/source/imf-datamapper/latest', async (req, res) => {
+  try {
+    if (!req.query.indicator || !req.query.country) {
+      return res.status(400).json({ error: 'indicator and country required' })
+    }
+    res.json(await fetchImfDataMapperLatest(String(req.query.indicator), String(req.query.country)))
+  } catch (err) {
+    res.status(502).json({ error: 'IMF DataMapper fetch failed', message: err.message })
   }
 })
 
