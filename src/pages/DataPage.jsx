@@ -52,32 +52,51 @@ export default function DataPage() {
 
   const counts = useMemo(() => countByStatus(sources), [sources])
 
-  // Primary filter: module (country/currency grouping)
-  const modules = useMemo(
-    () => ['todas', ...new Set(sources.map((s) => s.module))],
-    [sources]
-  )
-  const [activeModule, setActiveModule] = useState('todas')
+  // ====== FILTROS JERARQUICOS: Modulo -> Pais/Submodulo -> Categoria ======
+  const topModules = ['todas', 'World View', 'Endogenous', 'Exogenous']
+  const [activeTop, setActiveTop] = useState('todas')
 
-  // Secondary filter: category (only categories present in current module selection)
-  const categories = useMemo(() => {
+  // Sub-filter: pais (Endogenous) o sub-modulo (Exogenous). No aplica a World View.
+  const subOptions = useMemo(() => {
     const pool =
-      activeModule === 'todas'
+      activeTop === 'todas'
         ? sources
-        : sources.filter((s) => s.module === activeModule)
+        : sources.filter((s) => s.module.startsWith(activeTop))
+    const subs = new Set()
+    pool.forEach((s) => {
+      const parts = s.module.split(' — ')
+      if (parts.length > 1) subs.add(parts[1])
+    })
+    return ['todas', ...Array.from(subs).sort()]
+  }, [sources, activeTop])
+  const [activeSub, setActiveSub] = useState('todas')
+
+  // Category filter (tercer nivel)
+  const categories = useMemo(() => {
+    let pool = sources
+    if (activeTop !== 'todas') pool = pool.filter((s) => s.module.startsWith(activeTop))
+    if (activeSub !== 'todas') pool = pool.filter((s) => s.module.endsWith(activeSub))
     return ['todas', ...new Set(pool.map((s) => s.category))]
-  }, [sources, activeModule])
+  }, [sources, activeTop, activeSub])
   const [activeCategory, setActiveCategory] = useState('todas')
 
-  // Reset category when module changes to avoid empty intersections
+  // Reset sub y category cuando cambia top
+  useEffect(() => {
+    setActiveSub('todas')
+    setActiveCategory('todas')
+  }, [activeTop])
+
+  // Reset category cuando cambia sub
   useEffect(() => {
     setActiveCategory('todas')
-  }, [activeModule])
+  }, [activeSub])
 
+  // Filtrado en 3 niveles
   const filtered = sources.filter((s) => {
-    const matchModule = activeModule === 'todas' || s.module === activeModule
-    const matchCategory = activeCategory === 'todas' || s.category === activeCategory
-    return matchModule && matchCategory
+    const matchTop = activeTop === 'todas' || s.module.startsWith(activeTop)
+    const matchSub = activeSub === 'todas' || s.module.endsWith(activeSub)
+    const matchCat = activeCategory === 'todas' || s.category === activeCategory
+    return matchTop && matchSub && matchCat
   })
 
   // Extract top-level module groups (World View, Endogenous, Exogenous)
@@ -287,16 +306,16 @@ export default function DataPage() {
           </div>
         )}
 
-        {/* ===== FILTROS — MODULO ===== */}
+        {/* ===== FILTROS — MODULO (top-level) ===== */}
         <div className="mb-2">
           <div className="text-[10px] text-[#555] uppercase tracking-widest mb-1.5">Modulo</div>
           <div className="flex items-center gap-2 flex-wrap">
-            {modules.map((mod) => (
+            {topModules.map((mod) => (
               <button
                 key={mod}
-                onClick={() => setActiveModule(mod)}
+                onClick={() => setActiveTop(mod)}
                 className={`px-3 py-1 text-sm font-bold uppercase tracking-wider border-2 ${
-                  activeModule === mod
+                  activeTop === mod
                     ? 'border-[#ecd987] text-[#ecd987]'
                     : 'border-[#333] text-[#777] hover:text-white hover:border-[#555]'
                 }`}
@@ -306,6 +325,30 @@ export default function DataPage() {
             ))}
           </div>
         </div>
+
+        {/* ===== FILTROS — PAIS / SUBMODULO (solo Endogenous & Exogenous) ===== */}
+        {(activeTop === 'Endogenous' || activeTop === 'Exogenous') && (
+          <div className="mb-2">
+            <div className="text-[10px] text-[#555] uppercase tracking-widest mb-1.5">
+              {activeTop === 'Endogenous' ? 'Pais' : 'Sub-modulo'}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {subOptions.map((sub) => (
+                <button
+                  key={sub}
+                  onClick={() => setActiveSub(sub)}
+                  className={`px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider border-2 ${
+                    activeSub === sub
+                      ? 'border-[#ecd987] text-[#ecd987]'
+                      : 'border-[#333] text-[#777] hover:text-white hover:border-[#555]'
+                  }`}
+                >
+                  {sub === 'todas' ? 'TODOS' : sub}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ===== FILTROS — CATEGORIA ===== */}
         <div className="mb-3">
