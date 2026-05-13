@@ -10,8 +10,8 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "coverage": "vitest run --coverage",
-    "proxy": "node api/index.cjs",
-    "proxy:dev": "node --watch api/index.cjs"
+    "proxy": "node api/index.js",
+    "proxy:dev": "node --watch api/index.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
