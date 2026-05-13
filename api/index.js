@@ -121,14 +121,17 @@ async function fetchFredObservations(seriesId, limit = 1) {
 }
 
 async function fetchFredLatestValue(seriesId) {
-  const observations = await fetchFredObservations(seriesId, 1)
+  const observations = await fetchFredObservations(seriesId, 12)
   if (!observations.length) return null
-  const latest = observations[0]
-  const val = parseFloat(latest.value)
+  const latest = observations.find((obs) => {
+    const v = parseFloat(obs.value)
+    return !isNaN(v)
+  })
+  if (!latest) return null
   return {
     seriesId,
     date: latest.date,
-    value: isNaN(val) ? null : val,
+    value: parseFloat(latest.value),
     raw: latest.value,
   }
 }
