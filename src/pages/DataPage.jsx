@@ -1,6 +1,25 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { dataSources, getNextUpdate, getStatus, countByStatus } from '../data/dataSources'
+
+const STORAGE_KEY = 'polaris_data_sources'
+
+function loadSources() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      // Merge with defaults to ensure any new fields from code updates are present
+      return dataSources.map((defaultSrc) => {
+        const savedSrc = parsed.find((s) => s.id === defaultSrc.id)
+        return savedSrc ? { ...defaultSrc, ...savedSrc } : defaultSrc
+      })
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return dataSources
+}
 
 async function scrapeTradingEconomics(url, indicatorName) {
   const res = await fetch('/api/scrape', {
@@ -20,11 +39,16 @@ function isTradingEconomicsUrl(url) {
 }
 
 export default function DataPage() {
-  const [sources, setSources] = useState(dataSources)
+  const [sources, setSources] = useState(loadSources)
   const [loadingAll, setLoadingAll] = useState(false)
   const [loadingId, setLoadingId] = useState(null)
   const [lastGlobalRefresh, setLastGlobalRefresh] = useState(null)
   const [scrapeLog, setScrapeLog] = useState(null)
+
+  // Persistir cambios en localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sources))
+  }, [sources])
 
   const counts = useMemo(() => countByStatus(sources), [sources])
 
