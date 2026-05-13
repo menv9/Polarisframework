@@ -260,13 +260,13 @@ export default function DataPage() {
                     </td>
                     <td className="px-2 py-1.5">
                       {/* Editable URL */}
-                      <div className="mb-1">
+                      <div className="mb-1.5">
                         <input
                           type="text"
                           value={source.scrapeUrl || ''}
                           onChange={(e) => updateField(source.id, 'scrapeUrl', e.target.value)}
-                          placeholder="URL de fuente..."
-                          className="w-full bg-[#111] border-b border-[#ecd987] text-[10px] text-[#888] font-mono px-1 py-0.5 outline-none focus:border-white"
+                          placeholder="https://tradingeconomics.com/..."
+                          className="w-full bg-[#111] border-b-2 border-[#ecd987] text-xs text-white font-mono px-1.5 py-1 outline-none focus:border-white focus:bg-[#1a1a0d]"
                         />
                       </div>
                       {/* Scrape preview */}
