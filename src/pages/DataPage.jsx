@@ -52,12 +52,42 @@ export default function DataPage() {
 
   const counts = useMemo(() => countByStatus(sources), [sources])
 
-  const categories = ['todas', ...new Set(sources.map((s) => s.category))]
-  const [activeFilter, setActiveFilter] = useState('todas')
+  // Primary filter: module (country/currency grouping)
+  const modules = useMemo(
+    () => ['todas', ...new Set(sources.map((s) => s.module))],
+    [sources]
+  )
+  const [activeModule, setActiveModule] = useState('todas')
 
-  const filtered = activeFilter === 'todas'
-    ? sources
-    : sources.filter((s) => s.category === activeFilter)
+  // Secondary filter: category (only categories present in current module selection)
+  const categories = useMemo(() => {
+    const pool =
+      activeModule === 'todas'
+        ? sources
+        : sources.filter((s) => s.module === activeModule)
+    return ['todas', ...new Set(pool.map((s) => s.category))]
+  }, [sources, activeModule])
+  const [activeCategory, setActiveCategory] = useState('todas')
+
+  // Reset category when module changes to avoid empty intersections
+  useEffect(() => {
+    setActiveCategory('todas')
+  }, [activeModule])
+
+  const filtered = sources.filter((s) => {
+    const matchModule = activeModule === 'todas' || s.module === activeModule
+    const matchCategory = activeCategory === 'todas' || s.category === activeCategory
+    return matchModule && matchCategory
+  })
+
+  // Group filtered results by module for table rendering
+  const grouped = useMemo(() => {
+    return filtered.reduce((acc, s) => {
+      if (!acc[s.module]) acc[s.module] = []
+      acc[s.module].push(s)
+      return acc
+    }, {})
+  }, [filtered])
 
   const updateField = (id, field, value) => {
     setSources((prev) => prev.map((s) => (s.id === id ? { ...s, [field]: value } : s)))
@@ -136,7 +166,7 @@ export default function DataPage() {
     for (const source of staleSources) {
       try {
         if (source.scraper === 'trading-economics' && source.scrapeUrl) {
-          await scrapeTradingEconomics(source.scrapeUrl)
+          await scrapeTradingEconomics(source.scrapeUrl, source.indicator)
         }
       } catch (err) {
         console.warn(`Failed to refresh ${source.id}:`, err.message)
@@ -248,21 +278,44 @@ export default function DataPage() {
           </div>
         )}
 
-        {/* ===== FILTROS ===== */}
-        <div className="flex items-center gap-2 mb-3 flex-wrap">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveFilter(cat)}
-              className={`px-3 py-1 text-sm font-bold uppercase tracking-wider border-2 ${
-                activeFilter === cat
-                  ? 'border-[#ecd987] text-[#ecd987]'
-                  : 'border-[#333] text-[#777] hover:text-white hover:border-[#555]'
-              }`}
-            >
-              {cat === 'todas' ? 'TODAS' : cat}
-            </button>
-          ))}
+        {/* ===== FILTROS — MODULO ===== */}
+        <div className="mb-2">
+          <div className="text-[10px] text-[#555] uppercase tracking-widest mb-1.5">Modulo</div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {modules.map((mod) => (
+              <button
+                key={mod}
+                onClick={() => setActiveModule(mod)}
+                className={`px-3 py-1 text-sm font-bold uppercase tracking-wider border-2 ${
+                  activeModule === mod
+                    ? 'border-[#ecd987] text-[#ecd987]'
+                    : 'border-[#333] text-[#777] hover:text-white hover:border-[#555]'
+                }`}
+              >
+                {mod === 'todas' ? 'TODOS' : mod}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ===== FILTROS — CATEGORIA ===== */}
+        <div className="mb-3">
+          <div className="text-[10px] text-[#555] uppercase tracking-widest mb-1.5">Categoria</div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider border-2 ${
+                  activeCategory === cat
+                    ? 'border-[#ecd987] text-[#ecd987]'
+                    : 'border-[#333] text-[#777] hover:text-white hover:border-[#555]'
+                }`}
+              >
+                {cat === 'todas' ? 'TODAS' : cat}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* ===== TABLA ===== */}
@@ -280,103 +333,114 @@ export default function DataPage() {
                 <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[24%]">Fuente / Accion</th>
               </tr>
             </thead>
-            <tbody>
-              {filtered.map((source) => {
-                const status = getStatus(source)
-                const nextUpdate = getNextUpdate(source.lastUpdate, source.frequencyDays)
-                const isStale = status.code === 'stale'
-                const isLoading = loadingId === source.id
-                const lastScrape = source._lastScrape
-
-                return (
-                  <tr
-                    key={source.id}
-                    className={`border-b border-[#222] ${isStale ? 'bg-[#1a0a0a]' : ''}`}
+            {Object.entries(grouped).map(([moduleName, items]) => (
+              <tbody key={moduleName}>
+                {/* Module section header */}
+                <tr className="bg-[#0a0a0a] border-b border-[#333]">
+                  <td
+                    colSpan={8}
+                    className="px-3 py-2 text-xs font-bold uppercase tracking-widest text-[#ecd987]"
                   >
-                    <td className="px-2 py-1.5">
-                      <span className="text-sm font-bold text-white uppercase tracking-wider">{source.indicator}</span>
-                      <div className="text-[10px] text-[#555] mt-0.5">{source.notes}</div>
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <span className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider">{source.category}</span>
-                    </td>
-                    <td className="px-2 py-1.5">
-                      {scraperBadge(source.scraper)}
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <span className="text-xs text-[#888] uppercase">{source.frequency}</span>
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <span className="text-xs font-mono text-[#888]">{source.lastUpdate}</span>
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <span className={`text-xs font-mono ${isStale ? 'text-[#ef4444]' : 'text-[#888]'}`}>
-                        {nextUpdate}
-                      </span>
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <span className={`text-xs font-bold uppercase tracking-wider ${status.color}`}>
-                        {status.label}
-                      </span>
-                    </td>
-                    <td className="px-2 py-1.5">
-                      {/* Editable URL */}
-                      <div className="mb-1.5">
-                        <input
-                          type="text"
-                          value={source.scrapeUrl || ''}
-                          onChange={(e) => {
-                            const val = e.target.value
-                            const isTE = isTradingEconomicsUrl(val)
-                            setSources((prev) =>
-                              prev.map((s) =>
-                                s.id === source.id
-                                  ? { ...s, scrapeUrl: val, scraper: isTE ? 'trading-economics' : s.scraper }
-                                  : s
+                    {moduleName}
+                    <span className="ml-2 text-[#555]">({items.length})</span>
+                  </td>
+                </tr>
+                {items.map((source) => {
+                  const status = getStatus(source)
+                  const nextUpdate = getNextUpdate(source.lastUpdate, source.frequencyDays)
+                  const isStale = status.code === 'stale'
+                  const isLoading = loadingId === source.id
+
+                  return (
+                    <tr
+                      key={source.id}
+                      className={`border-b border-[#222] ${isStale ? 'bg-[#1a0a0a]' : ''}`}
+                    >
+                      <td className="px-2 py-1.5">
+                        <span className="text-sm font-bold text-white uppercase tracking-wider">{source.indicator}</span>
+                        <div className="text-[10px] text-[#555] mt-0.5">{source.notes}</div>
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <span className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider">{source.category}</span>
+                      </td>
+                      <td className="px-2 py-1.5">
+                        {scraperBadge(source.scraper)}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <span className="text-xs text-[#888] uppercase">{source.frequency}</span>
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <span className="text-xs font-mono text-[#888]">{source.lastUpdate}</span>
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <span className={`text-xs font-mono ${isStale ? 'text-[#ef4444]' : 'text-[#888]'}`}>
+                          {nextUpdate}
+                        </span>
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <span className={`text-xs font-bold uppercase tracking-wider ${status.color}`}>
+                          {status.label}
+                        </span>
+                      </td>
+                      <td className="px-2 py-1.5">
+                        {/* Editable URL */}
+                        <div className="mb-1.5">
+                          <input
+                            type="text"
+                            value={source.scrapeUrl || ''}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              const isTE = isTradingEconomicsUrl(val)
+                              setSources((prev) =>
+                                prev.map((s) =>
+                                  s.id === source.id
+                                    ? { ...s, scrapeUrl: val, scraper: isTE ? 'trading-economics' : s.scraper }
+                                    : s
+                                )
                               )
-                            )
-                          }}
-                          placeholder="https://tradingeconomics.com/..."
-                          className="w-full bg-[#111] border-b-2 border-[#ecd987] text-xs text-white font-mono px-1.5 py-1 outline-none focus:border-white focus:bg-[#1a1a0d]"
-                        />
-                      </div>
-                      {/* Scrape preview */}
-                      {source._scrapedValue && (
-                        <div className="text-[10px] text-[#4ade80] font-mono mb-1">
-                          {source._scrapedValue}
+                            }}
+                            placeholder="https://tradingeconomics.com/..."
+                            className="w-full bg-[#111] border-b-2 border-[#ecd987] text-xs text-white font-mono px-1.5 py-1 outline-none focus:border-white focus:bg-[#1a1a0d]"
+                          />
                         </div>
-                      )}
-                      {/* Action buttons */}
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => refreshSource(source.id)}
-                          disabled={isLoading}
-                          className={`text-xs font-bold uppercase tracking-wider border-b-2 px-2 py-0.5 ${
-                            isLoading
-                              ? 'border-[#333] text-[#555] cursor-not-allowed'
-                              : isStale
-                                ? 'border-[#ef4444] text-[#ef4444] hover:text-white hover:border-white'
-                                : 'border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white'
-                          }`}
-                        >
-                          {isLoading ? '...' : 'REFRESH'}
-                        </button>
-                        {source.scrapeUrl && (
-                          <a
-                            href={source.scrapeUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[10px] text-[#777] hover:text-[#ecd987] border-b border-[#333] hover:border-[#ecd987]"
-                          >
-                            [EXT]
-                          </a>
+                        {/* Scrape preview */}
+                        {source._scrapedValue && (
+                          <div className="text-[10px] text-[#4ade80] font-mono mb-1">
+                            {source._scrapedValue}
+                          </div>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => refreshSource(source.id)}
+                            disabled={isLoading}
+                            className={`text-xs font-bold uppercase tracking-wider border-b-2 px-2 py-0.5 ${
+                              isLoading
+                                ? 'border-[#333] text-[#555] cursor-not-allowed'
+                                : isStale
+                                  ? 'border-[#ef4444] text-[#ef4444] hover:text-white hover:border-white'
+                                  : 'border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white'
+                            }`}
+                          >
+                            {isLoading ? '...' : 'REFRESH'}
+                          </button>
+                          {source.scrapeUrl && (
+                            <a
+                              href={source.scrapeUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] text-[#777] hover:text-[#ecd987] border-b border-[#333] hover:border-[#ecd987]"
+                            >
+                              [EXT]
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            ))}
           </table>
         </div>
 
