@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import WorldViewSidebar from '../components/worldview/WorldViewSidebar'
 import { fetchTradingEconomicsData, getLastUpdateTime } from '../services/tradingEconomicsService'
+
+const STORAGE_KEY_WV = 'polaris_worldview_data'
 
 const teCountryUrls = {
   usa: 'https://tradingeconomics.com/united-states/indicators',
@@ -26,18 +28,85 @@ function TeLink({ code }) {
   )
 }
 
-export default function WorldViewOpsPage() {
-  const [data, setData] = useState({
+function loadWorldViewData() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_WV)
+    if (saved) return JSON.parse(saved)
+  } catch {
+    // ignore
+  }
+  return {
     gdpUsa: 0.3, gdpEur: -0.2, gdpChn: 0.5, gdpJpn: 0.1, gdpResto: 0.0,
-    vix: 45, hyOas: 55, sp200dma: 1, embi: 60,
+    vix: 15, hyOas: 45, sp200dma: 1, embi: 55,
     smartZ: 0.5, retailZ: -0.8,
     dxy: 103.5, dxy200dma: 101.0, dxyRising: 1,
     cpiG7: 2.8, breakevens: 2.3,
-  })
+  }
+}
+
+const indicatorScrapeConfig = {
+  gdpUsa: { url: 'https://tradingeconomics.com/united-states/gdp-growth', name: 'GDP Growth Rate' },
+  gdpEur: { url: 'https://tradingeconomics.com/euro-area/gdp-growth', name: 'GDP Growth Rate' },
+  gdpChn: { url: 'https://tradingeconomics.com/china/gdp-growth', name: 'GDP Growth Rate' },
+  gdpJpn: { url: 'https://tradingeconomics.com/japan/gdp-growth', name: 'GDP Growth Rate' },
+  vix: { url: 'https://www.cboe.com/tradable_products/vix/', name: 'VIX' },
+  hyOas: { url: 'https://fred.stlouisfed.org/series/BAMLH0A0HYM2', name: 'HY OAS' },
+  embi: { url: 'https://fred.stlouisfed.org/series/EMBIG', name: 'EMBI Global Spread' },
+  cpiG7: { url: 'https://tradingeconomics.com/united-states/inflation-rate', name: 'CPI USA' },
+  breakevens: { url: 'https://fred.stlouisfed.org/series/T5YIFRM', name: 'Breakevens 5Y5Y' },
+  dxy: { url: 'https://www.theice.com/index', name: 'DXY' },
+}
+
+export default function WorldViewOpsPage() {
+  const [data, setData] = useState(loadWorldViewData)
   const [loading, setLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(null)
+  const [scrapeLog, setScrapeLog] = useState(null)
+  const [refreshingId, setRefreshingId] = useState(null)
+
+  // Persistir cambios en localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_WV, JSON.stringify(data))
+  }, [data])
 
   const handleChange = (key, value) => setData((prev) => ({ ...prev, [key]: value }))
+
+  const refreshIndicator = async (key) => {
+    const cfg = indicatorScrapeConfig[key]
+    if (!cfg) {
+      setScrapeLog({ key, error: 'No hay scraper configurado para este indicador' })
+      return
+    }
+
+    setRefreshingId(key)
+    setScrapeLog(null)
+
+    try {
+      const res = await fetch('/api/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: cfg.url, indicatorName: cfg.name }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.message || res.statusText)
+      }
+      const result = await res.json()
+
+      let newValue = data[key]
+      if (result.matchedIndicator?.last) {
+        const parsed = parseFloat(result.matchedIndicator.last.replace(/,/g, ''))
+        if (!isNaN(parsed)) newValue = parsed
+      }
+
+      setData((prev) => ({ ...prev, [key]: newValue }))
+      setScrapeLog({ key, result, value: newValue, ok: true })
+    } catch (err) {
+      setScrapeLog({ key, error: err.message })
+    } finally {
+      setRefreshingId(null)
+    }
+  }
 
   const handleRefresh = async () => {
     setLoading(true)
@@ -99,6 +168,29 @@ export default function WorldViewOpsPage() {
                 </button>
               </div>
             </div>
+
+            {/* ===== SCRAPE LOG ===== */}
+            {scrapeLog && (
+              <div className={`border-2 mb-4 p-3 ${scrapeLog.error ? 'border-[#ef4444] bg-[#1a0a0a]' : 'border-[#4ade80] bg-[#0a1a0a]'}`}>
+                <div className="text-xs font-bold uppercase tracking-wider mb-1">
+                  {scrapeLog.error ? (
+                    <span className="text-[#ef4444]">[!] ERROR ({scrapeLog.key}): {scrapeLog.error}</span>
+                  ) : (
+                    <span className="text-[#4ade80]">[OK] {scrapeLog.key.toUpperCase()} ACTUALIZADO: {scrapeLog.value}</span>
+                  )}
+                </div>
+                {scrapeLog.result && (
+                  <div className="text-xs text-[#888] font-mono">
+                    <div>URL: {scrapeLog.result.url}</div>
+                    {scrapeLog.result.matchedIndicator && (
+                      <div className="text-[#4ade80]">
+                        {scrapeLog.result.matchedIndicator.name}: {scrapeLog.result.matchedIndicator.last} {scrapeLog.result.matchedIndicator.unit}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* ===== HERO: RESULTADOS DERIVADOS ===== */}
             <div className="border-2 border-[#333] mb-4">
@@ -170,10 +262,25 @@ export default function WorldViewOpsPage() {
                         <span className="text-sm font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
                       </td>
                       <td className="px-2 py-1.5">
-                        <div className="relative inline-flex items-center">
-                          <input type="number" value={data[row.key]} min={row.min} max={row.max} step={row.step}
-                            onChange={(e) => handleChange(row.key, Number(e.target.value))}
-                            className="w-32 bg-[#111] border-b-2 border-[#ecd987] text-sm font-mono font-bold text-white px-2 py-0.5 text-right outline-none focus:border-white" />
+                        <div className="flex items-center gap-2">
+                          <div className="relative inline-flex items-center">
+                            <input type="number" value={data[row.key]} min={row.min} max={row.max} step={row.step}
+                              onChange={(e) => handleChange(row.key, Number(e.target.value))}
+                              className="w-28 bg-[#111] border-b-2 border-[#ecd987] text-sm font-mono font-bold text-white px-2 py-0.5 text-right outline-none focus:border-white" />
+                          </div>
+                          {indicatorScrapeConfig[row.key] && (
+                            <button
+                              onClick={() => refreshIndicator(row.key)}
+                              disabled={refreshingId === row.key}
+                              className={`text-[10px] font-bold uppercase tracking-wider border-b-2 px-1.5 py-0.5 ${
+                                refreshingId === row.key
+                                  ? 'border-[#333] text-[#555] cursor-not-allowed'
+                                  : 'border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white'
+                              }`}
+                            >
+                              {refreshingId === row.key ? '...' : '[REF]'}
+                            </button>
+                          )}
                         </div>
                       </td>
                       <td className="px-2 py-1.5 text-sm text-[#888]">
@@ -204,21 +311,36 @@ export default function WorldViewOpsPage() {
                         <span className="text-sm font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
                       </td>
                       <td className="px-2 py-1.5">
-                        {row.type === 'select' ? (
-                          <div className="relative inline-block w-32">
-                            <select value={data[row.key]} onChange={(e) => handleChange(row.key, Number(e.target.value))}
-                              className="w-32 appearance-none bg-[#111] border-b-2 border-[#ecd987] text-sm font-bold text-white px-2 py-0.5 pr-6 outline-none focus:border-white">
-                              {row.options.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
-                            </select>
-                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#ecd987] text-xs pointer-events-none">v</span>
-                          </div>
-                        ) : (
-                          <div className="relative inline-flex items-center">
-                            <input type="number" value={data[row.key]} min={row.min} max={row.max} step={row.step}
-                              onChange={(e) => handleChange(row.key, Number(e.target.value))}
-                              className="w-32 bg-[#111] border-b-2 border-[#ecd987] text-sm font-mono font-bold text-white px-2 py-0.5 text-right outline-none focus:border-white" />
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {row.type === 'select' ? (
+                            <div className="relative inline-block w-28">
+                              <select value={data[row.key]} onChange={(e) => handleChange(row.key, Number(e.target.value))}
+                                className="w-28 appearance-none bg-[#111] border-b-2 border-[#ecd987] text-sm font-bold text-white px-2 py-0.5 pr-6 outline-none focus:border-white">
+                                {row.options.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+                              </select>
+                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#ecd987] text-xs pointer-events-none">v</span>
+                            </div>
+                          ) : (
+                            <div className="relative inline-flex items-center">
+                              <input type="number" value={data[row.key]} min={row.min} max={row.max} step={row.step}
+                                onChange={(e) => handleChange(row.key, Number(e.target.value))}
+                                className="w-28 bg-[#111] border-b-2 border-[#ecd987] text-sm font-mono font-bold text-white px-2 py-0.5 text-right outline-none focus:border-white" />
+                            </div>
+                          )}
+                          {indicatorScrapeConfig[row.key] && (
+                            <button
+                              onClick={() => refreshIndicator(row.key)}
+                              disabled={refreshingId === row.key}
+                              className={`text-[10px] font-bold uppercase tracking-wider border-b-2 px-1.5 py-0.5 ${
+                                refreshingId === row.key
+                                  ? 'border-[#333] text-[#555] cursor-not-allowed'
+                                  : 'border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white'
+                              }`}
+                            >
+                              {refreshingId === row.key ? '...' : '[REF]'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="px-2 py-1.5 text-sm text-[#888]">
                         {row.url ? (
@@ -245,10 +367,25 @@ export default function WorldViewOpsPage() {
                         <span className="text-sm font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
                       </td>
                       <td className="px-2 py-1.5">
-                        <div className="relative inline-flex items-center">
-                          <input type="number" value={data[row.key]} min={row.min} max={row.max} step={row.step}
-                            onChange={(e) => handleChange(row.key, Number(e.target.value))}
-                            className="w-32 bg-[#111] border-b-2 border-[#ecd987] text-sm font-mono font-bold text-white px-2 py-0.5 text-right outline-none focus:border-white" />
+                        <div className="flex items-center gap-2">
+                          <div className="relative inline-flex items-center">
+                            <input type="number" value={data[row.key]} min={row.min} max={row.max} step={row.step}
+                              onChange={(e) => handleChange(row.key, Number(e.target.value))}
+                              className="w-28 bg-[#111] border-b-2 border-[#ecd987] text-sm font-mono font-bold text-white px-2 py-0.5 text-right outline-none focus:border-white" />
+                          </div>
+                          {indicatorScrapeConfig[row.key] && (
+                            <button
+                              onClick={() => refreshIndicator(row.key)}
+                              disabled={refreshingId === row.key}
+                              className={`text-[10px] font-bold uppercase tracking-wider border-b-2 px-1.5 py-0.5 ${
+                                refreshingId === row.key
+                                  ? 'border-[#333] text-[#555] cursor-not-allowed'
+                                  : 'border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white'
+                              }`}
+                            >
+                              {refreshingId === row.key ? '...' : '[REF]'}
+                            </button>
+                          )}
                         </div>
                       </td>
                       <td className="px-2 py-1.5 text-sm text-[#888]">
@@ -277,21 +414,36 @@ export default function WorldViewOpsPage() {
                         <span className="text-sm font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
                       </td>
                       <td className="px-2 py-1.5">
-                        {row.type === 'select' ? (
-                          <div className="relative inline-block w-32">
-                            <select value={data[row.key]} onChange={(e) => handleChange(row.key, Number(e.target.value))}
-                              className="w-32 appearance-none bg-[#111] border-b-2 border-[#ecd987] text-sm font-bold text-white px-2 py-0.5 pr-6 outline-none focus:border-white">
-                              {row.options.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
-                            </select>
-                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#ecd987] text-xs pointer-events-none">v</span>
-                          </div>
-                        ) : (
-                          <div className="relative inline-flex items-center">
-                            <input type="number" value={data[row.key]} min={row.min} max={row.max} step={row.step}
-                              onChange={(e) => handleChange(row.key, Number(e.target.value))}
-                              className="w-32 bg-[#111] border-b-2 border-[#ecd987] text-sm font-mono font-bold text-white px-2 py-0.5 text-right outline-none focus:border-white" />
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {row.type === 'select' ? (
+                            <div className="relative inline-block w-28">
+                              <select value={data[row.key]} onChange={(e) => handleChange(row.key, Number(e.target.value))}
+                                className="w-28 appearance-none bg-[#111] border-b-2 border-[#ecd987] text-sm font-bold text-white px-2 py-0.5 pr-6 outline-none focus:border-white">
+                                {row.options.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+                              </select>
+                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#ecd987] text-xs pointer-events-none">v</span>
+                            </div>
+                          ) : (
+                            <div className="relative inline-flex items-center">
+                              <input type="number" value={data[row.key]} min={row.min} max={row.max} step={row.step}
+                                onChange={(e) => handleChange(row.key, Number(e.target.value))}
+                                className="w-28 bg-[#111] border-b-2 border-[#ecd987] text-sm font-mono font-bold text-white px-2 py-0.5 text-right outline-none focus:border-white" />
+                            </div>
+                          )}
+                          {indicatorScrapeConfig[row.key] && (
+                            <button
+                              onClick={() => refreshIndicator(row.key)}
+                              disabled={refreshingId === row.key}
+                              className={`text-[10px] font-bold uppercase tracking-wider border-b-2 px-1.5 py-0.5 ${
+                                refreshingId === row.key
+                                  ? 'border-[#333] text-[#555] cursor-not-allowed'
+                                  : 'border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white'
+                              }`}
+                            >
+                              {refreshingId === row.key ? '...' : '[REF]'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="px-2 py-1.5 text-sm text-[#888]">
                         {row.url ? (
@@ -318,10 +470,25 @@ export default function WorldViewOpsPage() {
                         <span className="text-sm font-bold text-[#a3a3a3] uppercase tracking-wider">{row.label}</span>
                       </td>
                       <td className="px-2 py-1.5">
-                        <div className="relative inline-flex items-center">
-                          <input type="number" value={data[row.key]} min={row.min} max={row.max} step={row.step}
-                            onChange={(e) => handleChange(row.key, Number(e.target.value))}
-                            className="w-32 bg-[#111] border-b-2 border-[#ecd987] text-sm font-mono font-bold text-white px-2 py-0.5 text-right outline-none focus:border-white" />
+                        <div className="flex items-center gap-2">
+                          <div className="relative inline-flex items-center">
+                            <input type="number" value={data[row.key]} min={row.min} max={row.max} step={row.step}
+                              onChange={(e) => handleChange(row.key, Number(e.target.value))}
+                              className="w-28 bg-[#111] border-b-2 border-[#ecd987] text-sm font-mono font-bold text-white px-2 py-0.5 text-right outline-none focus:border-white" />
+                          </div>
+                          {indicatorScrapeConfig[row.key] && (
+                            <button
+                              onClick={() => refreshIndicator(row.key)}
+                              disabled={refreshingId === row.key}
+                              className={`text-[10px] font-bold uppercase tracking-wider border-b-2 px-1.5 py-0.5 ${
+                                refreshingId === row.key
+                                  ? 'border-[#333] text-[#555] cursor-not-allowed'
+                                  : 'border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white'
+                              }`}
+                            >
+                              {refreshingId === row.key ? '...' : '[REF]'}
+                            </button>
+                          )}
                         </div>
                       </td>
                       <td className="px-2 py-1.5 text-sm text-[#888]">
