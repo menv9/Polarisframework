@@ -215,10 +215,16 @@ app.get('/api/polaris/worldview', async (_req, res) => {
   res.json(data)
 })
 
-app.listen(PORT, () => {
-  console.log(`🚀 Polaris Proxy Server running on http://localhost:${PORT}`)
-  console.log(`📊 Endpoints:`)
-  console.log(`   GET http://localhost:${PORT}/api/health`)
-  console.log(`   GET http://localhost:${PORT}/api/indicators/:country`)
-  console.log(`   GET http://localhost:${PORT}/api/polaris/worldview`)
-})
+// Solo iniciar servidor si se ejecuta directamente (desarrollo local)
+// En Vercel serverless, esto no se ejecuta
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Polaris Proxy Server running on http://localhost:${PORT}`)
+    console.log(`📊 Endpoints:`)
+    console.log(`   GET http://localhost:${PORT}/api/health`)
+    console.log(`   GET http://localhost:${PORT}/api/indicators/:country`)
+    console.log(`   GET http://localhost:${PORT}/api/polaris/worldview`)
+  })
+}
+
+module.exports = app

@@ -1,7 +1,7 @@
 // Trading Economics Proxy Client
 // Llama al backend proxy local que hace scraping de Trading Economics
 
-const API_BASE = 'http://localhost:3001'
+const API_BASE = '' // URLs relativas: /api/... funciona en dev (proxy Vite) y en producción (Vercel)
 
 export async function fetchTradingEconomicsData() {
   const res = await fetch(`${API_BASE}/api/polaris/worldview`, {
