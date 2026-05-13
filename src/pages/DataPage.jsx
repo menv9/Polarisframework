@@ -43,7 +43,6 @@ export default function DataPage() {
   const [loadingAll, setLoadingAll] = useState(false)
   const [loadingId, setLoadingId] = useState(null)
   const [lastGlobalRefresh, setLastGlobalRefresh] = useState(null)
-  const [scrapeLog, setScrapeLog] = useState(null)
 
   // Persistir cambios en localStorage
   useEffect(() => {
@@ -126,7 +125,6 @@ export default function DataPage() {
     if (!source) return
 
     setLoadingId(id)
-    setScrapeLog(null)
 
     try {
       const url = source.scrapeUrl
@@ -141,6 +139,10 @@ export default function DataPage() {
           ? `${result.matchedIndicator.name}: ${result.matchedIndicator.last}${result.matchedIndicator.unit ? ' ' + result.matchedIndicator.unit : ''}`
           : null
 
+        const valueOnly = result.matchedIndicator?.last
+          ? result.matchedIndicator.last + (result.matchedIndicator.unit ? ' ' + result.matchedIndicator.unit : '')
+          : null
+
         setSources((prev) =>
           prev.map((s) =>
             s.id === id
@@ -150,23 +152,25 @@ export default function DataPage() {
                   lastUpdate: today,
                   _lastScrape: result,
                   _scrapedValue: scrapedValue,
+                  _value: valueOnly || s._value,
                 }
               : s
           )
         )
-        setScrapeLog({ id, result, scrapedValue })
       } else if (source.scraper === 'trading-economics' && url) {
         // Scraper ya era TE pero URL no parece TE (caso raro)
         const result = await scrapeTradingEconomics(url, source.indicator)
         const today = new Date().toISOString().split('T')[0]
+        const valueOnly = result.matchedIndicator?.last
+          ? result.matchedIndicator.last + (result.matchedIndicator.unit ? ' ' + result.matchedIndicator.unit : '')
+          : null
         setSources((prev) =>
           prev.map((s) =>
             s.id === id
-              ? { ...s, lastUpdate: today, _lastScrape: result }
+              ? { ...s, lastUpdate: today, _lastScrape: result, _value: valueOnly || s._value }
               : s
           )
         )
-        setScrapeLog({ id, result })
       } else {
         // API/manual: solo marca como actualizado (hoy)
         const today = new Date().toISOString().split('T')[0]
@@ -178,7 +182,6 @@ export default function DataPage() {
       }
     } catch (err) {
       console.error('Refresh failed:', err)
-      setScrapeLog({ id, error: err.message })
     } finally {
       setLoadingId(null)
     }
@@ -186,7 +189,6 @@ export default function DataPage() {
 
   const refreshAllStale = async () => {
     setLoadingAll(true)
-    setScrapeLog(null)
     const today = new Date().toISOString().split('T')[0]
 
     const staleSources = sources.filter((s) => getStatus(s).code !== 'ok')
@@ -194,7 +196,15 @@ export default function DataPage() {
     for (const source of staleSources) {
       try {
         if (source.scraper === 'trading-economics' && source.scrapeUrl) {
-          await scrapeTradingEconomics(source.scrapeUrl, source.indicator)
+          const result = await scrapeTradingEconomics(source.scrapeUrl, source.indicator)
+          const valueOnly = result.matchedIndicator?.last
+            ? result.matchedIndicator.last + (result.matchedIndicator.unit ? ' ' + result.matchedIndicator.unit : '')
+            : null
+          setSources((prev) =>
+            prev.map((s) =>
+              s.id === source.id ? { ...s, lastUpdate: today, _lastScrape: result, _value: valueOnly || s._value } : s
+            )
+          )
         }
       } catch (err) {
         console.warn(`Failed to refresh ${source.id}:`, err.message)
@@ -274,37 +284,6 @@ export default function DataPage() {
             <div className="text-xl font-mono font-bold text-[#ef4444]">{counts.stale}</div>
           </div>
         </div>
-
-        {/* ===== SCRAPE LOG ===== */}
-        {scrapeLog && (
-          <div className={`border-2 mb-4 p-3 ${scrapeLog.error ? 'border-[#ef4444] bg-[#1a0a0a]' : 'border-[#4ade80] bg-[#0a1a0a]'}`}>
-            <div className="text-xs font-bold uppercase tracking-wider mb-1">
-              {scrapeLog.error ? (
-                <span className="text-[#ef4444]">[!] ERROR: {scrapeLog.error}</span>
-              ) : (
-                <span className="text-[#4ade80]">[OK] SCRAPE EXITOSO</span>
-              )}
-            </div>
-            {scrapeLog.result && (
-              <div className="text-xs text-[#888] font-mono space-y-0.5">
-                <div>URL: {scrapeLog.result.url}</div>
-                {scrapeLog.scrapedValue ? (
-                  <div className="text-[#4ade80] font-bold">VALOR: {scrapeLog.scrapedValue}</div>
-                ) : (
-                  <>
-                    <div>Indicadores: {scrapeLog.result.totalIndicators || scrapeLog.result.indicators?.length || 0}</div>
-                    {scrapeLog.result.indicators?.slice(0, 3).map((ind, i) => (
-                      <div key={i}>• {ind.name}: {ind.last} {ind.unit}</div>
-                    ))}
-                    {(scrapeLog.result.totalIndicators || scrapeLog.result.indicators?.length || 0) > 3 && (
-                      <div className="text-[#555]">... y mas</div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* ===== FILTROS — MODULO (top-level) ===== */}
         <div className="mb-2">
@@ -465,9 +444,20 @@ export default function DataPage() {
                                 </span>
                               </td>
                               <td className="px-2 py-1.5">
-                                <span className="text-xs font-mono font-bold text-white">
-                                  {source._scrapedValue ? source._scrapedValue.split(': ')[1] || source._scrapedValue : '--'}
-                                </span>
+                                <input
+                                  type="text"
+                                  value={source._value || ''}
+                                  onChange={(e) => {
+                                    setSources((prev) =>
+                                      prev.map((s) =>
+                                        s.id === source.id ? { ...s, _value: e.target.value } : s
+                                      )
+                                    )
+                                  }}
+                                  placeholder="--"
+                                  className="w-full bg-[#111] border-b-2 border-[#4ade80] text-xs font-mono font-bold text-white px-1.5 py-1 outline-none focus:border-white focus:bg-[#0a1a0a]"
+                                  title="Dato actual. Edita manualmente o usa [REF] para scrapear"
+                                />
                               </td>
                               <td className="px-2 py-1.5">
                                 {/* Editable URL */}
