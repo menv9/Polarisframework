@@ -214,6 +214,12 @@ export function getStatus(source) {
   const last = new Date(source.lastUpdate)
   last.setHours(0, 0, 0, 0)
 
+  // Si fue actualizado hoy -> OK
+  const daysSinceUpdate = Math.floor((today - last) / (1000 * 60 * 60 * 24))
+  if (daysSinceUpdate <= 0) {
+    return { code: 'ok', label: 'OK', color: 'text-[#4ade80]' }
+  }
+
   const nextStr = getNextUpdate(source.lastUpdate, source.frequencyDays)
   const next = new Date(nextStr)
   next.setHours(0, 0, 0, 0)
