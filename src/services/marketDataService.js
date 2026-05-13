@@ -1,9 +1,9 @@
-// Trading Economics Proxy Client
-// Llama al backend proxy local que hace scraping de Trading Economics
+// Market data client
+// FRED es la fuente automatica principal para los datos USA y proxies globales.
 
 const API_BASE = '' // URLs relativas: /api/... funciona en dev (proxy Vite) y en producción (Vercel)
 
-export async function fetchTradingEconomicsData() {
+export async function fetchMarketData() {
   const res = await fetch(`${API_BASE}/api/polaris/worldview`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },
@@ -41,6 +41,18 @@ export async function fetchTradingEconomicsData() {
     cpiG7: data.cpiG7 ?? 2.8,
     breakevens: data.breakevens ?? 2.3,
   }
+}
+
+export async function fetchFredLatestValue(seriesId) {
+  const res = await fetch(`${API_BASE}/api/fred/latest/${seriesId}`)
+  if (!res.ok) throw new Error(`FRED fetch failed for ${seriesId}`)
+  return res.json()
+}
+
+export async function fetchFredYoY(seriesId) {
+  const res = await fetch(`${API_BASE}/api/fred/yoy/${seriesId}`)
+  if (!res.ok) throw new Error(`FRED YoY fetch failed for ${seriesId}`)
+  return res.json()
 }
 
 export async function fetchCountryIndicators(countryCode) {

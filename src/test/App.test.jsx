@@ -66,7 +66,7 @@ describe('App', () => {
       </MemoryRouter>
     )
     expect(screen.getByText('CENTRO DE CONTROL — DATOS')).toBeInTheDocument()
-    expect(screen.getByText('REFRESH DESACTUALIZADOS')).toBeInTheDocument()
+    expect(screen.getByText('REFRESH TODO')).toBeInTheDocument()
     expect(screen.getByText('Actualizados')).toBeInTheDocument()
     expect(screen.getByText('Desactualizados')).toBeInTheDocument()
   })

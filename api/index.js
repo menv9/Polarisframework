@@ -3,6 +3,8 @@ const express = require('express')
 const axios = require('axios')
 const cheerio = require('cheerio')
 const cors = require('cors')
+const AdmZip = require('adm-zip')
+const XLSX = require('xlsx')
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -11,7 +13,7 @@ const PORT = process.env.PORT || 3001
 app.use(cors({ origin: '*' }))
 app.use(express.json())
 
-// Mapeo de códigos de país a slugs de Trading Economics
+// Mapeo de codigos de pais para futuras fuentes oficiales
 const countrySlugs = {
   usa: 'united-states',
   eur: 'euro-area',
@@ -49,6 +51,13 @@ function setCached(key, data) {
 const SCRAPINGANT_API_KEY = process.env.SCRAPINGANT_API_KEY || ''
 const SCRAPINGANT_BASE = 'https://api.scrapingant.com/v2/general'
 
+// FRED API config
+const FRED_API_KEY = process.env.FRED_API_KEY || ''
+const FRED_BASE = 'https://api.stlouisfed.org/fred/series/observations'
+const ECB_BASE = 'https://data-api.ecb.europa.eu/service/data'
+const EUROSTAT_BASE = 'https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data'
+const IMF_BASE = 'https://dataservices.imf.org/REST/SDMX_JSON.svc/CompactData'
+
 // Headers para simular navegador real
 const browserHeaders = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -67,77 +76,471 @@ const browserHeaders = {
   'Upgrade-Insecure-Requests': '1',
 }
 
-async function fetchViaScrapingAnt(targetUrl) {
+async function fetchViaScrapingAnt(targetUrl, opts = {}) {
   if (!SCRAPINGANT_API_KEY) {
     throw new Error('ScrapingAnt API key not configured')
   }
-  const params = new URLSearchParams({ url: targetUrl, proxy_type: 'residential' })
+  const params = new URLSearchParams({
+    url: targetUrl,
+    proxy_type: 'residential',
+    wait_for_selector: opts.wait_for_selector || 'table',
+    browser: 'true',
+  })
+  if (opts.js_snippet) {
+    params.set('js_snippet', opts.js_snippet)
+  }
   const apiUrl = `${SCRAPINGANT_BASE}?${params.toString()}`
-  console.log(`[SCRAPINGANT] Proxying: ${targetUrl}`)
+  console.log(`[SCRAPINGANT] Proxying: ${targetUrl}${opts.js_snippet ? ' (with js_snippet)' : ''}`)
   console.log(`[SCRAPINGANT] Full URL: ${apiUrl}`)
   const { data: html } = await axios.get(apiUrl, {
     headers: { 'x-api-key': SCRAPINGANT_API_KEY },
-    timeout: 30000,
+    timeout: opts.timeout || 45000,
   })
   console.log(`[SCRAPINGANT] Success, HTML length: ${html.length}`)
   return html
 }
 
-async function scrapeTradingEconomics(countrySlug) {
-  const url = `https://tradingeconomics.com/${countrySlug}/indicators`
-
-  let html
-  try {
-    html = await fetchViaScrapingAnt(url)
-  } catch (antErr) {
-    console.log(`[SCRAPINGANT] Failed for country ${countrySlug}: ${antErr.message}. Falling back.`)
-    const { data } = await axios.get(url, { headers: browserHeaders, timeout: 5000 })
-    html = data
+async function fetchFredObservations(seriesId, limit = 1) {
+  if (!FRED_API_KEY) {
+    throw new Error('FRED API key not configured')
   }
+  const params = new URLSearchParams({
+    series_id: seriesId,
+    api_key: FRED_API_KEY,
+    file_type: 'json',
+    sort_order: 'desc',
+    limit: String(limit),
+  })
+  const url = `${FRED_BASE}?${params.toString()}`
+  console.log(`[FRED] Fetching series ${seriesId}, limit ${limit}`)
+  const { data } = await axios.get(url, { timeout: 15000 })
+  if (!data || !data.observations) {
+    throw new Error('Invalid FRED response')
+  }
+  return data.observations
+}
 
-  const $ = cheerio.load(html)
+async function fetchFredLatestValue(seriesId) {
+  const observations = await fetchFredObservations(seriesId, 1)
+  if (!observations.length) return null
+  const latest = observations[0]
+  const val = parseFloat(latest.value)
+  return {
+    seriesId,
+    date: latest.date,
+    value: isNaN(val) ? null : val,
+    raw: latest.value,
+  }
+}
 
-  const indicators = []
+function toFredNumber(observation) {
+  const value = Number.parseFloat(observation?.value)
+  if (!Number.isFinite(value)) return null
+  return { date: observation.date, value, raw: observation.value }
+}
 
-  $('.table-responsive table tbody tr').each((_, row) => {
-    const cells = $(row).find('td')
-    if (cells.length >= 3) {
-      const name = $(cells[0]).text().trim()
-      const last = $(cells[1]).text().trim().replace(/,/g, '')
-      const previous = $(cells[2]).text().trim().replace(/,/g, '')
-      const unit = $(cells[3]).text().trim() || ''
+async function fetchFredNumericObservations(seriesId, limit = 1000) {
+  const observations = await fetchFredObservations(seriesId, limit)
+  return observations.map(toFredNumber).filter(Boolean)
+}
 
-      if (name && last) {
-        indicators.push({
-          name,
-          last: parseFloat(last) || last,
-          previous: parseFloat(previous) || previous,
-          unit,
+async function fetchFredPercentile(seriesId, limit = 1300) {
+  const observations = await fetchFredNumericObservations(seriesId, limit)
+  if (observations.length < 20) return null
+  const latest = observations[0]
+  const rank = observations.filter((obs) => obs.value <= latest.value).length
+  const percentile = (rank / observations.length) * 100
+  return {
+    seriesId,
+    date: latest.date,
+    value: Number(percentile.toFixed(1)),
+    raw: latest.raw,
+    meta: { latestValue: latest.value, sampleSize: observations.length },
+  }
+}
+
+async function fetchFredSpread(leftSeriesId, rightSeriesId, limit = 30) {
+  const [left, right] = await Promise.all([
+    fetchFredNumericObservations(leftSeriesId, limit),
+    fetchFredNumericObservations(rightSeriesId, limit),
+  ])
+  const rightByDate = new Map(right.map((obs) => [obs.date, obs]))
+  const leftMatch = left.find((obs) => rightByDate.has(obs.date))
+  if (!leftMatch) return null
+  const rightMatch = rightByDate.get(leftMatch.date)
+  const value = leftMatch.value - rightMatch.value
+  return {
+    seriesId: `${leftSeriesId}-${rightSeriesId}`,
+    date: leftMatch.date,
+    value: Number(value.toFixed(2)),
+    raw: value,
+    meta: {
+      left: { seriesId: leftSeriesId, value: leftMatch.value },
+      right: { seriesId: rightSeriesId, value: rightMatch.value },
+    },
+  }
+}
+
+async function fetchFredAboveMovingAverage(seriesId, window = 200, limit = 260) {
+  const observations = await fetchFredNumericObservations(seriesId, Math.max(limit, window + 20))
+  if (observations.length < window) return null
+  const ascending = observations.slice().reverse()
+  const latest = ascending.at(-1)
+  const windowValues = ascending.slice(-window).map((obs) => obs.value)
+  const sma = windowValues.reduce((sum, value) => sum + value, 0) / windowValues.length
+  return {
+    seriesId,
+    date: latest.date,
+    value: latest.value > sma ? 1 : 0,
+    raw: latest.value,
+    meta: { latestValue: latest.value, movingAverage: Number(sma.toFixed(2)), window },
+  }
+}
+
+// Calculate YoY % change from FRED monthly observations
+async function fetchFredYoYChange(seriesId) {
+  const observations = await fetchFredObservations(seriesId, 14)
+  if (observations.length < 13) return null
+  const current = parseFloat(observations[0].value)
+  const yearAgo = parseFloat(observations[12].value)
+  if (isNaN(current) || isNaN(yearAgo) || yearAgo === 0) return null
+  const yoy = ((current - yearAgo) / yearAgo) * 100
+  return {
+    seriesId,
+    date: observations[0].date,
+    value: Number(yoy.toFixed(2)),
+    current,
+    yearAgo,
+  }
+}
+
+// Calculate YoY % change from FRED quarterly observations (index[0] vs index[4])
+async function fetchFredYoYChangeQuarterly(seriesId) {
+  const observations = await fetchFredObservations(seriesId, 5)
+  if (observations.length < 5) return null
+  const current = parseFloat(observations[0].value)
+  const yearAgo = parseFloat(observations[4].value)
+  if (isNaN(current) || isNaN(yearAgo) || yearAgo === 0) return null
+  const yoy = ((current - yearAgo) / yearAgo) * 100
+  return {
+    seriesId,
+    date: observations[0].date,
+    value: Number(yoy.toFixed(2)),
+    current,
+    yearAgo,
+  }
+}
+
+function normalizeLatest({ provider, seriesId, date, value, raw, meta = {} }) {
+  return {
+    provider,
+    seriesId,
+    date: date || null,
+    value: Number.isFinite(value) ? value : null,
+    raw: raw ?? null,
+    meta,
+    fetchedAt: new Date().toISOString(),
+  }
+}
+
+function parseCsv(text) {
+  const lines = text.trim().split(/\r?\n/)
+  if (!lines.length) return []
+  const headers = lines[0].split(',').map((h) => h.replace(/^"|"$/g, '').trim())
+  return lines.slice(1).map((line) => {
+    const cells = line.match(/("([^"]|"")*"|[^,]*)/g).filter((_, i) => i % 2 === 0).map((cell) => cell.replace(/^"|"$/g, '').replace(/""/g, '"').trim())
+    return headers.reduce((row, header, index) => {
+      row[header] = cells[index] ?? ''
+      return row
+    }, {})
+  })
+}
+
+async function fetchYahooLatest(symbol) {
+  const encoded = encodeURIComponent(symbol)
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?range=5d&interval=1d`
+  const { data } = await axios.get(url, { timeout: 15000, headers: browserHeaders })
+  const result = data?.chart?.result?.[0]
+  const quote = result?.indicators?.quote?.[0]
+  const closes = quote?.close || []
+  const timestamps = result?.timestamp || []
+  for (let i = closes.length - 1; i >= 0; i -= 1) {
+    if (closes[i] === null || closes[i] === undefined) continue
+    const value = Number(closes[i])
+    if (Number.isFinite(value)) {
+      return normalizeLatest({
+        provider: 'yahoo',
+        seriesId: symbol,
+        date: timestamps[i] ? new Date(timestamps[i] * 1000).toISOString().slice(0, 10) : null,
+        value,
+        raw: closes[i],
+        meta: { currency: result?.meta?.currency, exchangeName: result?.meta?.exchangeName },
+      })
+    }
+  }
+  throw new Error(`No Yahoo close available for ${symbol}`)
+}
+
+async function fetchYahooHistory(symbol, range = '1y', interval = '1d') {
+  const encoded = encodeURIComponent(symbol)
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}`
+  const { data } = await axios.get(url, { timeout: 15000, headers: browserHeaders })
+  const result = data?.chart?.result?.[0]
+  const quote = result?.indicators?.quote?.[0]
+  const closes = quote?.close || []
+  const timestamps = result?.timestamp || []
+  return closes
+    .map((close, index) => ({
+      date: timestamps[index] ? new Date(timestamps[index] * 1000).toISOString().slice(0, 10) : null,
+      value: Number(close),
+    }))
+    .filter((row) => row.date && Number.isFinite(row.value) && row.value > 0)
+}
+
+async function fetchYahooAboveMovingAverage(symbol, window = 200) {
+  const observations = await fetchYahooHistory(symbol, '1y', '1d')
+  if (observations.length < window) throw new Error(`Not enough Yahoo data for ${symbol} ${window}dma`)
+  const latest = observations.at(-1)
+  const windowValues = observations.slice(-window).map((obs) => obs.value)
+  const sma = windowValues.reduce((sum, value) => sum + value, 0) / windowValues.length
+  return normalizeLatest({
+    provider: 'yahoo',
+    seriesId: `${symbol}_${window}DMA_SIGNAL`,
+    date: latest.date,
+    value: latest.value > sma ? 1 : 0,
+    raw: latest.value,
+    meta: { symbol, latestValue: latest.value, movingAverage: Number(sma.toFixed(2)), window },
+  })
+}
+
+async function fetchYahooRatio(leftSymbol, rightSymbol) {
+  const [left, right] = await Promise.all([
+    fetchYahooLatest(leftSymbol),
+    fetchYahooLatest(rightSymbol),
+  ])
+  if (!Number.isFinite(left.value) || !Number.isFinite(right.value) || right.value === 0) {
+    throw new Error(`Invalid Yahoo ratio ${leftSymbol}/${rightSymbol}`)
+  }
+  return normalizeLatest({
+    provider: 'yahoo',
+    seriesId: `${leftSymbol}/${rightSymbol}`,
+    date: left.date || right.date,
+    value: Number((left.value / right.value).toFixed(6)),
+    raw: left.value / right.value,
+    meta: { left, right },
+  })
+}
+
+async function fetchEcbLatest(seriesKey) {
+  const url = `${ECB_BASE}/${seriesKey}?format=csvdata&detail=dataonly&lastNObservations=1`
+  const { data } = await axios.get(url, { timeout: 20000 })
+  const rows = parseCsv(data)
+  const row = rows.find((r) => r.OBS_VALUE || r.TIME_PERIOD) || rows[0]
+  if (!row) throw new Error(`No ECB data for ${seriesKey}`)
+  return normalizeLatest({
+    provider: 'ecb',
+    seriesId: seriesKey,
+    date: row.TIME_PERIOD,
+    value: Number.parseFloat(row.OBS_VALUE),
+    raw: row.OBS_VALUE,
+    meta: row,
+  })
+}
+
+function latestJsonStatValue(data) {
+  const timeDimId = data.id?.find((id) => id === 'time' || id === 'TIME_PERIOD')
+  const timeDim = timeDimId ? data.dimension?.[timeDimId] : null
+  const index = timeDim?.category?.index || {}
+  const labels = timeDim?.category?.label || {}
+  const valueMap = data.value || {}
+  const latest = Object.entries(valueMap)
+    .map(([flatIndex, rawValue]) => ({ flatIndex: Number(flatIndex), rawValue: Number(rawValue) }))
+    .filter((item) => Number.isFinite(item.rawValue))
+    .sort((a, b) => a.flatIndex - b.flatIndex)
+    .at(-1)
+  if (!latest) throw new Error('No numeric Eurostat values')
+  const timeEntries = Object.entries(index).sort((a, b) => a[1] - b[1])
+  const guessedTime = timeEntries.at(-1)?.[0]
+  return { value: latest.rawValue, date: labels[guessedTime] || guessedTime || null, flatIndex: latest.flatIndex }
+}
+
+async function fetchEurostatLatest(dataset, filters = {}) {
+  const params = new URLSearchParams({ lang: 'en' })
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') params.set(key, value)
+  })
+  const url = `${EUROSTAT_BASE}/${dataset}?${params.toString()}`
+  const { data } = await axios.get(url, { timeout: 20000 })
+  const latest = latestJsonStatValue(data)
+  return normalizeLatest({
+    provider: 'eurostat',
+    seriesId: dataset,
+    date: latest.date,
+    value: latest.value,
+    raw: latest.value,
+    meta: { filters, flatIndex: latest.flatIndex },
+  })
+}
+
+async function fetchOecdLatest(url) {
+  const parsed = new URL(url)
+  if (!parsed.hostname.endsWith('oecd.org')) {
+    throw new Error('Only OECD official URLs are allowed')
+  }
+  const { data } = await axios.get(url, { timeout: 30000, headers: { Accept: 'application/json' } })
+
+  // SDMX-JSON format (stats.oecd.org or sdmx.oecd.org)
+  if (typeof data === 'object' && data.dataSets) {
+    const series = Object.values(data.dataSets[0]?.series || {})[0]
+    const observations = series?.observations || {}
+    const timeValues = data.structure?.dimensions?.observation?.[0]?.values || []
+    for (let i = timeValues.length - 1; i >= 0; i--) {
+      const obs = observations[String(i)]
+      const val = obs?.[0]
+      if (val !== null && val !== undefined && Number.isFinite(Number(val))) {
+        return normalizeLatest({
+          provider: 'oecd',
+          seriesId: parsed.pathname,
+          date: timeValues[i]?.id ?? null,
+          value: Number(val),
+          raw: String(val),
+          meta: { url },
         })
       }
     }
+    throw new Error('No OECD observations in SDMX-JSON')
+  }
+
+  // CSV fallback
+  const rows = typeof data === 'string' ? parseCsv(data) : []
+  if (!rows.length) throw new Error('OECD response is not parseable (not CSV or SDMX-JSON)')
+  const valueKeys = ['OBS_VALUE', 'ObsValue', 'Value', 'value']
+  const timeKeys = ['TIME_PERIOD', 'Time', 'TIME', 'time']
+  const row = rows
+    .filter((item) => valueKeys.some((key) => Number.isFinite(Number.parseFloat(item[key]))))
+    .at(-1)
+  if (!row) throw new Error('No OECD numeric observations')
+  const valueKey = valueKeys.find((key) => Number.isFinite(Number.parseFloat(row[key])))
+  const timeKey = timeKeys.find((key) => row[key])
+  return normalizeLatest({
+    provider: 'oecd',
+    seriesId: parsed.pathname,
+    date: timeKey ? row[timeKey] : null,
+    value: Number.parseFloat(row[valueKey]),
+    raw: row[valueKey],
+    meta: { url },
   })
+}
 
-  if (indicators.length === 0) {
-    $('table tbody tr').each((_, row) => {
-      const cells = $(row).find('td')
-      if (cells.length >= 3) {
-        const name = $(cells[0]).text().trim()
-        const last = $(cells[1]).text().trim().replace(/,/g, '')
-        const previous = $(cells[2]).text().trim().replace(/,/g, '')
-        if (name && last && !isNaN(parseFloat(last))) {
-          indicators.push({ name, last: parseFloat(last), previous: parseFloat(previous) || null, unit: '' })
-        }
-      }
+async function fetchBisReerLatest(currency) {
+  const bisCurrencyCodes = {
+    USD: 'RBUS',
+    EUR: 'RBXM',
+    JPY: 'RBJP',
+    GBP: 'RBGB',
+    CHF: 'RBCH',
+    CAD: 'RBCA',
+    AUD: 'RBAU',
+    NZD: 'RBNZ',
+    SEK: 'RBSE',
+    NOK: 'RBNO',
+  }
+  const targetCode = bisCurrencyCodes[currency.toUpperCase()] || currency.toUpperCase()
+  const url = 'https://www.bis.org/statistics/eer/broad.xlsx'
+  const { data } = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 })
+  const workbook = XLSX.read(data, { type: 'buffer' })
+  const sheetName = workbook.SheetNames.find((name) => name.toLowerCase() === 'real') || workbook.SheetNames[0]
+  const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, raw: true })
+  const headerIndex = rows.findIndex((row) => row.some((cell) => String(cell).trim().toUpperCase() === targetCode))
+  if (headerIndex < 0) throw new Error(`BIS currency not found: ${currency}`)
+  const headers = rows[headerIndex].map((cell) => String(cell || '').trim().toUpperCase())
+  const colIndex = headers.findIndex((cell) => cell === targetCode)
+  const latestRow = rows.slice(headerIndex + 1).filter((row) => row[colIndex] !== undefined && row[colIndex] !== null && row[colIndex] !== '').at(-1)
+  if (!latestRow) throw new Error(`No BIS REER value for ${currency}`)
+  const excelDate = Number(latestRow[0])
+  const date = Number.isFinite(excelDate)
+    ? new Date(Date.UTC(1899, 11, 30) + excelDate * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    : String(latestRow[0])
+  return normalizeLatest({
+    provider: 'bis',
+    seriesId: `BIS_REER_${currency.toUpperCase()}`,
+    date,
+    value: Number.parseFloat(latestRow[colIndex]),
+    raw: latestRow[colIndex],
+    meta: { sheetName, currency: currency.toUpperCase(), bisCode: targetCode },
+  })
+}
+
+async function fetchCftcLatest(market) {
+  const year = new Date().getUTCFullYear()
+  const url = `https://www.cftc.gov/files/dea/history/fut_fin_txt_${year}.zip`
+  const { data } = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 })
+  const zip = new AdmZip(Buffer.from(data))
+  const entry = zip.getEntries().find((item) => item.entryName.toLowerCase().endsWith('.txt'))
+  if (!entry) throw new Error('No CFTC txt file in zip')
+  const rows = parseCsv(entry.getData().toString('utf8'))
+  const needle = market.toLowerCase()
+  const row = rows
+    .filter((r) => {
+      const name = String(r.Market_and_Exchange_Names || r['Market and Exchange Names'] || '').toLowerCase()
+      return name.startsWith(`${needle} -`) || name === needle
     })
-  }
+    .at(-1)
+  if (!row) throw new Error(`No CFTC market match for ${market}`)
+  const longValue = Number.parseFloat(row.Asset_Mgr_Positions_Long_All || row['Asset Mgr Longs'] || '0')
+  const shortValue = Number.parseFloat(row.Asset_Mgr_Positions_Short_All || row['Asset Mgr Shorts'] || '0')
+  const value = longValue - shortValue
+  const compactDate = row.As_of_Date_In_Form_YYMMDD
+  const parsedDate = row.Report_Date_as_YYYY_MM_DD || (
+    /^\d{6}$/.test(compactDate || '')
+      ? `20${compactDate.slice(0, 2)}-${compactDate.slice(2, 4)}-${compactDate.slice(4, 6)}`
+      : compactDate
+  )
+  return normalizeLatest({
+    provider: 'cftc',
+    seriesId: market,
+    date: parsedDate,
+    value,
+    raw: value,
+    meta: { long: longValue, short: shortValue, market: row.Market_and_Exchange_Names || row['Market and Exchange Names'] },
+  })
+}
 
-  return {
-    country: countrySlug,
-    url,
-    scrapedAt: new Date().toISOString(),
-    indicators,
-  }
+async function fetchImfLatest(dataset, seriesKey, startPeriod = '2000') {
+  const url = `${IMF_BASE}/${dataset}/${seriesKey}?startPeriod=${encodeURIComponent(startPeriod)}`
+  const { data } = await axios.get(url, { timeout: 20000 })
+  const observations = data?.CompactData?.DataSet?.Series?.Obs
+  const list = Array.isArray(observations) ? observations : observations ? [observations] : []
+  const latest = list.filter((obs) => obs['@OBS_VALUE']).at(-1)
+  if (!latest) throw new Error(`No IMF observations for ${dataset}/${seriesKey}`)
+  return normalizeLatest({
+    provider: 'imf',
+    seriesId: `${dataset}/${seriesKey}`,
+    date: latest['@TIME_PERIOD'],
+    value: Number.parseFloat(latest['@OBS_VALUE']),
+    raw: latest['@OBS_VALUE'],
+    meta: { dataset, seriesKey },
+  })
+}
+
+async function fetchBankOfCanadaPolicyRate() {
+  const url = 'https://www.bankofcanada.ca/valet/observations/V39079/json'
+  const { data } = await axios.get(url, { timeout: 15000 })
+  const latest = data?.observations?.at(-1)
+  const value = Number.parseFloat(latest?.V39079?.v)
+  if (!latest || !Number.isFinite(value)) throw new Error('No Bank of Canada policy rate')
+  return normalizeLatest({
+    provider: 'central-bank',
+    seriesId: 'BOC_POLICY_RATE',
+    date: latest.d,
+    value,
+    raw: latest.V39079.v,
+    meta: { bank: 'boc' },
+  })
+}
+
+async function fetchOfficialCountryIndicators(countrySlug) {
+  throw new Error(`No official fetcher configured yet for ${countrySlug}`)
 }
 
 function findIndicator(indicators, searchTerms) {
@@ -152,6 +555,227 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
+// FRED proxy endpoints
+app.get('/api/fred/latest/:seriesId', async (req, res) => {
+  const { seriesId } = req.params
+  try {
+    const result = await fetchFredLatestValue(seriesId)
+    if (!result || result.value === null) {
+      return res.status(404).json({ error: 'No data available', seriesId })
+    }
+    res.json(result)
+  } catch (err) {
+    console.error(`[FRED] Error fetching latest ${seriesId}:`, err.message)
+    res.status(502).json({ error: 'FRED fetch failed', message: err.message })
+  }
+})
+
+app.get('/api/fred/yoy/:seriesId', async (req, res) => {
+  const { seriesId } = req.params
+  try {
+    const result = await fetchFredYoYChange(seriesId)
+    if (!result || result.value === null) {
+      return res.status(404).json({ error: 'Not enough data for YoY', seriesId })
+    }
+    res.json(result)
+  } catch (err) {
+    console.error(`[FRED] Error fetching YoY ${seriesId}:`, err.message)
+    res.status(502).json({ error: 'FRED fetch failed', message: err.message })
+  }
+})
+
+app.get('/api/fred/percentile/:seriesId', async (req, res) => {
+  const { seriesId } = req.params
+  const limit = Math.min(parseInt(req.query.limit || '1300', 10), 5000)
+  try {
+    const result = await fetchFredPercentile(seriesId, limit)
+    if (!result || result.value === null) {
+      return res.status(404).json({ error: 'Not enough data for percentile', seriesId })
+    }
+    res.json(result)
+  } catch (err) {
+    console.error(`[FRED] Error fetching percentile ${seriesId}:`, err.message)
+    res.status(502).json({ error: 'FRED percentile failed', message: err.message })
+  }
+})
+
+app.get('/api/fred/real-rate', async (req, res) => {
+  const policy = String(req.query.policy || '')
+  const cpi = String(req.query.cpi || '')
+  const quarterly = req.query.quarterly === 'true'
+  const cpiraw = req.query.cpiraw === 'true' // CPI series is already a YoY rate — use latest value directly
+  if (!policy || !cpi) return res.status(400).json({ error: 'policy and cpi required' })
+  try {
+    const policyObs = await fetchFredObservations(policy, 2)
+    const policyVal = Number.parseFloat(policyObs[0]?.value)
+    if (!Number.isFinite(policyVal)) throw new Error(`No valid policy rate for ${policy}`)
+    let cpiYoY
+    if (cpiraw) {
+      const cpiObs = await fetchFredObservations(cpi, 2)
+      const cpiVal = Number.parseFloat(cpiObs[0]?.value)
+      if (!Number.isFinite(cpiVal)) throw new Error(`No valid CPI value for ${cpi}`)
+      cpiYoY = { value: cpiVal, date: cpiObs[0]?.date }
+    } else {
+      cpiYoY = await (quarterly ? fetchFredYoYChangeQuarterly(cpi) : fetchFredYoYChange(cpi))
+    }
+    if (!cpiYoY || !Number.isFinite(cpiYoY.value)) throw new Error(`No valid CPI YoY for ${cpi}`)
+    const realRate = Number((policyVal - cpiYoY.value).toFixed(2))
+    res.json({
+      value: realRate,
+      date: policyObs[0]?.date,
+      seriesId: `${policy}-real`,
+      meta: { policyRate: policyVal, cpiYoY: cpiYoY.value },
+    })
+  } catch (err) {
+    res.status(502).json({ error: 'Real rate calculation failed', message: err.message })
+  }
+})
+
+app.get('/api/fred/spread', async (req, res) => {
+  const left = String(req.query.left || '')
+  const right = String(req.query.right || '')
+  const limit = Math.min(parseInt(req.query.limit || '30', 10), 1000)
+  if (!left || !right) return res.status(400).json({ error: 'left and right series required' })
+  try {
+    const result = await fetchFredSpread(left, right, limit)
+    if (!result || result.value === null) {
+      return res.status(404).json({ error: 'No aligned observations for spread', left, right })
+    }
+    res.json(result)
+  } catch (err) {
+    console.error(`[FRED] Error fetching spread ${left}-${right}:`, err.message)
+    res.status(502).json({ error: 'FRED spread failed', message: err.message })
+  }
+})
+
+app.get('/api/fred/above-ma/:seriesId', async (req, res) => {
+  const { seriesId } = req.params
+  const window = Math.min(parseInt(req.query.window || '200', 10), 1000)
+  const limit = Math.min(parseInt(req.query.limit || String(window + 60), 10), 5000)
+  try {
+    const result = await fetchFredAboveMovingAverage(seriesId, window, limit)
+    if (!result || result.value === null) {
+      return res.status(404).json({ error: 'Not enough data for moving average', seriesId })
+    }
+    res.json(result)
+  } catch (err) {
+    console.error(`[FRED] Error fetching above-ma ${seriesId}:`, err.message)
+    res.status(502).json({ error: 'FRED moving average failed', message: err.message })
+  }
+})
+
+app.get('/api/fred/:seriesId', async (req, res) => {
+  const { seriesId } = req.params
+  const limit = Math.min(parseInt(req.query.limit || '1', 10), 1000)
+  try {
+    const observations = await fetchFredObservations(seriesId, limit)
+    res.json({ seriesId, count: observations.length, observations })
+  } catch (err) {
+    console.error(`[FRED] Error fetching ${seriesId}:`, err.message)
+    res.status(502).json({ error: 'FRED fetch failed', message: err.message })
+  }
+})
+
+app.get('/api/source/yahoo/latest', async (req, res) => {
+  try {
+    if (!req.query.symbol) return res.status(400).json({ error: 'symbol required' })
+    res.json(await fetchYahooLatest(String(req.query.symbol)))
+  } catch (err) {
+    res.status(502).json({ error: 'Yahoo fetch failed', message: err.message })
+  }
+})
+
+app.get('/api/source/yahoo/above-ma', async (req, res) => {
+  try {
+    if (!req.query.symbol) return res.status(400).json({ error: 'symbol required' })
+    const window = Math.min(parseInt(req.query.window || '200', 10), 1000)
+    res.json(await fetchYahooAboveMovingAverage(String(req.query.symbol), window))
+  } catch (err) {
+    res.status(502).json({ error: 'Yahoo moving average failed', message: err.message })
+  }
+})
+
+app.get('/api/source/yahoo/ratio', async (req, res) => {
+  try {
+    if (!req.query.left || !req.query.right) return res.status(400).json({ error: 'left and right symbols required' })
+    res.json(await fetchYahooRatio(String(req.query.left), String(req.query.right)))
+  } catch (err) {
+    res.status(502).json({ error: 'Yahoo ratio failed', message: err.message })
+  }
+})
+
+app.get('/api/source/ecb/latest', async (req, res) => {
+  try {
+    if (!req.query.seriesKey) return res.status(400).json({ error: 'seriesKey required' })
+    res.json(await fetchEcbLatest(String(req.query.seriesKey)))
+  } catch (err) {
+    res.status(502).json({ error: 'ECB fetch failed', message: err.message })
+  }
+})
+
+app.get('/api/source/eurostat/latest/:dataset', async (req, res) => {
+  try {
+    const { dataset } = req.params
+    const { dataset: _dataset, ...filters } = req.query
+    res.json(await fetchEurostatLatest(dataset, filters))
+  } catch (err) {
+    res.status(502).json({ error: 'Eurostat fetch failed', message: err.message })
+  }
+})
+
+app.get('/api/source/oecd/latest', async (req, res) => {
+  try {
+    if (!req.query.url) return res.status(400).json({ error: 'url required' })
+    res.json(await fetchOecdLatest(String(req.query.url)))
+  } catch (err) {
+    res.status(502).json({ error: 'OECD fetch failed', message: err.message })
+  }
+})
+
+app.get('/api/source/bis/reer/latest', async (req, res) => {
+  try {
+    if (!req.query.currency) return res.status(400).json({ error: 'currency required' })
+    res.json(await fetchBisReerLatest(String(req.query.currency)))
+  } catch (err) {
+    res.status(502).json({ error: 'BIS fetch failed', message: err.message })
+  }
+})
+
+app.get('/api/source/cftc/latest', async (req, res) => {
+  try {
+    if (!req.query.market) return res.status(400).json({ error: 'market required' })
+    const result = await fetchCftcLatest(String(req.query.market))
+    if (String(req.query.invert || '').toLowerCase() === 'true') {
+      result.value = Number((-result.value).toFixed(2))
+      result.raw = result.value
+      result.meta = { ...result.meta, inverted: true }
+    }
+    res.json(result)
+  } catch (err) {
+    res.status(502).json({ error: 'CFTC fetch failed', message: err.message })
+  }
+})
+
+app.get('/api/source/imf/latest', async (req, res) => {
+  try {
+    if (!req.query.dataset || !req.query.seriesKey) {
+      return res.status(400).json({ error: 'dataset and seriesKey required' })
+    }
+    res.json(await fetchImfLatest(String(req.query.dataset), String(req.query.seriesKey), String(req.query.startPeriod || '2000')))
+  } catch (err) {
+    res.status(502).json({ error: 'IMF fetch failed', message: err.message })
+  }
+})
+
+app.get('/api/source/central-bank/boc/policy-rate/latest', async (_req, res) => {
+  try {
+    res.json(await fetchBankOfCanadaPolicyRate())
+  } catch (err) {
+    res.status(502).json({ error: 'Central bank fetch failed', message: err.message })
+  }
+})
+
+
 // Indicadores por país (raw scrape)
 app.get('/api/indicators/:country', async (req, res) => {
   const country = req.params.country.toLowerCase()
@@ -161,7 +785,7 @@ app.get('/api/indicators/:country', async (req, res) => {
   try {
     let data = getCached(cacheKey)
     if (!data) {
-      data = await scrapeTradingEconomics(slug)
+      data = await fetchOfficialCountryIndicators(slug)
       setCached(cacheKey, data)
     }
     res.json(data)
@@ -184,10 +808,10 @@ const fallbackData = {
   gdpChn: 5.2,
   gdpJpn: 0.1,
   gdpResto: 0,
-  vix: 15,
+  vix: 35,
   hyOas: 35,
   sp200dma: 1,
-  embi: 320,
+  embi: 55,
   smartZ: 0.2,
   retailZ: -0.5,
   dxy: 103.5,
@@ -219,37 +843,85 @@ app.get('/api/polaris/worldview', async (_req, res) => {
   }
 
   try {
-    let usa, eur, chn, jpn
-    try { usa = await scrapeTradingEconomics('united-states') } catch (e) { console.warn('USA scrape failed:', e.message) }
-    try { eur = await scrapeTradingEconomics('euro-area') } catch (e) { console.warn('EUR scrape failed:', e.message) }
-    try { chn = await scrapeTradingEconomics('china') } catch (e) { console.warn('CHN scrape failed:', e.message) }
-    try { jpn = await scrapeTradingEconomics('japan') } catch (e) { console.warn('JPN scrape failed:', e.message) }
+    let gdpUsa = null
+    let gdpEur = null
+    let gdpJpn = null
+    let cpiUsa = null
+    let vix = null
+    let hyOas = null
+    let sp200dma = null
+    let embi = null
+    let breakevens = null
+    let dxy = null
+    let dxy200dma = null
+    let dxyRising = null
 
-    const allFailed = !usa && !eur && !chn && !jpn
+    // Todas las fuentes en paralelo para minimizar latencia en Vercel
+    const [
+      fredGdpUsa, fredCpiUsa, fredVix, fredHyOas, fredSp200dma,
+      fredEmbi, fredBreakevens, fredGdpEur, fredGdpJpn, yahooDxy,
+    ] = await Promise.allSettled([
+      FRED_API_KEY ? fetchFredLatestValue('A191RL1Q225SBEA') : Promise.resolve(null),
+      FRED_API_KEY ? fetchFredYoYChange('CPIAUCSL') : Promise.resolve(null),
+      FRED_API_KEY ? fetchFredPercentile('VIXCLS', 1300) : Promise.resolve(null),
+      FRED_API_KEY ? fetchFredPercentile('BAMLH0A0HYM2', 1300) : Promise.resolve(null),
+      FRED_API_KEY ? fetchFredAboveMovingAverage('SP500', 200, 320) : Promise.resolve(null),
+      FRED_API_KEY ? fetchFredPercentile('BAMLEMCBPIOAS', 756) : Promise.resolve(null),
+      FRED_API_KEY ? fetchFredLatestValue('T5YIFR') : Promise.resolve(null),
+      FRED_API_KEY ? fetchFredYoYChangeQuarterly('CLVMNACSCAB1GQEA19') : Promise.resolve(null),
+      FRED_API_KEY ? fetchFredYoYChangeQuarterly('JPNRGDPEXP') : Promise.resolve(null),
+      fetchYahooAboveMovingAverage('DX-Y.NYB', 200),
+    ])
+
+    const val = (settled) => settled.status === 'fulfilled' ? settled.value?.value ?? null : null
+    const meta = (settled) => settled.status === 'fulfilled' ? settled.value?.meta ?? null : null
+
+    gdpUsa = val(fredGdpUsa)
+    cpiUsa = val(fredCpiUsa)
+    vix    = val(fredVix)
+    hyOas  = val(fredHyOas)
+    sp200dma = val(fredSp200dma)
+    embi   = val(fredEmbi)
+    breakevens = val(fredBreakevens)
+    gdpEur = val(fredGdpEur)
+    gdpJpn = val(fredGdpJpn)
+
+    const dxyMeta = meta(yahooDxy)
+    if (dxyMeta) {
+      dxy       = dxyMeta.latestValue
+      dxy200dma = dxyMeta.movingAverage
+      dxyRising = val(yahooDxy)
+    }
+
+    console.log(`[worldview] gdpUsa=${gdpUsa} gdpEur=${gdpEur} gdpJpn=${gdpJpn} vix=${vix} dxy=${dxy}`)
+
+    const allFailed = [gdpUsa, cpiUsa, vix, hyOas, sp200dma, embi, breakevens].every((value) => value === null)
 
     if (allFailed) {
-      console.warn('All scrapes failed, returning fallback data')
+      console.warn('Official sources failed, returning fallback data')
       data = { ...fallbackData, fallback: true }
     } else {
+      const usaGDP = gdpUsa ?? fallbackData.gdpUsa
+      const usaCPI = cpiUsa ?? fallbackData.cpiG7
       data = {
-        source: 'trading-economics-proxy',
+        source: 'fred-primary+official-fallback',
         scrapedAt: new Date().toISOString(),
-        gdpUsa: usa ? getGDP(usa.indicators) : fallbackData.gdpUsa,
-        gdpEur: eur ? getGDP(eur.indicators) : fallbackData.gdpEur,
-        gdpChn: chn ? getGDP(chn.indicators) : fallbackData.gdpChn,
-        gdpJpn: jpn ? getGDP(jpn.indicators) : fallbackData.gdpJpn,
+        gdpUsa: usaGDP,
+        gdpEur: gdpEur ?? fallbackData.gdpEur,
+        gdpChn: fallbackData.gdpChn,
+        gdpJpn: gdpJpn ?? fallbackData.gdpJpn,
         gdpResto: 0,
-        vix: fallbackData.vix,
-        hyOas: fallbackData.hyOas,
-        sp200dma: 1,
-        embi: fallbackData.embi,
+        vix: vix ?? fallbackData.vix,
+        hyOas: hyOas ?? fallbackData.hyOas,
+        sp200dma: sp200dma ?? fallbackData.sp200dma,
+        embi: embi ?? fallbackData.embi,
         smartZ: fallbackData.smartZ,
         retailZ: fallbackData.retailZ,
-        dxy: fallbackData.dxy,
-        dxy200dma: fallbackData.dxy200dma,
-        dxyRising: 1,
-        cpiG7: ((usa ? getCPI(usa.indicators) : fallbackData.cpiG7) + (eur ? getCPI(eur.indicators) : fallbackData.cpiG7)) / 2,
-        breakevens: fallbackData.breakevens,
+        dxy: dxy ?? fallbackData.dxy,
+        dxy200dma: dxy200dma ?? fallbackData.dxy200dma,
+        dxyRising: dxyRising ?? 1,
+        cpiG7: usaCPI,
+        breakevens: breakevens ?? fallbackData.breakevens,
       }
       setCached(cacheKey, data)
     }
@@ -261,46 +933,25 @@ app.get('/api/polaris/worldview', async (_req, res) => {
   }
 })
 
-// Endpoint dinamico: scrapea cualquier URL de Trading Economics
+// Endpoint dinamico desactivado hasta conectar fetchers oficiales por fuente.
 app.post('/api/scrape', express.json(), async (req, res) => {
-  const { url, indicatorName } = req.body
-  if (!url) {
-    return res.status(400).json({ error: 'URL required' })
-  }
-
-  // Validar que sea dominio de Trading Economics (seguridad basica)
-  if (!url.includes('tradingeconomics.com')) {
-    return res.status(400).json({ error: 'Only tradingeconomics.com URLs allowed' })
-  }
-
-  try {
-    const result = await scrapeTradingEconomicsFromUrl(url, indicatorName)
-    res.json({
-      success: true,
-      url,
-      indicatorName: indicatorName || null,
-      scrapedAt: new Date().toISOString(),
-      ...result,
-    })
-  } catch (err) {
-    console.error('Error en /api/scrape:', err.message)
-    res.status(502).json({
-      success: false,
-      error: 'Scraping failed',
-      message: err.message,
-    })
-  }
+  res.status(410).json({ success: false, error: 'Scraping disabled', message: 'Use official source endpoints instead.' })
 })
 
-async function scrapeTradingEconomicsFromUrl(url, indicatorName) {
-  console.log(`[SCRAPE] Target: ${url}`)
+async function scrapeOfficialSourceFromUrl(url, indicatorName, forceJsSnippet = false) {
+  console.log(`[SCRAPE] Target: ${url}${forceJsSnippet ? ' (forced js_snippet)' : ''}`)
 
   let html
   let usedProxy = false
 
   // Intentar ScrapingAnt primero (anti-bot bypass)
   try {
-    html = await fetchViaScrapingAnt(url)
+    if (forceJsSnippet && SCRAPINGANT_API_KEY) {
+      const jsSnippet = 'await new Promise(r => setTimeout(r, 5000));'
+      html = await fetchViaScrapingAnt(url, { js_snippet: jsSnippet, timeout: 60000, wait_for_selector: '.table-responsive' })
+    } else {
+      html = await fetchViaScrapingAnt(url)
+    }
     usedProxy = true
   } catch (antErr) {
     console.log(`[SCRAPINGANT] Failed: ${antErr.message}. Falling back to direct fetch.`)
@@ -312,61 +963,22 @@ async function scrapeTradingEconomicsFromUrl(url, indicatorName) {
   // Log primeros 800 chars para debugging
   console.log(`[SCRAPE] HTML preview (${usedProxy ? 'via ScrapingAnt' : 'direct'}): ${html.substring(0, 800).replace(/\n/g, ' ')}`)
 
-  const $ = cheerio.load(html)
+  let $ = cheerio.load(html)
+  let indicators = extractIndicators($)
+  console.log(`[SCRAPE] Found ${indicators.length} indicators on first attempt`)
 
-  const indicators = []
-
-  // Selector principal
-  $('.table-responsive table tbody tr').each((_, row) => {
-    const cells = $(row).find('td')
-    if (cells.length >= 3) {
-      const name = $(cells[0]).text().trim()
-      const last = $(cells[1]).text().trim().replace(/,/g, '')
-      const previous = $(cells[2]).text().trim().replace(/,/g, '')
-      const unit = $(cells[3]).text().trim() || ''
-
-      if (name && last) {
-        indicators.push({
-          name,
-          last: parseFloat(last) || last,
-          previous: parseFloat(previous) || previous,
-          unit,
-        })
-      }
+  // Ultimo intento: ScrapingAnt con js_snippet para esperar carga dinamica
+  if (indicators.length === 0 && usedProxy && SCRAPINGANT_API_KEY && !forceJsSnippet) {
+    try {
+      console.log(`[SCRAPE] Retrying with js_snippet to wait for dynamic content...`)
+      const jsSnippet = 'await new Promise(r => setTimeout(r, 5000));'
+      html = await fetchViaScrapingAnt(url, { js_snippet: jsSnippet, timeout: 60000, wait_for_selector: '.table-responsive' })
+      $ = cheerio.load(html)
+      indicators = extractIndicators($)
+      console.log(`[SCRAPE] Found ${indicators.length} indicators after js_snippet wait`)
+    } catch (retryErr) {
+      console.log(`[SCRAPE] js_snippet retry failed: ${retryErr.message}`)
     }
-  })
-
-  console.log(`[SCRAPE] Found ${indicators.length} indicators via .table-responsive`)
-
-  // Fallback: cualquier tabla
-  if (indicators.length === 0) {
-    $('table tbody tr').each((_, row) => {
-      const cells = $(row).find('td')
-      if (cells.length >= 3) {
-        const name = $(cells[0]).text().trim()
-        const last = $(cells[1]).text().trim().replace(/,/g, '')
-        const previous = $(cells[2]).text().trim().replace(/,/g, '')
-        if (name && last && !isNaN(parseFloat(last))) {
-          indicators.push({ name, last: parseFloat(last), previous: parseFloat(previous) || null, unit: '' })
-        }
-      }
-    })
-    console.log(`[SCRAPE] Found ${indicators.length} indicators via fallback table selector`)
-  }
-
-  // Fallback 2: buscar divs con clase tipo "table" o listas de indicadores
-  if (indicators.length === 0) {
-    $('[class*="table"] tbody tr, [class*="datatable"] tbody tr, .indicator-row').each((_, row) => {
-      const cells = $(row).find('td')
-      if (cells.length >= 2) {
-        const name = $(cells[0]).text().trim()
-        const last = $(cells[1]).text().trim().replace(/,/g, '')
-        if (name && last && !isNaN(parseFloat(last))) {
-          indicators.push({ name, last: parseFloat(last), previous: null, unit: '' })
-        }
-      }
-    })
-    console.log(`[SCRAPE] Found ${indicators.length} indicators via generic table selector`)
   }
 
   // Debug: mostrar primeros 5 indicadores encontrados
@@ -410,14 +1022,80 @@ async function scrapeTradingEconomicsFromUrl(url, indicatorName) {
   }
 }
 
+function extractIndicators($) {
+  const indicators = []
+
+  // Selector principal
+  $('.table-responsive table tbody tr').each((_, row) => {
+    const cells = $(row).find('td')
+    if (cells.length >= 3) {
+      const name = $(cells[0]).text().trim()
+      const last = $(cells[1]).text().trim().replace(/,/g, '')
+      const previous = $(cells[2]).text().trim().replace(/,/g, '')
+      const unit = $(cells[3]).text().trim() || ''
+
+      if (name && last) {
+        indicators.push({
+          name,
+          last: parseFloat(last) || last,
+          previous: parseFloat(previous) || previous,
+          unit,
+        })
+      }
+    }
+  })
+
+  // Fallback: cualquier tabla
+  if (indicators.length === 0) {
+    $('table tbody tr').each((_, row) => {
+      const cells = $(row).find('td')
+      if (cells.length >= 3) {
+        const name = $(cells[0]).text().trim()
+        const last = $(cells[1]).text().trim().replace(/,/g, '')
+        const previous = $(cells[2]).text().trim().replace(/,/g, '')
+        if (name && last && !isNaN(parseFloat(last))) {
+          indicators.push({ name, last: parseFloat(last), previous: parseFloat(previous) || null, unit: '' })
+        }
+      }
+    })
+  }
+
+  // Fallback 2: buscar divs con clase tipo "table" o listas de indicadores
+  if (indicators.length === 0) {
+    $('[class*="table"] tbody tr, [class*="datatable"] tbody tr, .indicator-row').each((_, row) => {
+      const cells = $(row).find('td')
+      if (cells.length >= 2) {
+        const name = $(cells[0]).text().trim()
+        const last = $(cells[1]).text().trim().replace(/,/g, '')
+        if (name && last && !isNaN(parseFloat(last))) {
+          indicators.push({ name, last: parseFloat(last), previous: null, unit: '' })
+        }
+      }
+    })
+  }
+
+  return indicators
+}
+
 // Solo iniciar servidor si se ejecuta directamente (desarrollo local)
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`🚀 Polaris Proxy Server running on http://localhost:${PORT}`)
     console.log(`📊 Endpoints:`)
     console.log(`   GET http://localhost:${PORT}/api/health`)
+    console.log(`   GET http://localhost:${PORT}/api/fred/:seriesId`)
+    console.log(`   GET http://localhost:${PORT}/api/fred/latest/:seriesId`)
+    console.log(`   GET http://localhost:${PORT}/api/fred/yoy/:seriesId`)
+    console.log(`   GET http://localhost:${PORT}/api/source/yahoo/latest?symbol=EURUSD%3DX`)
+    console.log(`   GET http://localhost:${PORT}/api/source/ecb/latest?seriesKey=...`)
+    console.log(`   GET http://localhost:${PORT}/api/source/eurostat/latest/:dataset`)
+    console.log(`   GET http://localhost:${PORT}/api/source/oecd/latest?url=...`)
+    console.log(`   GET http://localhost:${PORT}/api/source/bis/reer/latest?currency=USD`)
+    console.log(`   GET http://localhost:${PORT}/api/source/cftc/latest?market=EURO%20FX`)
+    console.log(`   GET http://localhost:${PORT}/api/source/imf/latest?dataset=...&seriesKey=...`)
     console.log(`   GET http://localhost:${PORT}/api/indicators/:country`)
     console.log(`   GET http://localhost:${PORT}/api/polaris/worldview`)
+    console.log(`   POST http://localhost:${PORT}/api/scrape`)
   })
 }
 

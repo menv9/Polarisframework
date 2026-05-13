@@ -161,7 +161,7 @@ export default function WorldViewCalculator() {
                   {spAbove200dma ? 'Above 200dma' : 'Below 200dma'}
                 </button>
               </div>
-              <InputNumber label="EMBI Spread" value={embi} setValue={setEmbi} min={0} max={100} step={1} unit="P" />
+              <InputNumber label="EM OAS Percentile" value={embi} setValue={setEmbi} min={0} max={100} step={1} unit="P" />
             </div>
             <div className="mt-4 p-3 rounded-lg bg-bg-secondary border border-white/5">
               <div className="text-sm text-text-muted">Régimen detectado</div>
@@ -222,8 +222,8 @@ export default function WorldViewCalculator() {
           <div className="p-5 rounded-xl border border-white/10 bg-bg-card">
             <h4 className="text-sm font-semibold text-text-primary mb-4">Inflación Global</h4>
             <div className="space-y-4">
-              <InputNumber label="CPI G7 mediana YoY" value={cpiG7} setValue={setCpiG7} min={0} max={10} step={0.1} unit="%" />
-              <InputNumber label="Breakevens 5Y5Y G7" value={breakevens5y5y} setValue={setBreakevens5y5y} min={0} max={5} step={0.1} unit="%" />
+              <InputNumber label="CPI USA YoY" value={cpiG7} setValue={setCpiG7} min={0} max={10} step={0.1} unit="%" />
+              <InputNumber label="5Y5Y Inflation Expectations" value={breakevens5y5y} setValue={setBreakevens5y5y} min={0} max={5} step={0.1} unit="%" />
             </div>
             <div className="mt-4 p-3 rounded-lg bg-bg-secondary border border-white/5">
               <div className="text-sm text-text-muted">Régimen inflación</div>

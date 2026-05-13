@@ -106,7 +106,7 @@ export default function WorldViewRegime() {
             offLabel="OFF: < 200dma"
           />
           <Slider
-            label="D. Spread EM (EMBI)"
+            label="D. Spread EM (OAS)"
             value={embi}
             setValue={setEmbi}
             onThreshold={40}
@@ -133,8 +133,8 @@ export default function WorldViewRegime() {
       >
         <h4 className="text-sm font-semibold text-text-primary mb-3">Reglas operativas</h4>
         <div className="space-y-2 text-sm text-text-secondary font-mono bg-bg-secondary p-4 rounded-lg border border-white/5">
-          <div className="text-accent-emerald">Risk-ON: VIX &lt; P30 AND HY &lt; P30 AND S&amp;P &gt; 200dma AND EMBI &lt; P40</div>
-          <div className="text-accent-rose">Risk-OFF: VIX &gt; P70 OR HY &gt; P70 OR S&amp;P &lt; 200dma OR EMBI &gt; P70</div>
+          <div className="text-accent-emerald">Risk-ON: VIX &lt; P30 AND HY &lt; P30 AND S&amp;P &gt; 200dma AND EM OAS &lt; P40</div>
+          <div className="text-accent-rose">Risk-OFF: VIX &gt; P70 OR HY &gt; P70 OR S&amp;P &lt; 200dma OR EM OAS &gt; P70</div>
           <div className="text-text-muted">Mixto: cualquier otro caso</div>
         </div>
       </motion.div>

@@ -1,18 +1,31 @@
-import { useState, useMemo, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { dataSources, getNextUpdate, getStatus, countByStatus } from '../data/dataSources'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { dataSources, getNextUpdate, getStatus, countByStatus, getAccessSummary } from '../data/dataSources'
 
 const STORAGE_KEY = 'polaris_data_sources'
+const USER_EDITABLE_FIELDS = ['lastUpdate', '_lastScrape', '_scrapedValue', '_value', '_refreshError']
+
+function splitModuleName(moduleName) {
+  return moduleName.split(/\s+(?:—|â€”)\s+/)
+}
+
+function mergeSavedSource(defaultSrc, savedSrc) {
+  if (!savedSrc) return defaultSrc
+  const preserved = USER_EDITABLE_FIELDS.reduce((acc, field) => {
+    if (Object.hasOwn(savedSrc, field)) acc[field] = savedSrc[field]
+    return acc
+  }, {})
+  return { ...defaultSrc, ...preserved }
+}
 
 function loadSources() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
       const parsed = JSON.parse(saved)
-      // Merge with defaults to ensure any new fields from code updates are present
       return dataSources.map((defaultSrc) => {
         const savedSrc = parsed.find((s) => s.id === defaultSrc.id)
-        return savedSrc ? { ...defaultSrc, ...savedSrc } : defaultSrc
+        return mergeSavedSource(defaultSrc, savedSrc)
       })
     }
   } catch {
@@ -21,11 +34,11 @@ function loadSources() {
   return dataSources
 }
 
-async function scrapeTradingEconomics(url, indicatorName) {
-  const res = await fetch('/api/scrape', {
-    method: 'POST',
+async function fetchFredData(seriesId, yoy = false) {
+  const endpoint = yoy ? `/api/fred/yoy/${seriesId}` : `/api/fred/latest/${seriesId}`
+  const res = await fetch(endpoint, {
+    method: 'GET',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, indicatorName }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
@@ -34,8 +47,18 @@ async function scrapeTradingEconomics(url, indicatorName) {
   return res.json()
 }
 
-function isTradingEconomicsUrl(url) {
-  return url && url.includes('tradingeconomics.com')
+async function fetchSourceData(source) {
+  const endpoint = source.apiPath || (source.fredSeriesId ? (source.fredYoY ? `/api/fred/yoy/${source.fredSeriesId}` : `/api/fred/latest/${source.fredSeriesId}`) : null)
+  if (!endpoint) throw new Error('No automatic endpoint configured')
+  const res = await fetch(endpoint, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || res.statusText)
+  }
+  return res.json()
 }
 
 export default function DataPage() {
@@ -43,6 +66,7 @@ export default function DataPage() {
   const [loadingAll, setLoadingAll] = useState(false)
   const [loadingId, setLoadingId] = useState(null)
   const [lastGlobalRefresh, setLastGlobalRefresh] = useState(null)
+  const [globalRefreshResult, setGlobalRefreshResult] = useState(null)
 
   // Persistir cambios en localStorage
   useEffect(() => {
@@ -50,10 +74,22 @@ export default function DataPage() {
   }, [sources])
 
   const counts = useMemo(() => countByStatus(sources), [sources])
+  const accessSummary = useMemo(() => getAccessSummary(sources), [sources])
 
   // ====== FILTROS JERARQUICOS: Modulo -> Pais/Submodulo -> Categoria ======
+  const [searchParams] = useSearchParams()
+  const highlightId = searchParams.get('highlight')
+  const moduleParam = searchParams.get('module')
+  const highlightRef = useRef(null)
+
   const topModules = ['todas', 'World View', 'Endogenous', 'Exogenous']
-  const [activeTop, setActiveTop] = useState('todas')
+  const [activeTop, setActiveTop] = useState(() => {
+    if (moduleParam && topModules.includes(moduleParam)) return moduleParam
+    if (highlightId?.startsWith('wv_')) return 'World View'
+    if (highlightId?.startsWith('endo_')) return 'Endogenous'
+    if (highlightId?.startsWith('exo_')) return 'Exogenous'
+    return 'todas'
+  })
 
   // Sub-filter: pais (Endogenous) o sub-modulo (Exogenous). No aplica a World View.
   const subOptions = useMemo(() => {
@@ -63,7 +99,7 @@ export default function DataPage() {
         : sources.filter((s) => s.module.startsWith(activeTop))
     const subs = new Set()
     pool.forEach((s) => {
-      const parts = s.module.split(' — ')
+      const parts = splitModuleName(s.module)
       if (parts.length > 1) subs.add(parts[1])
     })
     return ['todas', ...Array.from(subs).sort()]
@@ -90,6 +126,15 @@ export default function DataPage() {
     setActiveCategory('todas')
   }, [activeSub])
 
+  // Scroll + highlight cuando viene ?highlight=<id> desde otra página
+  useEffect(() => {
+    if (!highlightId || !highlightRef.current) return
+    const timer = setTimeout(() => {
+      highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [highlightId, highlightRef.current])
+
   // Filtrado en 3 niveles
   const filtered = sources.filter((s) => {
     const matchTop = activeTop === 'todas' || s.module.startsWith(activeTop)
@@ -101,7 +146,7 @@ export default function DataPage() {
   // Extract top-level module groups (World View, Endogenous, Exogenous)
   const topGroups = useMemo(() => {
     const groups = filtered.reduce((acc, s) => {
-      const top = s.module.split(' — ')[0]
+      const top = splitModuleName(s.module)[0]
       if (!acc[top]) acc[top] = {}
       if (!acc[top][s.module]) acc[top][s.module] = []
       acc[top][s.module].push(s)
@@ -116,10 +161,6 @@ export default function DataPage() {
     setCollapsed((prev) => ({ ...prev, [group]: !prev[group] }))
   }
 
-  const updateField = (id, field, value) => {
-    setSources((prev) => prev.map((s) => (s.id === id ? { ...s, [field]: value } : s)))
-  }
-
   const refreshSource = async (id) => {
     const source = sources.find((s) => s.id === id)
     if (!source) return
@@ -127,20 +168,13 @@ export default function DataPage() {
     setLoadingId(id)
 
     try {
-      const url = source.scrapeUrl
-      const isTE = isTradingEconomicsUrl(url)
+      const today = new Date().toISOString().split('T')[0]
 
-      if (isTE && url) {
-        // Detecto TE: fuerza scraper a TE y scrapea con indicatorName
-        const result = await scrapeTradingEconomics(url, source.indicator)
-        const today = new Date().toISOString().split('T')[0]
-
-        const scrapedValue = result.matchedIndicator
-          ? `${result.matchedIndicator.name}: ${result.matchedIndicator.last}${result.matchedIndicator.unit ? ' ' + result.matchedIndicator.unit : ''}`
-          : null
-
-        const valueOnly = result.matchedIndicator?.last
-          ? result.matchedIndicator.last + (result.matchedIndicator.unit ? ' ' + result.matchedIndicator.unit : '')
+      if (source.apiPath || (source.accessKind === 'fred' && source.fredSeriesId)) {
+        const result = await fetchSourceData(source)
+        const valueOnly = result.value !== null ? String(result.value) : null
+        const scrapedLabel = valueOnly
+          ? `${source.indicator}: ${valueOnly}${source.fredYoY ? '%' : ''} (${result.date || 'latest'})`
           : null
 
         setSources((prev) =>
@@ -148,32 +182,17 @@ export default function DataPage() {
             s.id === id
               ? {
                   ...s,
-                  scraper: 'trading-economics',
                   lastUpdate: today,
                   _lastScrape: result,
-                  _scrapedValue: scrapedValue,
+                  _scrapedValue: scrapedLabel,
                   _value: valueOnly || s._value,
+                  _refreshError: null,
                 }
-              : s
-          )
-        )
-      } else if (source.scraper === 'trading-economics' && url) {
-        // Scraper ya era TE pero URL no parece TE (caso raro)
-        const result = await scrapeTradingEconomics(url, source.indicator)
-        const today = new Date().toISOString().split('T')[0]
-        const valueOnly = result.matchedIndicator?.last
-          ? result.matchedIndicator.last + (result.matchedIndicator.unit ? ' ' + result.matchedIndicator.unit : '')
-          : null
-        setSources((prev) =>
-          prev.map((s) =>
-            s.id === id
-              ? { ...s, lastUpdate: today, _lastScrape: result, _value: valueOnly || s._value }
               : s
           )
         )
       } else {
         // API/manual: solo marca como actualizado (hoy)
-        const today = new Date().toISOString().split('T')[0]
         setSources((prev) =>
           prev.map((s) =>
             s.id === id ? { ...s, lastUpdate: today } : s
@@ -182,41 +201,66 @@ export default function DataPage() {
       }
     } catch (err) {
       console.error('Refresh failed:', err)
+      setSources((prev) =>
+        prev.map((s) =>
+          s.id === id ? { ...s, _refreshError: err.message || 'Refresh failed' } : s
+        )
+      )
     } finally {
       setLoadingId(null)
     }
   }
 
-  const refreshAllStale = async () => {
+  const refreshAllSources = async () => {
     setLoadingAll(true)
+    setGlobalRefreshResult(null)
     const today = new Date().toISOString().split('T')[0]
 
-    const staleSources = sources.filter((s) => getStatus(s).code !== 'ok')
+    const refreshableSources = sources.filter((s) => canRefresh(s))
+    let okCount = 0
+    let errorCount = 0
+    const skippedCount = sources.length - refreshableSources.length
 
-    for (const source of staleSources) {
-      try {
-        if (source.scraper === 'trading-economics' && source.scrapeUrl) {
-          const result = await scrapeTradingEconomics(source.scrapeUrl, source.indicator)
-          const valueOnly = result.matchedIndicator?.last
-            ? result.matchedIndicator.last + (result.matchedIndicator.unit ? ' ' + result.matchedIndicator.unit : '')
-            : null
-          setSources((prev) =>
-            prev.map((s) =>
-              s.id === source.id ? { ...s, lastUpdate: today, _lastScrape: result, _value: valueOnly || s._value } : s
-            )
-          )
-        }
-      } catch (err) {
-        console.warn(`Failed to refresh ${source.id}:`, err.message)
-      }
+    if (refreshableSources.length === 0) {
+      setGlobalRefreshResult({ ok: 0, errors: 0, skipped: skippedCount })
+      setLoadingAll(false)
+      return
     }
 
-    setSources((prev) =>
-      prev.map((s) => {
-        const st = getStatus(s)
-        return st.code !== 'ok' ? { ...s, lastUpdate: today } : s
-      })
-    )
+    for (const source of refreshableSources) {
+      try {
+        setLoadingId(source.id)
+        const result = await fetchSourceData(source)
+        const valueOnly = result.value !== null ? String(result.value) : null
+        const scrapedLabel = valueOnly
+          ? `${source.indicator}: ${valueOnly}${source.fredYoY ? '%' : ''} (${result.date || 'latest'})`
+          : null
+        okCount += 1
+        setSources((prev) =>
+          prev.map((s) =>
+            s.id === source.id
+              ? {
+                  ...s,
+                  lastUpdate: today,
+                  _lastScrape: result,
+                  _scrapedValue: scrapedLabel,
+                  _value: valueOnly || s._value,
+                  _refreshError: null,
+                }
+              : s
+          )
+        )
+      } catch (err) {
+        errorCount += 1
+        console.warn(`Failed to refresh ${source.id}:`, err.message)
+        setSources((prev) =>
+          prev.map((s) =>
+            s.id === source.id ? { ...s, _refreshError: err.message || 'Refresh failed' } : s
+          )
+        )
+      }
+      await new Promise((resolve) => setTimeout(resolve, 150))
+    }
 
     setLastGlobalRefresh(
       new Date().toLocaleTimeString('en-US', {
@@ -226,21 +270,63 @@ export default function DataPage() {
         hour12: false,
       })
     )
+    setGlobalRefreshResult({ ok: okCount, errors: errorCount, skipped: skippedCount })
+    setLoadingId(null)
     setLoadingAll(false)
   }
 
-  const scraperBadge = (scraper) => {
+  const sourceBadge = (source) => {
     const map = {
-      'trading-economics': { label: 'TE', color: 'text-[#ecd987] border-[#ecd987]' },
-      api: { label: 'API', color: 'text-[#4ade80] border-[#4ade80]' },
+      fred: { label: 'FRED', color: 'text-[#60a5fa] border-[#60a5fa]' },
       manual: { label: 'MANUAL', color: 'text-[#888] border-[#888]' },
+      'needs-mapping': { label: 'MAPEAR', color: 'text-[#f59e0b] border-[#f59e0b]' },
+      'bulk-file': { label: 'CSV/XLS', color: 'text-[#4ade80] border-[#4ade80]' },
+      'rest-api': { label: 'REST', color: 'text-[#4ade80] border-[#4ade80]' },
+      'official-api': { label: 'OFICIAL', color: 'text-[#4ade80] border-[#4ade80]' },
+      'public-api': { label: 'API', color: 'text-[#4ade80] border-[#4ade80]' },
     }
-    const cfg = map[scraper] || map.manual
+    const cfg = map[source.accessKind] || map['public-api']
     return (
-      <span className={`inline-block px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${cfg.color}`}>
+      <span
+        className={`inline-block px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${cfg.color}`}
+        title={`${source.primarySource} · ${source.accessMode}`}
+      >
         {cfg.label}
       </span>
     )
+  }
+
+  const qualityBadge = (source) => {
+    const map = {
+      exact: { label: 'OK', color: 'text-[#4ade80] border-[#4ade80]' },
+      derived: { label: 'DERIV', color: 'text-[#60a5fa] border-[#60a5fa]' },
+      proxy: { label: 'PROXY', color: 'text-[#f59e0b] border-[#f59e0b]' },
+      manual: { label: 'MANUAL', color: 'text-[#888] border-[#888]' },
+      pending: { label: 'REVISAR', color: 'text-[#ef4444] border-[#ef4444]' },
+    }
+    const cfg = map[source.dataFit] || map.pending
+    return (
+      <span
+        className={`inline-block px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${cfg.color}`}
+        title={source.dataCheck}
+      >
+        {cfg.label}
+      </span>
+    )
+  }
+
+  const canRefresh = (source) => Boolean(source.apiPath || source.fredSeriesId)
+
+  const endpointLabel = (source) => {
+    if (source.apiPath) return 'ENDPOINT'
+    if (source.fredSeriesId) return 'FRED'
+    return source.accessKind === 'manual' ? 'MANUAL' : 'PENDIENTE'
+  }
+
+  const endpointDetail = (source) => {
+    if (source.apiPath) return source.apiPath
+    if (source.fredSeriesId) return `/api/fred/${source.fredYoY ? 'yoy' : 'latest'}/${source.fredSeriesId}`
+    return source.accessKind === 'manual' ? 'Input manual' : 'Sin endpoint conectado'
   }
 
   return (
@@ -255,8 +341,15 @@ export default function DataPage() {
                 REFRESH: {lastGlobalRefresh}
               </span>
             )}
+            {globalRefreshResult && (
+              <span className={`text-xs uppercase tracking-wider ${
+                globalRefreshResult.errors ? 'text-[#ef4444]' : 'text-[#4ade80]'
+              }`}>
+                OK {globalRefreshResult.ok} / ERR {globalRefreshResult.errors} / SKIP {globalRefreshResult.skipped}
+              </span>
+            )}
             <button
-              onClick={refreshAllStale}
+              onClick={refreshAllSources}
               disabled={loadingAll}
               className={`px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 ${
                 loadingAll
@@ -264,13 +357,13 @@ export default function DataPage() {
                   : 'border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white'
               }`}
             >
-              {loadingAll ? 'ACTUALIZANDO...' : 'REFRESH DESACTUALIZADOS'}
+              {loadingAll ? `ACTUALIZANDO${loadingId ? `: ${loadingId}` : '...'}` : 'REFRESH TODO'}
             </button>
           </div>
         </div>
 
         {/* ===== STATS ===== */}
-        <div className="grid grid-cols-3 gap-0 border-2 border-[#333] mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-0 border-2 border-[#333] mb-4">
           <div className="p-3 border-r border-[#222]">
             <div className="text-[10px] text-[#777] uppercase tracking-widest mb-1">Actualizados</div>
             <div className="text-xl font-mono font-bold text-[#4ade80]">{counts.ok}</div>
@@ -282,6 +375,18 @@ export default function DataPage() {
           <div className="p-3">
             <div className="text-[10px] text-[#777] uppercase tracking-widest mb-1">Desactualizados</div>
             <div className="text-xl font-mono font-bold text-[#ef4444]">{counts.stale}</div>
+          </div>
+          <div className="p-3 border-l border-[#222]">
+            <div className="text-[10px] text-[#777] uppercase tracking-widest mb-1">Auto gratis</div>
+            <div className="text-xl font-mono font-bold text-[#4ade80]">{accessSummary.automatic}</div>
+          </div>
+          <div className="p-3 border-l border-[#222]">
+            <div className="text-[10px] text-[#777] uppercase tracking-widest mb-1">Manual</div>
+            <div className="text-xl font-mono font-bold text-[#888]">{accessSummary.manual}</div>
+          </div>
+          <div className="p-3 border-l border-[#222]">
+            <div className="text-[10px] text-[#777] uppercase tracking-widest mb-1">Por mapear</div>
+            <div className="text-xl font-mono font-bold text-[#f59e0b]">{accessSummary.needsMapping}</div>
           </div>
         </div>
 
@@ -354,15 +459,16 @@ export default function DataPage() {
           <table className="w-full text-sm table-fixed">
             <thead>
               <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#777]">
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[18%]">Indicador</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[17%]">Indicador</th>
                 <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[8%]">Categoria</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[8%]">Scraper</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[8%]">Frec</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[9%]">Ultima</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[9%]">Proxima</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[7%]">Estado</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[11%]">Fuente</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[10%]">Fit</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[7%]">Frec</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[7%]">Ultima</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[7%]">Proxima</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[6%]">Estado</th>
                 <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[8%]">Dato</th>
-                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[25%]">Fuente / Accion</th>
+                <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[18%]">Endpoint / Accion</th>
               </tr>
             </thead>
             {Object.entries(topGroups).map(([topGroup, subModules]) => {
@@ -375,7 +481,7 @@ export default function DataPage() {
                     className="bg-[#000] border-b-2 border-[#333] cursor-pointer select-none hover:bg-[#0a0a0a]"
                     onClick={() => toggleGroup(topGroup)}
                   >
-                    <td colSpan={9} className="px-3 py-2.5">
+                    <td colSpan={10} className="px-3 py-2.5">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <span className="text-sm font-bold uppercase tracking-widest text-white">
@@ -399,10 +505,10 @@ export default function DataPage() {
                         {/* Submodule header */}
                         <tr className="bg-[#0a0a0a] border-b border-[#333]">
                           <td
-                            colSpan={9}
+                            colSpan={10}
                             className="px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-[#a3a3a3]"
                           >
-                            {moduleName.replace(topGroup + ' — ', '')}
+                            {splitModuleName(moduleName)[1] || moduleName}
                             <span className="ml-2 text-[#555]">({items.length})</span>
                           </td>
                         </tr>
@@ -412,10 +518,12 @@ export default function DataPage() {
                           const isStale = status.code === 'stale'
                           const isLoading = loadingId === source.id
 
+                          const isHighlighted = source.id === highlightId
                           return (
                             <tr
                               key={source.id}
-                              className={`border-b border-[#222] ${isStale ? 'bg-[#1a0a0a]' : ''}`}
+                              ref={isHighlighted ? highlightRef : null}
+                              className={`border-b border-[#222] ${isHighlighted ? 'bg-[#1a1a00] outline outline-1 outline-[#ecd987]' : isStale ? 'bg-[#1a0a0a]' : ''}`}
                             >
                               <td className="px-2 py-1.5">
                                 <span className="text-sm font-bold text-white uppercase tracking-wider">{source.indicator}</span>
@@ -425,7 +533,17 @@ export default function DataPage() {
                                 <span className="text-xs font-bold text-[#a3a3a3] uppercase tracking-wider">{source.category}</span>
                               </td>
                               <td className="px-2 py-1.5">
-                                {scraperBadge(source.scraper)}
+                                <div className="space-y-1">
+                                  {sourceBadge(source)}
+                                  <div className="text-[10px] text-[#777] uppercase tracking-wider">{source.primarySource}</div>
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <div className="space-y-1">
+                                  {qualityBadge(source)}
+                                  <div className="text-[10px] text-[#a3a3a3] leading-tight">{source.dataMeasure}</div>
+                                  <div className="text-[10px] text-[#555] leading-tight">{source.dataCheck}</div>
+                                </div>
                               </td>
                               <td className="px-2 py-1.5">
                                 <span className="text-xs text-[#888] uppercase">{source.frequency}</span>
@@ -460,39 +578,47 @@ export default function DataPage() {
                                 />
                               </td>
                               <td className="px-2 py-1.5">
-                                {/* Editable URL */}
-                                <div className="mb-1.5">
-                                  <input
-                                    type="text"
-                                    value={source.scrapeUrl || ''}
-                                    onChange={(e) => {
-                                      const val = e.target.value
-                                      const isTE = isTradingEconomicsUrl(val)
-                                      setSources((prev) =>
-                                        prev.map((s) =>
-                                          s.id === source.id
-                                            ? { ...s, scrapeUrl: val, scraper: isTE ? 'trading-economics' : s.scraper }
-                                            : s
-                                        )
-                                      )
-                                    }}
-                                    placeholder="https://tradingeconomics.com/..."
-                                    className="w-full bg-[#111] border-b-2 border-[#ecd987] text-xs text-white font-mono px-1.5 py-1 outline-none focus:border-white focus:bg-[#1a1a0d]"
-                                  />
+                                <div className="mb-1 flex items-center gap-2">
+                                  <span className={`inline-block px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${
+                                    canRefresh(source)
+                                      ? 'border-[#4ade80] text-[#4ade80]'
+                                      : source.accessKind === 'manual'
+                                        ? 'border-[#888] text-[#888]'
+                                        : 'border-[#f59e0b] text-[#f59e0b]'
+                                  }`}>
+                                    {endpointLabel(source)}
+                                  </span>
+                                  <span className="text-[10px] text-[#777] uppercase tracking-wider">
+                                    {source.accessCost}
+                                  </span>
                                 </div>
+                                <div
+                                  className={`text-[10px] font-mono mb-1 break-all ${
+                                    canRefresh(source) ? 'text-[#a3a3a3]' : 'text-[#555]'
+                                  }`}
+                                  title={endpointDetail(source)}
+                                >
+                                  {endpointDetail(source)}
+                                </div>
+                                <div className="text-[10px] text-[#555] mb-1">{source.coverage}</div>
                                 {/* Scrape preview */}
                                 {source._scrapedValue && (
                                   <div className="text-[10px] text-[#4ade80] font-mono mb-1">
                                     {source._scrapedValue}
                                   </div>
                                 )}
+                                {source._refreshError && (
+                                  <div className="text-[10px] text-[#ef4444] font-mono mb-1 break-all">
+                                    ERR: {source._refreshError}
+                                  </div>
+                                )}
                                 {/* Action buttons */}
                                 <div className="flex items-center gap-2">
                                   <button
                                     onClick={() => refreshSource(source.id)}
-                                    disabled={isLoading}
+                                    disabled={isLoading || !canRefresh(source)}
                                     className={`text-xs font-bold uppercase tracking-wider border-b-2 px-2 py-0.5 ${
-                                      isLoading
+                                      isLoading || !canRefresh(source)
                                         ? 'border-[#333] text-[#555] cursor-not-allowed'
                                         : isStale
                                           ? 'border-[#ef4444] text-[#ef4444] hover:text-white hover:border-white'
