@@ -235,7 +235,7 @@ app.post('/api/scrape', express.json(), async (req, res) => {
   }
 
   try {
-    const result = await scrapeTradingEconomicsFromUrl(url)
+    const result = await scrapeTradingEconomicsFromUrl(url, indicatorName)
     res.json({
       success: true,
       url,
@@ -253,7 +253,7 @@ app.post('/api/scrape', express.json(), async (req, res) => {
   }
 })
 
-async function scrapeTradingEconomicsFromUrl(url) {
+async function scrapeTradingEconomicsFromUrl(url, indicatorName) {
   const { data: html } = await axios.get(url, { headers: browserHeaders, timeout: 5000 })
   const $ = cheerio.load(html)
 
@@ -293,7 +293,27 @@ async function scrapeTradingEconomicsFromUrl(url) {
     })
   }
 
-  return { indicators }
+  // Si se especifico un indicatorName, buscarlo y devolver solo ese
+  let matchedIndicator = null
+  if (indicatorName && indicators.length > 0) {
+    const search = indicatorName.toLowerCase()
+    matchedIndicator = indicators.find((ind) =>
+      ind.name.toLowerCase().includes(search)
+    )
+    // Si no hay match exacto, buscar palabras individuales
+    if (!matchedIndicator) {
+      const words = search.split(/\s+/).filter((w) => w.length > 2)
+      matchedIndicator = indicators.find((ind) =>
+        words.some((w) => ind.name.toLowerCase().includes(w))
+      )
+    }
+  }
+
+  return {
+    indicators,
+    matchedIndicator: matchedIndicator || null,
+    totalIndicators: indicators.length,
+  }
 }
 
 // Solo iniciar servidor si se ejecuta directamente (desarrollo local)

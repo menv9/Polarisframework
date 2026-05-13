@@ -2,17 +2,21 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { dataSources, getNextUpdate, getStatus, countByStatus } from '../data/dataSources'
 
-async function scrapeTradingEconomics(url) {
+async function scrapeTradingEconomics(url, indicatorName) {
   const res = await fetch('/api/scrape', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url }),
+    body: JSON.stringify({ url, indicatorName }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.message || res.statusText)
   }
   return res.json()
+}
+
+function isTradingEconomicsUrl(url) {
+  return url && url.includes('tradingeconomics.com')
 }
 
 export default function DataPage() {
@@ -43,8 +47,35 @@ export default function DataPage() {
     setScrapeLog(null)
 
     try {
-      if (source.scraper === 'trading-economics' && source.scrapeUrl) {
-        const result = await scrapeTradingEconomics(source.scrapeUrl)
+      const url = source.scrapeUrl
+      const isTE = isTradingEconomicsUrl(url)
+
+      if (isTE && url) {
+        // Detecto TE: fuerza scraper a TE y scrapea con indicatorName
+        const result = await scrapeTradingEconomics(url, source.indicator)
+        const today = new Date().toISOString().split('T')[0]
+
+        const scrapedValue = result.matchedIndicator
+          ? `${result.matchedIndicator.name}: ${result.matchedIndicator.last}${result.matchedIndicator.unit ? ' ' + result.matchedIndicator.unit : ''}`
+          : null
+
+        setSources((prev) =>
+          prev.map((s) =>
+            s.id === id
+              ? {
+                  ...s,
+                  scraper: 'trading-economics',
+                  lastUpdate: today,
+                  _lastScrape: result,
+                  _scrapedValue: scrapedValue,
+                }
+              : s
+          )
+        )
+        setScrapeLog({ id, result, scrapedValue })
+      } else if (source.scraper === 'trading-economics' && url) {
+        // Scraper ya era TE pero URL no parece TE (caso raro)
+        const result = await scrapeTradingEconomics(url, source.indicator)
         const today = new Date().toISOString().split('T')[0]
         setSources((prev) =>
           prev.map((s) =>
@@ -55,7 +86,7 @@ export default function DataPage() {
         )
         setScrapeLog({ id, result })
       } else {
-        // Para API/manual: solo marca como actualizado (hoy)
+        // API/manual: solo marca como actualizado (hoy)
         const today = new Date().toISOString().split('T')[0]
         setSources((prev) =>
           prev.map((s) =>
@@ -172,15 +203,21 @@ export default function DataPage() {
                 <span className="text-[#4ade80]">[OK] SCRAPE EXITOSO</span>
               )}
             </div>
-            {scrapeLog.result && scrapeLog.result.indicators && (
+            {scrapeLog.result && (
               <div className="text-xs text-[#888] font-mono space-y-0.5">
                 <div>URL: {scrapeLog.result.url}</div>
-                <div>Indicadores: {scrapeLog.result.indicators.length}</div>
-                {scrapeLog.result.indicators.slice(0, 3).map((ind, i) => (
-                  <div key={i}>• {ind.name}: {ind.last} {ind.unit}</div>
-                ))}
-                {scrapeLog.result.indicators.length > 3 && (
-                  <div className="text-[#555]">... y {scrapeLog.result.indicators.length - 3} mas</div>
+                {scrapeLog.scrapedValue ? (
+                  <div className="text-[#4ade80] font-bold">VALOR: {scrapeLog.scrapedValue}</div>
+                ) : (
+                  <>
+                    <div>Indicadores: {scrapeLog.result.totalIndicators || scrapeLog.result.indicators?.length || 0}</div>
+                    {scrapeLog.result.indicators?.slice(0, 3).map((ind, i) => (
+                      <div key={i}>• {ind.name}: {ind.last} {ind.unit}</div>
+                    ))}
+                    {(scrapeLog.result.totalIndicators || scrapeLog.result.indicators?.length || 0) > 3 && (
+                      <div className="text-[#555]">... y mas</div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -264,15 +301,25 @@ export default function DataPage() {
                         <input
                           type="text"
                           value={source.scrapeUrl || ''}
-                          onChange={(e) => updateField(source.id, 'scrapeUrl', e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            const isTE = isTradingEconomicsUrl(val)
+                            setSources((prev) =>
+                              prev.map((s) =>
+                                s.id === source.id
+                                  ? { ...s, scrapeUrl: val, scraper: isTE ? 'trading-economics' : s.scraper }
+                                  : s
+                              )
+                            )
+                          }}
                           placeholder="https://tradingeconomics.com/..."
                           className="w-full bg-[#111] border-b-2 border-[#ecd987] text-xs text-white font-mono px-1.5 py-1 outline-none focus:border-white focus:bg-[#1a1a0d]"
                         />
                       </div>
                       {/* Scrape preview */}
-                      {lastScrape && lastScrape.indicators && lastScrape.indicators.length > 0 && (
+                      {source._scrapedValue && (
                         <div className="text-[10px] text-[#4ade80] font-mono mb-1">
-                          {lastScrape.indicators[0].name}: {lastScrape.indicators[0].last}
+                          {source._scrapedValue}
                         </div>
                       )}
                       {/* Action buttons */}
