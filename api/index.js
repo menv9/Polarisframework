@@ -254,11 +254,17 @@ app.post('/api/scrape', express.json(), async (req, res) => {
 })
 
 async function scrapeTradingEconomicsFromUrl(url, indicatorName) {
+  console.log(`[SCRAPE] Fetching: ${url}`)
   const { data: html } = await axios.get(url, { headers: browserHeaders, timeout: 5000 })
+
+  // Log primeros 500 chars para debugging
+  console.log(`[SCRAPE] HTML preview: ${html.substring(0, 500).replace(/\n/g, ' ')}`)
+
   const $ = cheerio.load(html)
 
   const indicators = []
 
+  // Selector principal
   $('.table-responsive table tbody tr').each((_, row) => {
     const cells = $(row).find('td')
     if (cells.length >= 3) {
@@ -278,7 +284,9 @@ async function scrapeTradingEconomicsFromUrl(url, indicatorName) {
     }
   })
 
-  // Fallback
+  console.log(`[SCRAPE] Found ${indicators.length} indicators via .table-responsive`)
+
+  // Fallback: cualquier tabla
   if (indicators.length === 0) {
     $('table tbody tr').each((_, row) => {
       const cells = $(row).find('td')
@@ -291,12 +299,19 @@ async function scrapeTradingEconomicsFromUrl(url, indicatorName) {
         }
       }
     })
+    console.log(`[SCRAPE] Found ${indicators.length} indicators via fallback table selector`)
+  }
+
+  // Debug: mostrar primeros 5 indicadores encontrados
+  if (indicators.length > 0) {
+    console.log(`[SCRAPE] First indicators:`, indicators.slice(0, 5).map((i) => i.name))
   }
 
   // Si se especifico un indicatorName, buscarlo y devolver solo ese
   let matchedIndicator = null
   if (indicatorName && indicators.length > 0) {
     const search = indicatorName.toLowerCase()
+    console.log(`[SCRAPE] Searching for: "${search}"`)
     matchedIndicator = indicators.find((ind) =>
       ind.name.toLowerCase().includes(search)
     )
@@ -306,6 +321,11 @@ async function scrapeTradingEconomicsFromUrl(url, indicatorName) {
       matchedIndicator = indicators.find((ind) =>
         words.some((w) => ind.name.toLowerCase().includes(w))
       )
+      if (matchedIndicator) {
+        console.log(`[SCRAPE] Fuzzy match found: "${matchedIndicator.name}"`)
+      }
+    } else {
+      console.log(`[SCRAPE] Exact match found: "${matchedIndicator.name}"`)
     }
   }
 
