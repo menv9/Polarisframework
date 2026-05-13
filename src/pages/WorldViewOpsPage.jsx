@@ -74,12 +74,12 @@ export default function WorldViewOpsPage() {
   const refreshIndicator = async (key) => {
     const cfg = indicatorScrapeConfig[key]
     if (!cfg) {
-      setScrapeLog({ key, error: 'No hay scraper configurado para este indicador' })
+      setScrapeLog({ key, error: 'No hay scraper configurado para este indicador. Edita manualmente o ve a /data' })
       return
     }
 
     setRefreshingId(key)
-    setScrapeLog(null)
+    setScrapeLog({ key, loading: true })
 
     try {
       const res = await fetch('/api/scrape', {
@@ -89,7 +89,7 @@ export default function WorldViewOpsPage() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.message || res.statusText)
+        throw new Error(err.message || `HTTP ${res.status}`)
       }
       const result = await res.json()
 
@@ -97,12 +97,17 @@ export default function WorldViewOpsPage() {
       if (result.matchedIndicator?.last) {
         const parsed = parseFloat(result.matchedIndicator.last.replace(/,/g, ''))
         if (!isNaN(parsed)) newValue = parsed
+      } else if (result.indicators?.length > 0) {
+        // Fallback: usa el primer indicador si no hay matchedIndicator
+        const first = result.indicators[0]
+        const parsed = parseFloat(first.last?.replace(/,/g, ''))
+        if (!isNaN(parsed)) newValue = parsed
       }
 
       setData((prev) => ({ ...prev, [key]: newValue }))
       setScrapeLog({ key, result, value: newValue, ok: true })
     } catch (err) {
-      setScrapeLog({ key, error: err.message })
+      setScrapeLog({ key, error: err.message, isNetworkError: err.message.includes('fetch') || err.message.includes('Network') })
     } finally {
       setRefreshingId(null)
     }
@@ -171,20 +176,39 @@ export default function WorldViewOpsPage() {
 
             {/* ===== SCRAPE LOG ===== */}
             {scrapeLog && (
-              <div className={`border-2 mb-4 p-3 ${scrapeLog.error ? 'border-[#ef4444] bg-[#1a0a0a]' : 'border-[#4ade80] bg-[#0a1a0a]'}`}>
+              <div className={`border-2 mb-4 p-3 ${
+                scrapeLog.error ? 'border-[#ef4444] bg-[#1a0a0a]' 
+                : scrapeLog.loading ? 'border-[#f59e0b] bg-[#1a1500]'
+                : 'border-[#4ade80] bg-[#0a1a0a]'
+              }`}>
                 <div className="text-xs font-bold uppercase tracking-wider mb-1">
-                  {scrapeLog.error ? (
-                    <span className="text-[#ef4444]">[!] ERROR ({scrapeLog.key}): {scrapeLog.error}</span>
+                  {scrapeLog.loading ? (
+                    <span className="text-[#f59e0b]">[...] SCRAPEANDO {scrapeLog.key.toUpperCase()}...</span>
+                  ) : scrapeLog.error ? (
+                    <span className="text-[#ef4444]">
+                      [!] ERROR ({scrapeLog.key.toUpperCase()}): {scrapeLog.error}
+                      {scrapeLog.isNetworkError && (
+                        <span className="block mt-1 text-[#888] normal-case">
+                          El backend no responde. En Vercel Hobby el scraping de Trading Economics esta bloqueado.
+                          Usa localhost o introduce el valor manualmente.
+                        </span>
+                      )}
+                    </span>
                   ) : (
                     <span className="text-[#4ade80]">[OK] {scrapeLog.key.toUpperCase()} ACTUALIZADO: {scrapeLog.value}</span>
                   )}
                 </div>
-                {scrapeLog.result && (
+                {!scrapeLog.loading && scrapeLog.result && (
                   <div className="text-xs text-[#888] font-mono">
                     <div>URL: {scrapeLog.result.url}</div>
                     {scrapeLog.result.matchedIndicator && (
                       <div className="text-[#4ade80]">
                         {scrapeLog.result.matchedIndicator.name}: {scrapeLog.result.matchedIndicator.last} {scrapeLog.result.matchedIndicator.unit}
+                      </div>
+                    )}
+                    {scrapeLog.result.indicators?.length > 0 && !scrapeLog.result.matchedIndicator && (
+                      <div className="text-[#f59e0b]">
+                        No match exacto. Usando primer valor: {scrapeLog.result.indicators[0].name}: {scrapeLog.result.indicators[0].last}
                       </div>
                     )}
                   </div>
