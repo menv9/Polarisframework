@@ -71,12 +71,13 @@ async function fetchViaScrapingAnt(targetUrl) {
   if (!SCRAPINGANT_API_KEY) {
     throw new Error('ScrapingAnt API key not configured')
   }
-  const params = new URLSearchParams({ url: targetUrl })
+  const params = new URLSearchParams({ url: targetUrl, proxy_type: 'residential' })
   const apiUrl = `${SCRAPINGANT_BASE}?${params.toString()}`
   console.log(`[SCRAPINGANT] Proxying: ${targetUrl}`)
+  console.log(`[SCRAPINGANT] Full URL: ${apiUrl}`)
   const { data: html } = await axios.get(apiUrl, {
     headers: { 'x-api-key': SCRAPINGANT_API_KEY },
-    timeout: 15000,
+    timeout: 30000,
   })
   console.log(`[SCRAPINGANT] Success, HTML length: ${html.length}`)
   return html
