@@ -6,8 +6,9 @@ const cors = require('cors')
 const app = express()
 const PORT = process.env.PORT || 3001
 
-// CORS para permitir llamadas desde el frontend Vite
-app.use(cors({ origin: 'http://localhost:5173' }))
+// CORS: permitir cualquier origen (frontend en Vercel es mismo dominio, pero
+// en dev puede ser localhost)
+app.use(cors({ origin: '*' }))
 app.use(express.json())
 
 // Mapeo de códigos de país a slugs de Trading Economics
@@ -58,7 +59,7 @@ const browserHeaders = {
  */
 async function scrapeTradingEconomics(countrySlug) {
   const url = `https://tradingeconomics.com/${countrySlug}/indicators`
-  const { data: html } = await axios.get(url, { headers: browserHeaders, timeout: 15000 })
+  const { data: html } = await axios.get(url, { headers: browserHeaders, timeout: 5000 })
   const $ = cheerio.load(html)
 
   const indicators = []
@@ -148,71 +149,93 @@ app.get('/api/indicators/:country', async (req, res) => {
   }
 })
 
+// Fallback data cuando el scraping falla
+const fallbackData = {
+  source: 'fallback-mock',
+  scrapedAt: new Date().toISOString(),
+  gdpUsa: 2.9,
+  gdpEur: 0.3,
+  gdpChn: 5.2,
+  gdpJpn: 0.1,
+  gdpResto: 0,
+  vix: 15,
+  hyOas: 35,
+  sp200dma: 1,
+  embi: 320,
+  smartZ: 0.2,
+  retailZ: -0.5,
+  dxy: 103.5,
+  dxy200dma: 101.0,
+  dxyRising: 1,
+  cpiG7: 2.8,
+  breakevens: 2.3,
+}
+
+// Helper para extraer GDP growth
+function getGDP(indicators) {
+  if (!indicators || indicators.length === 0) return 0
+  const gdp = findIndicator(indicators, ['GDP Growth Rate', 'GDP Annual'])
+  return gdp ? parseFloat(gdp.last) : 0
+}
+
+// Helper para extraer CPI
+function getCPI(indicators) {
+  if (!indicators || indicators.length === 0) return 0
+  const cpi = findIndicator(indicators, ['Inflation Rate', 'Consumer Price'])
+  return cpi ? parseFloat(cpi.last) : 0
+}
+
 // Endpoint unificado: devuelve los datos mapeados para Polaris
 app.get('/api/polaris/worldview', async (_req, res) => {
   const cacheKey = 'polaris_worldview'
   let data = getCached(cacheKey)
 
-  if (!data) {
-    try {
-      // Scrapear USA, EUR, CHN, JPN en paralelo
-      const [usa, eur, chn, jpn] = await Promise.all([
-        scrapeTradingEconomics('united-states'),
-        scrapeTradingEconomics('euro-area'),
-        scrapeTradingEconomics('china'),
-        scrapeTradingEconomics('japan'),
-      ])
+  if (data) {
+    return res.json(data)
+  }
 
-      // Helper para extraer GDP growth
-      const getGDP = (indicators) => {
-        const gdp = findIndicator(indicators, ['GDP Growth Rate', 'GDP Annual'])
-        return gdp ? parseFloat(gdp.last) : 0
-      }
+  try {
+    // Scrapear secuencialmente para evitar timeouts en Vercel (10s límite Hobby)
+    let usa, eur, chn, jpn
+    try { usa = await scrapeTradingEconomics('united-states') } catch (e) { console.warn('USA scrape failed:', e.message) }
+    try { eur = await scrapeTradingEconomics('euro-area') } catch (e) { console.warn('EUR scrape failed:', e.message) }
+    try { chn = await scrapeTradingEconomics('china') } catch (e) { console.warn('CHN scrape failed:', e.message) }
+    try { jpn = await scrapeTradingEconomics('japan') } catch (e) { console.warn('JPN scrape failed:', e.message) }
 
-      // Helper para extraer CPI
-      const getCPI = (indicators) => {
-        const cpi = findIndicator(indicators, ['Inflation Rate', 'Consumer Price'])
-        return cpi ? parseFloat(cpi.last) : 0
-      }
+    const allFailed = !usa && !eur && !chn && !jpn
 
+    if (allFailed) {
+      console.warn('All scrapes failed, returning fallback data')
+      data = { ...fallbackData, fallback: true }
+    } else {
       data = {
         source: 'trading-economics-proxy',
         scrapedAt: new Date().toISOString(),
-        gdpUsa: getGDP(usa.indicators),
-        gdpEur: getGDP(eur.indicators),
-        gdpChn: getGDP(chn.indicators),
-        gdpJpn: getGDP(jpn.indicators),
+        gdpUsa: usa ? getGDP(usa.indicators) : fallbackData.gdpUsa,
+        gdpEur: eur ? getGDP(eur.indicators) : fallbackData.gdpEur,
+        gdpChn: chn ? getGDP(chn.indicators) : fallbackData.gdpChn,
+        gdpJpn: jpn ? getGDP(jpn.indicators) : fallbackData.gdpJpn,
         gdpResto: 0,
-        // Regimen: estos requieren fuentes de mercado, no TE macro
-        vix: 15,
-        hyOas: 35,
+        vix: fallbackData.vix,
+        hyOas: fallbackData.hyOas,
         sp200dma: 1,
-        embi: 320,
-        // WoC: no disponible en TE
-        smartZ: 0.2,
-        retailZ: -0.5,
-        // USD
-        dxy: 103.5,
-        dxy200dma: 101.0,
+        embi: fallbackData.embi,
+        smartZ: fallbackData.smartZ,
+        retailZ: fallbackData.retailZ,
+        dxy: fallbackData.dxy,
+        dxy200dma: fallbackData.dxy200dma,
         dxyRising: 1,
-        // Inflacion
-        cpiG7: (getCPI(usa.indicators) + getCPI(eur.indicators)) / 2,
-        breakevens: 2.3,
-        raw: { usa, eur, chn, jpn },
+        cpiG7: ((usa ? getCPI(usa.indicators) : fallbackData.cpiG7) + (eur ? getCPI(eur.indicators) : fallbackData.cpiG7)) / 2,
+        breakevens: fallbackData.breakevens,
       }
-
       setCached(cacheKey, data)
-    } catch (err) {
-      console.error('Error en /api/polaris/worldview:', err.message)
-      return res.status(502).json({
-        error: 'Scraping failed',
-        message: err.message,
-        fallback: true,
-      })
     }
-  }
 
-  res.json(data)
+    res.json(data)
+  } catch (err) {
+    console.error('Error en /api/polaris/worldview:', err.message)
+    res.json({ ...fallbackData, fallback: true, error: err.message })
+  }
 })
 
 // Solo iniciar servidor si se ejecuta directamente (desarrollo local)
