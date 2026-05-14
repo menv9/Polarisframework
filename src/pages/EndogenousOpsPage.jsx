@@ -147,7 +147,7 @@ export default function EndogenousOpsPage() {
   const [pairA, setPairA]     = useState('usa')
   const [pairB, setPairB]     = useState('eur')
   const [activeTab, setActiveTab] = useState('usa')
-  const [importMsg, setImportMsg] = useState(null)
+  const [resetMsg, setResetMsg] = useState(null)
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_ZSCORES, JSON.stringify(zScores))
@@ -156,30 +156,16 @@ export default function EndogenousOpsPage() {
   const handleZChange = (prefix, key, value) =>
     setZScores(prev => ({ ...prev, [`${prefix}_${key}`]: Number(value) }))
 
-  const handleImport = () => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_SOURCES)
-      if (!saved) { setImportMsg('Sin datos en /data'); return }
-      const sources = JSON.parse(saved)
-      const updates = {}
-      for (const c of COUNTRIES) {
-        for (const ind of INDICATORS) {
-          const id = getSourceId(c.prefix, ind.key)
-          const src = sources.find(s => s.id === id)
-          if (src?._value != null && src._value !== '') {
-            const num = Number(src._value)
-            if (!isNaN(num)) updates[`${c.prefix}_${ind.key}`] = num
-          }
-        }
+  const handleReset = () => {
+    const defaults = {}
+    for (const c of COUNTRIES) {
+      for (const ind of INDICATORS) {
+        defaults[`${c.prefix}_${ind.key}`] = 0
       }
-      const count = Object.keys(updates).length
-      if (count === 0) { setImportMsg('Sin valores en /data'); return }
-      setZScores(prev => ({ ...prev, ...updates }))
-      setImportMsg(`${count} valores importados`)
-    } catch {
-      setImportMsg('Error al importar')
     }
-    setTimeout(() => setImportMsg(null), 3000)
+    setZScores(defaults)
+    setResetMsg('Z-scores reseteados a 0')
+    setTimeout(() => setResetMsg(null), 3000)
   }
 
   const regimeOn  = wvData.vix < 30 && wvData.hyOas < 30 && wvData.sp200dma === 1 && wvData.embi < 40
@@ -211,20 +197,20 @@ export default function EndogenousOpsPage() {
         <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-[#333]">
           <h1 className="text-2xl font-bold uppercase tracking-widest">OPERATIVA — ENDOGENOUS</h1>
           <div className="flex items-center gap-3">
-            {importMsg && (
-              <span className="text-xs font-bold uppercase tracking-wider text-[#4ade80]">{importMsg}</span>
+            {resetMsg && (
+              <span className="text-xs font-bold uppercase tracking-wider text-[#f59e0b]">{resetMsg}</span>
             )}
             <button
-              onClick={handleImport}
-              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white"
+              onClick={handleReset}
+              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#555] text-[#777] hover:text-white hover:border-white"
             >
-              ACTUALIZAR DATOS
+              RESET Z-SCORES
             </button>
             <Link
               to="/data?module=Endogenous"
-              className="text-xs font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]"
+              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white"
             >
-              → /DATA
+              FUENTES →
             </Link>
           </div>
         </div>
