@@ -38,6 +38,18 @@ const COUNTRIES = [
   { label: 'NOK', prefix: 'nor', cyclical: true  },
 ]
 
+const DASHBOARD_PAIRS = [
+  { label: 'EUR/USD', base: 'eur', quote: 'usa' },
+  { label: 'USD/JPY', base: 'usa', quote: 'jpn' },
+  { label: 'GBP/USD', base: 'gbr', quote: 'usa' },
+  { label: 'USD/CHF', base: 'usa', quote: 'che' },
+  { label: 'AUD/USD', base: 'aus', quote: 'usa' },
+  { label: 'USD/CAD', base: 'usa', quote: 'can' },
+  { label: 'NZD/USD', base: 'nzl', quote: 'usa' },
+  { label: 'USD/NOK', base: 'usa', quote: 'nor' },
+  { label: 'USD/SEK', base: 'usa', quote: 'swe' },
+]
+
 function getRegimeMultiplier(regime, cyclical) {
   if (regime === 'RISK-ON')  return cyclical ? 1.0 : 0.5
   if (regime === 'RISK-OFF') return cyclical ? 0.5 : 1.0
@@ -99,18 +111,20 @@ export default function DashboardPage() {
     [zScores]
   )
 
-  // ── Top pares (siempre top 5, sin filtro de conviction) ──────────────────
-  const topPairs = useMemo(() => {
-    const pairs = []
-    for (let i = 0; i < COUNTRIES.length; i++) {
-      for (let j = i + 1; j < COUNTRIES.length; j++) {
-        const a = countryScores[i]
-        const b = countryScores[j]
-        const signal = a.score - b.score
-        pairs.push({ a, b, signal, conv: getConviction(signal) })
+  // ── Pares operativos fijos del dashboard ─────────────────────────────────
+  const dashboardPairs = useMemo(() => {
+    const byPrefix = new Map(countryScores.map((country) => [country.prefix, country]))
+    return DASHBOARD_PAIRS.map((pair) => {
+      const base = byPrefix.get(pair.base)
+      const quote = byPrefix.get(pair.quote)
+      const signal = base && quote ? base.score - quote.score : 0
+      return {
+        ...pair,
+        signal,
+        conv: getConviction(signal),
+        direction: signal >= 0 ? 'LONG' : 'SHORT',
       }
-    }
-    return pairs.sort((x, y) => Math.abs(y.signal) - Math.abs(x.signal)).slice(0, 6)
+    })
   }, [countryScores])
 
   // ── Ranking G10 ──────────────────────────────────────────────────────────
@@ -201,16 +215,14 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {topPairs.map(({ a, b, signal, conv }) => {
-                  const long  = signal >= 0 ? a.label : b.label
-                  const short = signal >= 0 ? b.label : a.label
+                {dashboardPairs.map(({ label, signal, conv, direction }) => {
                   return (
-                    <tr key={`${a.prefix}-${b.prefix}`} className="border-b border-[#1a1a1a] hover:bg-[#0a0a0a]">
-                      <td className="px-3 py-1.5 font-mono font-bold text-[#a3a3a3] text-xs">{a.label}/{b.label}</td>
+                    <tr key={label} className="border-b border-[#1a1a1a] hover:bg-[#0a0a0a]">
+                      <td className="px-3 py-1.5 font-mono font-bold text-[#a3a3a3] text-xs">{label}</td>
                       <td className={`px-3 py-1.5 font-mono font-bold text-sm ${scoreColor(signal)}`}>{fmtScore(signal)}</td>
                       <td className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider ${convColor(conv)}`}>{conv}</td>
-                      <td className={`px-3 py-1.5 text-sm font-bold uppercase tracking-wide ${conv === 'FULL' ? 'text-white' : conv === 'HALF' ? 'text-[#a3a3a3]' : 'text-[#555]'}`}>
-                        LONG {long} / SHORT {short}
+                      <td className={`px-3 py-1.5 text-sm font-bold uppercase tracking-wide ${direction === 'LONG' ? 'text-[#4ade80]' : 'text-[#ef4444]'}`}>
+                        {direction}
                       </td>
                     </tr>
                   )
