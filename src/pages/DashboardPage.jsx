@@ -209,8 +209,8 @@ export default function DashboardPage() {
                       <td className="px-3 py-1.5 font-mono font-bold text-[#a3a3a3] text-xs">{a.label}/{b.label}</td>
                       <td className={`px-3 py-1.5 font-mono font-bold text-sm ${scoreColor(signal)}`}>{fmtScore(signal)}</td>
                       <td className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider ${convColor(conv)}`}>{conv}</td>
-                      <td className={`px-3 py-1.5 text-sm font-bold uppercase tracking-wide ${conv === 'FLAT' ? 'text-[#444]' : 'text-white'}`}>
-                        {conv === 'FLAT' ? '— sin señal' : `LONG ${long} / SHORT ${short}`}
+                      <td className={`px-3 py-1.5 text-sm font-bold uppercase tracking-wide ${conv === 'FULL' ? 'text-white' : conv === 'HALF' ? 'text-[#a3a3a3]' : 'text-[#555]'}`}>
+                        LONG {long} / SHORT {short}
                       </td>
                     </tr>
                   )
