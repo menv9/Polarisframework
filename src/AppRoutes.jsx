@@ -12,6 +12,7 @@ import CoverageMatrixPage from './pages/CoverageMatrixPage'
 import HistoryPage from './pages/HistoryPage'
 import HistorySeriesPage from './pages/HistorySeriesPage'
 import EconomicCalendarPage from './pages/EconomicCalendarPage'
+import NotificationsPage from './pages/NotificationsPage'
 import DashboardPage from './pages/DashboardPage'
 import EndogenousOpsPage from './pages/EndogenousOpsPage'
 import ModelInputsPage from './pages/ModelInputsPage'
@@ -58,6 +59,7 @@ export default function AppRoutes() {
                 <Route path="/history" element={<HistoryPage />} />
                 <Route path="/history/:sourceId" element={<HistorySeriesPage />} />
                 <Route path="/economic-calendar" element={<EconomicCalendarPage />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
               </Routes>
             </Layout>
           </AdminRoute>

@@ -2,6 +2,13 @@ import { Link } from 'react-router-dom'
 
 const cards = [
   {
+    title: 'Notifications',
+    path: '/data/notifications',
+    tone: 'text-[#ef4444] border-[#ef4444]',
+    desc: 'Inbox operativo: vencidos, proximos, releases nuevos y acciones sugeridas.',
+    meta: 'Data alerts',
+  },
+  {
     title: 'Source Registry',
     path: '/data/raw',
     tone: 'text-[#4ade80] border-[#4ade80]',
