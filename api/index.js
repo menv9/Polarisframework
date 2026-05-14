@@ -5,13 +5,15 @@ const cheerio = require('cheerio')
 const cors = require('cors')
 const AdmZip = require('adm-zip')
 const XLSX = require('xlsx')
+const fs = require('fs/promises')
+const path = require('path')
 
 const app = express()
 const PORT = process.env.PORT || 3001
 
 // CORS: permitir cualquier origen
 app.use(cors({ origin: '*' }))
-app.use(express.json())
+app.use(express.json({ limit: '5mb' }))
 
 // Mapeo de codigos de pais para futuras fuentes oficiales
 const countrySlugs = {
@@ -625,9 +627,374 @@ function findIndicator(indicators, searchTerms) {
   )
 }
 
+const HISTORY_ROOT = path.join(process.cwd(), 'data', 'history')
+const HISTORY_SERIES_DIR = path.join(HISTORY_ROOT, 'series')
+const HISTORY_STATUS_PATH = path.join(HISTORY_ROOT, 'status.json')
+
+async function ensureHistoryDirs() {
+  await fs.mkdir(HISTORY_SERIES_DIR, { recursive: true })
+}
+
+function safeFileName(id) {
+  return String(id).replace(/[^a-zA-Z0-9._-]/g, '_')
+}
+
+async function readHistoryStatus() {
+  try {
+    const raw = await fs.readFile(HISTORY_STATUS_PATH, 'utf8')
+    return JSON.parse(raw)
+  } catch {
+    return {}
+  }
+}
+
+async function writeHistoryStatus(status) {
+  await ensureHistoryDirs()
+  await fs.writeFile(HISTORY_STATUS_PATH, JSON.stringify(status, null, 2))
+}
+
+function normalizeHistorySeries(series) {
+  const byDate = new Map()
+  for (const row of series || []) {
+    const value = Number(row.value)
+    if (!row.date || !Number.isFinite(value)) continue
+    byDate.set(String(row.date).slice(0, 10), { date: String(row.date).slice(0, 10), value })
+  }
+  return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date))
+}
+
+function annualPercentChange(series, lag = 12) {
+  return series
+    .map((row, index) => {
+      const prev = series[index - lag]
+      if (!prev || !Number.isFinite(prev.value) || prev.value === 0) return null
+      return { date: row.date, value: Number((((row.value - prev.value) / prev.value) * 100).toFixed(6)) }
+    })
+    .filter(Boolean)
+}
+
+async function saveHistoryResult(source, result) {
+  await ensureHistoryDirs()
+  const series = normalizeHistorySeries(result.series)
+  const now = new Date().toISOString()
+  const fileName = `${safeFileName(source.id)}.json`
+  const payload = {
+    sourceId: source.id,
+    indicator: source.indicator,
+    module: source.module,
+    provider: result.provider,
+    transform: result.transform || null,
+    fetchedAt: now,
+    count: series.length,
+    start: series[0]?.date || null,
+    end: series.at(-1)?.date || null,
+    series,
+  }
+  await fs.writeFile(path.join(HISTORY_SERIES_DIR, fileName), JSON.stringify(payload, null, 2))
+  const status = await readHistoryStatus()
+  status[source.id] = {
+    sourceId: source.id,
+    indicator: source.indicator,
+    module: source.module,
+    status: 'ok',
+    provider: result.provider,
+    count: payload.count,
+    start: payload.start,
+    end: payload.end,
+    fetchedAt: now,
+    file: `data/history/series/${fileName}`,
+    error: null,
+  }
+  await writeHistoryStatus(status)
+  return status[source.id]
+}
+
+async function saveHistoryFailure(source, statusName, message) {
+  const status = await readHistoryStatus()
+  status[source.id] = {
+    sourceId: source.id,
+    indicator: source.indicator,
+    module: source.module,
+    status: statusName,
+    provider: null,
+    count: 0,
+    start: null,
+    end: null,
+    fetchedAt: new Date().toISOString(),
+    file: null,
+    error: message,
+  }
+  await writeHistoryStatus(status)
+  return status[source.id]
+}
+
+async function fetchFredHistorySeries(seriesId, transform = null, limit = 5000) {
+  const series = normalizeHistorySeries(await fetchFredNumericObservations(seriesId, limit).then((rows) => rows.reverse()))
+  return {
+    provider: 'fred',
+    transform,
+    series: transform === 'yoy' ? annualPercentChange(series, 12) : series,
+  }
+}
+
+async function fetchFredSpreadHistory(leftSeriesId, rightSeriesId, limit = 5000) {
+  const [left, right] = await Promise.all([
+    fetchFredNumericObservations(leftSeriesId, limit),
+    fetchFredNumericObservations(rightSeriesId, limit),
+  ])
+  const rightByDate = new Map(normalizeHistorySeries(right.reverse()).map((row) => [row.date, row]))
+  const series = normalizeHistorySeries(left.reverse())
+    .map((row) => {
+      const match = rightByDate.get(row.date)
+      if (!match) return null
+      return { date: row.date, value: Number((row.value - match.value).toFixed(6)) }
+    })
+    .filter(Boolean)
+  return { provider: 'fred', transform: 'spread', series }
+}
+
+async function fetchFredRealRateHistory(policySeriesId, cpiSeriesId, cpiRaw = false) {
+  const [policyResult, cpiResult] = await Promise.all([
+    fetchFredHistorySeries(policySeriesId),
+    fetchFredHistorySeries(cpiSeriesId),
+  ])
+  const cpiSeries = cpiRaw ? cpiResult.series : annualPercentChange(cpiResult.series, 12)
+  const cpiByDate = new Map(cpiSeries.map((row) => [row.date.slice(0, 7), row]))
+  const series = policyResult.series
+    .map((row) => {
+      const match = cpiByDate.get(row.date.slice(0, 7))
+      if (!match) return null
+      return { date: row.date, value: Number((row.value - match.value).toFixed(6)) }
+    })
+    .filter(Boolean)
+  return { provider: 'fred', transform: 'real_rate', series }
+}
+
+async function fetchYahooRatioHistory(leftSymbol, rightSymbol) {
+  const [left, right] = await Promise.all([
+    fetchYahooHistory(leftSymbol, '10y', '1d'),
+    fetchYahooHistory(rightSymbol, '10y', '1d'),
+  ])
+  const rightByDate = new Map(right.map((row) => [row.date, row]))
+  const series = left
+    .map((row) => {
+      const match = rightByDate.get(row.date)
+      if (!match || match.value === 0) return null
+      return { date: row.date, value: Number((row.value / match.value).toFixed(8)) }
+    })
+    .filter(Boolean)
+  return { provider: 'yahoo', transform: 'ratio', series }
+}
+
+async function fetchYahooAboveMaHistory(symbol, window = 200) {
+  const history = await fetchYahooHistory(symbol, '10y', '1d')
+  const series = history
+    .map((row, index) => {
+      const slice = history.slice(Math.max(0, index - window + 1), index + 1)
+      if (slice.length < window) return null
+      const sma = slice.reduce((sum, item) => sum + item.value, 0) / slice.length
+      return { date: row.date, value: row.value > sma ? 1 : 0 }
+    })
+    .filter(Boolean)
+  return { provider: 'yahoo', transform: `above_${window}dma`, series }
+}
+
+async function fetchEcbHistory(seriesKey) {
+  const url = `${ECB_BASE}/${seriesKey}?format=csvdata&detail=dataonly`
+  const { data } = await axios.get(url, { timeout: 30000 })
+  const rows = parseCsv(data)
+  const series = rows
+    .map((row) => ({ date: row.TIME_PERIOD, value: Number.parseFloat(row.OBS_VALUE) }))
+    .filter((row) => row.date && Number.isFinite(row.value))
+  return { provider: 'ecb', series }
+}
+
+async function fetchEurostatHistory(dataset, filters = {}) {
+  const params = new URLSearchParams({ lang: 'en' })
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') params.set(key, value)
+  })
+  const { data } = await axios.get(`${EUROSTAT_BASE}/${dataset}?${params.toString()}`, { timeout: 30000 })
+  const timeDimId = data.id?.find((id) => id === 'time' || id === 'TIME_PERIOD')
+  const timeDim = timeDimId ? data.dimension?.[timeDimId] : null
+  const timeIndex = timeDim?.category?.index || {}
+  const times = Object.entries(timeIndex).sort((a, b) => a[1] - b[1]).map(([id]) => id)
+  const values = Object.entries(data.value || {})
+    .map(([flatIndex, value]) => ({ flatIndex: Number(flatIndex), value: Number(value) }))
+    .filter((row) => Number.isFinite(row.value))
+    .sort((a, b) => a.flatIndex - b.flatIndex)
+  const series = values.map((row, index) => ({ date: times[index % times.length], value: row.value })).filter((row) => row.date)
+  return { provider: 'eurostat', series }
+}
+
+async function fetchBisReerHistory(currency) {
+  const bisCurrencyCodes = {
+    USD: 'RBUS', EUR: 'RBXM', JPY: 'RBJP', GBP: 'RBGB', CHF: 'RBCH',
+    CAD: 'RBCA', AUD: 'RBAU', NZD: 'RBNZ', SEK: 'RBSE', NOK: 'RBNO',
+  }
+  const targetCode = bisCurrencyCodes[currency.toUpperCase()] || currency.toUpperCase()
+  const { data } = await axios.get('https://www.bis.org/statistics/eer/broad.xlsx', { responseType: 'arraybuffer', timeout: 30000 })
+  const workbook = XLSX.read(data, { type: 'buffer' })
+  const sheetName = workbook.SheetNames.find((name) => name.toLowerCase() === 'real') || workbook.SheetNames[0]
+  const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, raw: true })
+  const headerIndex = rows.findIndex((row) => row.some((cell) => String(cell).trim().toUpperCase() === targetCode))
+  if (headerIndex < 0) throw new Error(`BIS currency not found: ${currency}`)
+  const headers = rows[headerIndex].map((cell) => String(cell || '').trim().toUpperCase())
+  const colIndex = headers.findIndex((cell) => cell === targetCode)
+  const series = rows.slice(headerIndex + 1)
+    .map((row) => {
+      const excelDate = Number(row[0])
+      const date = Number.isFinite(excelDate)
+        ? new Date(Date.UTC(1899, 11, 30) + excelDate * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+        : String(row[0] || '')
+      return { date, value: Number.parseFloat(row[colIndex]) }
+    })
+    .filter((row) => row.date && Number.isFinite(row.value))
+  return { provider: 'bis', series }
+}
+
+async function fetchCftcHistory(market, invert = false, yearsBack = 5) {
+  const currentYear = new Date().getUTCFullYear()
+  const allRows = []
+  for (let year = currentYear - yearsBack + 1; year <= currentYear; year += 1) {
+    try {
+      const url = `https://www.cftc.gov/files/dea/history/fut_fin_txt_${year}.zip`
+      const { data } = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 })
+      const zip = new AdmZip(Buffer.from(data))
+      const entry = zip.getEntries().find((item) => item.entryName.toLowerCase().endsWith('.txt'))
+      if (entry) allRows.push(...parseCsv(entry.getData().toString('utf8')))
+    } catch (err) {
+      console.warn(`[CFTC] History year ${year} skipped: ${err.message}`)
+    }
+  }
+  const needle = market.toLowerCase()
+  const series = allRows
+    .filter((row) => {
+      const name = String(row.Market_and_Exchange_Names || row['Market and Exchange Names'] || '').toLowerCase()
+      return name.startsWith(`${needle} -`) || name === needle
+    })
+    .map((row) => {
+      const longValue = Number.parseFloat(row.Asset_Mgr_Positions_Long_All || row['Asset Mgr Longs'] || '0')
+      const shortValue = Number.parseFloat(row.Asset_Mgr_Positions_Short_All || row['Asset Mgr Shorts'] || '0')
+      const compactDate = row.As_of_Date_In_Form_YYMMDD
+      const date = row.Report_Date_as_YYYY_MM_DD || (/^\d{6}$/.test(compactDate || '') ? `20${compactDate.slice(0, 2)}-${compactDate.slice(2, 4)}-${compactDate.slice(4, 6)}` : compactDate)
+      const value = longValue - shortValue
+      return { date, value: invert ? -value : value }
+    })
+  return { provider: 'cftc', transform: invert ? 'inverted_net_asset_manager' : 'net_asset_manager', series }
+}
+
+async function fetchImfDataMapperHistory(indicator, country) {
+  const { data } = await axios.get(`https://www.imf.org/external/datamapper/api/v1/${encodeURIComponent(indicator)}/${encodeURIComponent(country)}`, { timeout: 20000 })
+  const rawSeries = data?.values?.[indicator]?.[country]
+  if (!rawSeries) throw new Error(`No IMF DataMapper data for ${indicator}/${country}`)
+  const series = Object.entries(rawSeries).map(([date, value]) => ({ date, value: Number(value) }))
+  return { provider: 'imf-datamapper', series }
+}
+
+async function fetchWorldBankHistory(country, indicator) {
+  const url = `https://api.worldbank.org/v2/country/${encodeURIComponent(country)}/indicator/${encodeURIComponent(indicator)}?format=json&per_page=200&date=1960:2026`
+  const { data } = await axios.get(url, { timeout: 20000 })
+  const observations = Array.isArray(data) ? data[1] : null
+  if (!Array.isArray(observations)) throw new Error(`No World Bank data for ${country}/${indicator}`)
+  const series = observations.map((row) => ({ date: row.date, value: Number(row.value) }))
+  return { provider: 'worldbank', series }
+}
+
+async function fetchHistoryForSource(source) {
+  if (source.fredSeriesId) {
+    return fetchFredHistorySeries(source.fredSeriesId, source.fredYoY ? 'yoy' : null)
+  }
+  const endpoint = source.apiPath
+  if (!endpoint) throw new Error('No automatic history endpoint configured')
+  const url = new URL(endpoint, 'http://localhost')
+
+  if (url.pathname === '/api/fred/spread') {
+    return fetchFredSpreadHistory(url.searchParams.get('left'), url.searchParams.get('right'), Number(url.searchParams.get('limit') || 5000))
+  }
+  if (url.pathname === '/api/fred/real-rate') {
+    return fetchFredRealRateHistory(url.searchParams.get('policy'), url.searchParams.get('cpi'), url.searchParams.get('cpiraw') === 'true')
+  }
+  if (url.pathname.startsWith('/api/fred/percentile/')) {
+    return fetchFredHistorySeries(url.pathname.split('/').at(-1), 'raw_for_percentile')
+  }
+  if (url.pathname.startsWith('/api/fred/above-ma/')) {
+    return fetchFredHistorySeries(url.pathname.split('/').at(-1), `raw_for_${url.searchParams.get('window') || 200}dma`)
+  }
+  if (url.pathname === '/api/source/yahoo/latest') {
+    return { provider: 'yahoo', series: await fetchYahooHistory(url.searchParams.get('symbol'), '10y', '1d') }
+  }
+  if (url.pathname === '/api/source/yahoo/ratio') {
+    return fetchYahooRatioHistory(url.searchParams.get('left'), url.searchParams.get('right'))
+  }
+  if (url.pathname === '/api/source/yahoo/above-ma') {
+    return fetchYahooAboveMaHistory(url.searchParams.get('symbol'), Number(url.searchParams.get('window') || 200))
+  }
+  if (url.pathname === '/api/source/ecb/latest') {
+    return fetchEcbHistory(url.searchParams.get('seriesKey'))
+  }
+  if (url.pathname.startsWith('/api/source/eurostat/latest/')) {
+    const dataset = url.pathname.split('/').at(-1)
+    const filters = Object.fromEntries(url.searchParams.entries())
+    return fetchEurostatHistory(dataset, filters)
+  }
+  if (url.pathname === '/api/source/bis/reer/latest') {
+    return fetchBisReerHistory(url.searchParams.get('currency'))
+  }
+  if (url.pathname === '/api/source/cftc/latest') {
+    return fetchCftcHistory(url.searchParams.get('market'), url.searchParams.get('invert') === 'true')
+  }
+  if (url.pathname === '/api/source/imf-datamapper/latest') {
+    return fetchImfDataMapperHistory(url.searchParams.get('indicator'), url.searchParams.get('country'))
+  }
+  if (url.pathname === '/api/source/worldbank/latest') {
+    return fetchWorldBankHistory(url.searchParams.get('country'), url.searchParams.get('indicator'))
+  }
+  throw new Error(`No history fetcher for ${url.pathname}`)
+}
+
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
+app.get('/api/history/status', async (_req, res) => {
+  res.json(await readHistoryStatus())
+})
+
+app.post('/api/history/ingest', async (req, res) => {
+  const source = req.body?.source
+  if (!source?.id) return res.status(400).json({ error: 'source required' })
+  try {
+    const result = await fetchHistoryForSource(source)
+    res.json(await saveHistoryResult(source, result))
+  } catch (err) {
+    const skipped = /No automatic history endpoint|No history fetcher/.test(err.message)
+    const row = await saveHistoryFailure(source, skipped ? 'skipped' : 'error', err.message)
+    res.status(skipped ? 200 : 502).json(row)
+  }
+})
+
+app.post('/api/history/ingest-all', async (req, res) => {
+  const sources = Array.isArray(req.body?.sources) ? req.body.sources : []
+  if (!sources.length) return res.status(400).json({ error: 'sources required' })
+  const results = []
+  for (const source of sources) {
+    try {
+      const result = await fetchHistoryForSource(source)
+      results.push(await saveHistoryResult(source, result))
+    } catch (err) {
+      const skipped = /No automatic history endpoint|No history fetcher/.test(err.message)
+      results.push(await saveHistoryFailure(source, skipped ? 'skipped' : 'error', err.message))
+    }
+  }
+  res.json({
+    total: results.length,
+    ok: results.filter((row) => row.status === 'ok').length,
+    skipped: results.filter((row) => row.status === 'skipped').length,
+    errors: results.filter((row) => row.status === 'error').length,
+    results,
+  })
 })
 
 // FRED proxy endpoints

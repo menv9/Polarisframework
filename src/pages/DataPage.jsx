@@ -429,6 +429,12 @@ export default function DataPage() {
             >
               MODEL INPUTS
             </Link>
+            <Link
+              to="/data/history"
+              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#333] text-[#aaa] hover:text-white hover:border-white"
+            >
+              HISTORY
+            </Link>
             <button
               onClick={refreshAllSources}
               disabled={loadingAll}

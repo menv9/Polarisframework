@@ -5,6 +5,7 @@ import WorldViewTheoryPage from './pages/WorldViewTheoryPage'
 import WorldViewOpsPage from './pages/WorldViewOpsPage'
 import DataPage from './pages/DataPage'
 import CoverageMatrixPage from './pages/CoverageMatrixPage'
+import HistoryPage from './pages/HistoryPage'
 import DashboardPage from './pages/DashboardPage'
 import EndogenousOpsPage from './pages/EndogenousOpsPage'
 import ModelInputsPage from './pages/ModelInputsPage'
@@ -25,6 +26,7 @@ export default function AppRoutes() {
         <Route path="/endogenous/betas" element={<EndogenousBetasPage />} />
         <Route path="/data" element={<DataPage />} />
         <Route path="/data/coverage-matrix" element={<CoverageMatrixPage />} />
+        <Route path="/data/history" element={<HistoryPage />} />
       </Routes>
     </div>
   )
