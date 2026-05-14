@@ -43,6 +43,24 @@ export default function AppRoutes() {
         }
       />
 
+      {/* Rutas solo admin — Data */}
+      <Route
+        path="/data/*"
+        element={
+          <AdminRoute>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<DataHubPage />} />
+                <Route path="/raw" element={<DataPage />} />
+                <Route path="/coverage-matrix" element={<CoverageMatrixPage />} />
+                <Route path="/history" element={<HistoryPage />} />
+                <Route path="/history/:sourceId" element={<HistorySeriesPage />} />
+              </Routes>
+            </Layout>
+          </AdminRoute>
+        }
+      />
+
       {/* Rutas protegidas */}
       <Route
         path="/*"
@@ -58,11 +76,6 @@ export default function AppRoutes() {
                 <Route path="/model-inputs" element={<ModelInputsPage />} />
                 <Route path="/endogenous/zscores" element={<ModelInputsPage />} />
                 <Route path="/endogenous/betas" element={<EndogenousBetasPage />} />
-                <Route path="/data" element={<DataHubPage />} />
-                <Route path="/data/raw" element={<DataPage />} />
-                <Route path="/data/coverage-matrix" element={<CoverageMatrixPage />} />
-                <Route path="/data/history" element={<HistoryPage />} />
-                <Route path="/data/history/:sourceId" element={<HistorySeriesPage />} />
               </Routes>
             </Layout>
           </ProtectedRoute>
