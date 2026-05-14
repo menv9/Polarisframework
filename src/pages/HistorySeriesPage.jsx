@@ -2,14 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { dataSources } from '../data/dataSources'
 
-const PAGE_SIZE = 250
-
 export default function HistorySeriesPage() {
   const { sourceId } = useParams()
   const [payload, setPayload] = useState(null)
   const [status, setStatus] = useState(null)
   const [order, setOrder] = useState('asc')
-  const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -22,7 +19,7 @@ export default function HistorySeriesPage() {
       setError('')
       try {
         const [seriesRes, statusRes] = await Promise.all([
-          fetch(`/api/history/series/${encodeURIComponent(sourceId)}?limit=${PAGE_SIZE}&offset=${offset}&order=${order}`),
+          fetch(`/api/history/series/${encodeURIComponent(sourceId)}?limit=all&order=${order}`),
           fetch('/api/history/status'),
         ])
         const seriesBody = await seriesRes.json().catch(() => ({}))
@@ -40,12 +37,10 @@ export default function HistorySeriesPage() {
     }
     load()
     return () => { cancelled = true }
-  }, [sourceId, offset, order])
+  }, [sourceId, order])
 
   const observations = payload?.observations || []
   const total = payload?.total || 0
-  const canPrev = offset > 0
-  const canNext = offset + PAGE_SIZE < total
 
   return (
     <div className="pt-12 min-h-screen">
@@ -59,13 +54,17 @@ export default function HistorySeriesPage() {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => {
-                setOffset(0)
-                setOrder((current) => current === 'asc' ? 'desc' : 'asc')
-              }}
+              onClick={() => setOrder((current) => current === 'asc' ? 'desc' : 'asc')}
               className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#333] text-[#aaa] hover:text-white hover:border-white"
             >
               ORDER {order === 'asc' ? 'ASC' : 'DESC'}
+            </button>
+            <button
+              onClick={() => exportSeriesCsv({ source, sourceId, observations })}
+              disabled={!observations.length}
+              className={`px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 ${observations.length ? 'border-[#333] text-[#aaa] hover:text-white hover:border-white' : 'border-[#222] text-[#444] cursor-not-allowed'}`}
+            >
+              EXPORT CSV
             </button>
             <Link
               to="/data/history"
@@ -99,23 +98,7 @@ export default function HistorySeriesPage() {
 
         <div className="flex items-center justify-between mb-2">
           <div className="text-xs text-[#777] uppercase tracking-wider">
-            Showing {total === 0 ? 0 : offset + 1}-{Math.min(offset + PAGE_SIZE, total)} of {total}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setOffset((current) => Math.max(0, current - PAGE_SIZE))}
-              disabled={!canPrev || loading}
-              className={`px-2.5 py-1.5 text-xs font-bold uppercase tracking-wider border ${canPrev && !loading ? 'border-[#333] text-[#aaa] hover:text-white hover:border-white' : 'border-[#222] text-[#444] cursor-not-allowed'}`}
-            >
-              Prev
-            </button>
-            <button
-              onClick={() => setOffset((current) => current + PAGE_SIZE)}
-              disabled={!canNext || loading}
-              className={`px-2.5 py-1.5 text-xs font-bold uppercase tracking-wider border ${canNext && !loading ? 'border-[#333] text-[#aaa] hover:text-white hover:border-white' : 'border-[#222] text-[#444] cursor-not-allowed'}`}
-            >
-              Next
-            </button>
+            Showing all {observations.length} observations{total ? ` of ${total}` : ''}
           </div>
         </div>
 
@@ -172,4 +155,35 @@ function formatValue(value) {
 function formatRaw(raw) {
   if (raw === null || raw === undefined || raw === '') return '-'
   return typeof raw === 'object' ? JSON.stringify(raw) : String(raw)
+}
+
+function exportSeriesCsv({ source, sourceId, observations }) {
+  const rows = observations.map((row) => ({
+    source_id: row.source_id || sourceId,
+    indicator: source?.indicator || '',
+    module: source?.module || '',
+    date: row.date || '',
+    value: row.value ?? '',
+    raw: formatRaw(row.raw),
+    fetched_at: row.fetched_at || '',
+  }))
+  const headers = ['source_id', 'indicator', 'module', 'date', 'value', 'raw', 'fetched_at']
+  const csv = [
+    headers.join(','),
+    ...rows.map((row) => headers.map((header) => csvCell(row[header])).join(',')),
+  ].join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `polaris_history_${sourceId}_${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+function csvCell(value) {
+  const text = String(value ?? '')
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }

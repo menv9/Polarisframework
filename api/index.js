@@ -1396,31 +1396,38 @@ async function saveHistoryFailure(source, statusName, message) {
 }
 
 async function readHistorySeries(sourceId, { limit = 500, offset = 0, order = 'asc' } = {}) {
-  const safeLimit = Math.max(1, Math.min(Number(limit) || 500, 5000))
+  const includeAll = String(limit).toLowerCase() === 'all'
+  const safeLimit = includeAll ? null : Math.max(1, Math.min(Number(limit) || 500, 5000))
   const safeOffset = Math.max(0, Number(offset) || 0)
   const ascending = order !== 'desc'
 
   if (supabaseAdmin) {
-    const [{ count, error: countError }, { data, error }] = await Promise.all([
-      supabaseAdmin
-        .from('history_observations')
-        .select('*', { count: 'exact', head: true })
-        .eq('source_id', sourceId),
-      supabaseAdmin
-        .from('history_observations')
-        .select('source_id,date,value,raw,fetched_at')
-        .eq('source_id', sourceId)
-        .order('date', { ascending })
-        .range(safeOffset, safeOffset + safeLimit - 1),
+    const countQuery = supabaseAdmin
+      .from('history_observations')
+      .select('*', { count: 'exact', head: true })
+      .eq('source_id', sourceId)
+    const rowsQuery = supabaseAdmin
+      .from('history_observations')
+      .select('source_id,date,value,raw,fetched_at')
+      .eq('source_id', sourceId)
+      .order('date', { ascending })
+
+    const [{ count, error: countError }, observations] = await Promise.all([
+      countQuery,
+      includeAll
+        ? readHistorySeriesRows(sourceId, ascending)
+        : rowsQuery.range(safeOffset, safeOffset + safeLimit - 1),
     ])
     if (countError) throw new Error(`Supabase history count failed: ${countError.message}`)
+    const data = includeAll ? observations.data : observations.data
+    const error = observations.error
     if (error) throw new Error(`Supabase history read failed: ${error.message}`)
     return {
       sourceId,
       storage: 'supabase',
       total: count || 0,
-      limit: safeLimit,
-      offset: safeOffset,
+      limit: includeAll ? 'all' : safeLimit,
+      offset: includeAll ? 0 : safeOffset,
       order: ascending ? 'asc' : 'desc',
       observations: data || [],
     }
@@ -1434,10 +1441,10 @@ async function readHistorySeries(sourceId, { limit = 500, offset = 0, order = 'a
     sourceId,
     storage: 'filesystem',
     total: payload.series.length,
-    limit: safeLimit,
-    offset: safeOffset,
+    limit: includeAll ? 'all' : safeLimit,
+    offset: includeAll ? 0 : safeOffset,
     order: ascending ? 'asc' : 'desc',
-    observations: series.slice(safeOffset, safeOffset + safeLimit).map((row) => ({
+    observations: (includeAll ? series : series.slice(safeOffset, safeOffset + safeLimit)).map((row) => ({
       source_id: sourceId,
       date: row.date,
       value: row.value,
@@ -1445,6 +1452,23 @@ async function readHistorySeries(sourceId, { limit = 500, offset = 0, order = 'a
       fetched_at: payload.fetchedAt,
     })),
   }
+}
+
+async function readHistorySeriesRows(sourceId, ascending) {
+  const rows = []
+  const pageSize = 1000
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabaseAdmin
+      .from('history_observations')
+      .select('source_id,date,value,raw,fetched_at')
+      .eq('source_id', sourceId)
+      .order('date', { ascending })
+      .range(offset, offset + pageSize - 1)
+    if (error) return { data: rows, error }
+    rows.push(...(data || []))
+    if (!data || data.length < pageSize) break
+  }
+  return { data: rows, error: null }
 }
 
 async function readAllHistoryObservations(sourceId) {
