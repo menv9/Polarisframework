@@ -417,30 +417,6 @@ export default function DataPage() {
             >
               EXPORT CSV
             </button>
-            <Link
-              to="/data"
-              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#333] text-[#aaa] hover:text-white hover:border-white"
-            >
-              DATA CENTER
-            </Link>
-            <Link
-              to="/data/coverage-matrix"
-              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#60a5fa] text-[#60a5fa] hover:text-white hover:border-white"
-            >
-              COVERAGE MATRIX
-            </Link>
-            <Link
-              to="/model-inputs"
-              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#333] text-[#aaa] hover:text-white hover:border-white"
-            >
-              MODEL INPUTS
-            </Link>
-            <Link
-              to="/data/history"
-              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#333] text-[#aaa] hover:text-white hover:border-white"
-            >
-              HISTORY
-            </Link>
             <button
               onClick={refreshAllSources}
               disabled={loadingAll}
@@ -452,6 +428,12 @@ export default function DataPage() {
             >
               {loadingAll ? `ACTUALIZANDO${loadingId ? `: ${loadingId}` : '...'}` : 'REFRESH TODO'}
             </button>
+            <Link
+              to="/data"
+              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#333] text-[#aaa] hover:text-white hover:border-white"
+            >
+              DATA CENTER
+            </Link>
           </div>
         </div>
 
