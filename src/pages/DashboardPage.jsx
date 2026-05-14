@@ -3,6 +3,28 @@ import { Link } from 'react-router-dom'
 import { useModelStore } from '../store/ModelDataContext'
 import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 
+const EXO_CCYS = ['AUD','CAD','NOK','NZD','JPY','CHF','USD','EUR','GBP','SEK']
+
+const EXO_DRIVERS = [
+  { id: 'exo_brent',       bullCcy: ['CAD','NOK'],            bearCcy: [] },
+  { id: 'exo_wti',         bullCcy: ['CAD'],                  bearCcy: [] },
+  { id: 'exo_iron',        bullCcy: ['AUD'],                  bearCcy: [] },
+  { id: 'exo_copper',      bullCcy: ['AUD','NZD'],            bearCcy: [] },
+  { id: 'exo_gold',        bullCcy: ['CHF','JPY'],            bearCcy: [] },
+  { id: 'exo_gdt',         bullCcy: ['NZD'],                  bearCcy: [] },
+  { id: 'exo_coal',        bullCcy: ['AUD','NZD'],            bearCcy: [] },
+  { id: 'exo_grains',      bullCcy: ['AUD','NZD','CAD'],      bearCcy: [] },
+  { id: 'exo_chn_pmi',     bullCcy: ['AUD','NZD'],            bearCcy: [] },
+  { id: 'exo_chn_caixin',  bullCcy: ['AUD','NZD'],            bearCcy: [] },
+  { id: 'exo_chn_credit',  bullCcy: ['AUD'],                  bearCcy: [] },
+  { id: 'exo_eur_pmi_comp',bullCcy: ['EUR','SEK'],            bearCcy: [] },
+  { id: 'exo_us10y',       bullCcy: ['USD'],                  bearCcy: ['JPY'] },
+  { id: 'exo_us_real',     bullCcy: ['USD'],                  bearCcy: [] },
+  { id: 'exo_us_2y',       bullCcy: ['USD'],                  bearCcy: [] },
+  { id: 'exo_vix',         bullCcy: ['JPY','CHF','USD'],      bearCcy: ['AUD','NZD','CAD','NOK'] },
+  { id: 'exo_embi',        bullCcy: ['USD'],                  bearCcy: ['AUD','NZD','SEK'] },
+]
+
 const COUNTRIES = [
   { label: 'USD', prefix: 'usa', cyclical: false },
   { label: 'EUR', prefix: 'eur', cyclical: true  },
@@ -101,6 +123,19 @@ export default function DashboardPage() {
     Math.max(...countryScores.map(c => Math.abs(c.score)), 0.01),
     [countryScores]
   )
+
+  // ── Sesgo exógeno por divisa ─────────────────────────────────────────────
+  const exoBias = useMemo(() => {
+    const bias = Object.fromEntries(EXO_CCYS.map(c => [c, { bull: 0, bear: 0 }]))
+    const sourceMap = new Map(sources.map(s => [s.id, s]))
+    for (const { id, bullCcy, bearCcy } of EXO_DRIVERS) {
+      const src = sourceMap.get(id)
+      if (src?._value == null || src._value === '') continue
+      for (const c of bullCcy) if (bias[c]) bias[c].bull++
+      for (const c of bearCcy) if (bias[c]) bias[c].bear++
+    }
+    return bias
+  }, [sources])
 
   const convColor = (conv) =>
     conv === 'FULL' ? 'text-[#4ade80]' : conv === 'HALF' ? 'text-[#f59e0b]' : 'text-[#555]'
@@ -210,34 +245,25 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ===== FILA 4: EXOGENOUS ===== */}
+        {/* ===== FILA 4: EXOGENOUS — SESGO POR DIVISA ===== */}
         <div className="border-2 border-[#333] mb-3">
           <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333] flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">II.6 — Exogenous Drivers</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">II.6 — Sesgo Exógeno por Divisa</span>
             <Link to="/exogenous/operativa" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">OPERATIVA →</Link>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-0">
-            {[
-              { id: 'exo_brent',       label: 'Brent',      unit: '$/bbl' },
-              { id: 'exo_wti',         label: 'WTI',        unit: '$/bbl' },
-              { id: 'exo_iron',        label: 'Iron Ore',   unit: '$/t'   },
-              { id: 'exo_copper',      label: 'Copper',     unit: '$/lb'  },
-              { id: 'exo_gold',        label: 'Gold',       unit: '$/oz'  },
-              { id: 'exo_chn_pmi',     label: 'China PMI',  unit: 'pts'   },
-              { id: 'exo_us10y',       label: 'US 10Y',     unit: '%'     },
-              { id: 'exo_vix',         label: 'VIX',        unit: 'pts'   },
-            ].map(item => {
-              const src = sources.find(s => s.id === item.id)
-              const val = src?._value
-              const hasVal = val != null && val !== ''
-              const n = hasVal ? Number(val) : null
+          <div className="grid grid-cols-5 sm:grid-cols-10 gap-0">
+            {EXO_CCYS.map(ccy => {
+              const { bull, bear } = exoBias[ccy]
+              const net = bull - bear
+              const color = net > 0 ? 'text-[#4ade80]' : net < 0 ? 'text-[#ef4444]' : 'text-[#555]'
+              const label = net > 1 ? '▲▲' : net === 1 ? '▲' : net === -1 ? '▼' : net < -1 ? '▼▼' : '—'
               return (
-                <div key={item.id} className="p-2 border-r border-b border-[#222] text-center">
-                  <div className="text-[10px] text-[#555] uppercase tracking-wider mb-0.5">{item.label}</div>
-                  <div className={`text-sm font-mono font-bold ${hasVal ? 'text-white' : 'text-[#333]'}`}>
-                    {hasVal && n != null ? (item.unit === '%' ? n.toFixed(2) + '%' : n.toFixed(item.unit === '$/lb' ? 3 : 1)) : '—'}
-                  </div>
-                  <div className="text-[9px] text-[#444]">{item.unit}</div>
+                <div key={ccy} className="p-3 border-r border-b border-[#222] text-center">
+                  <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">{ccy}</div>
+                  <div className={`text-xl font-mono font-bold ${color}`}>{label}</div>
+                  {(bull > 0 || bear > 0) && (
+                    <div className="text-[9px] text-[#444] mt-0.5">{bull}↑ {bear}↓</div>
+                  )}
                 </div>
               )
             })}
