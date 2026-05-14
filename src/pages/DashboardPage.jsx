@@ -28,14 +28,14 @@ function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
   const betaTotal = computeBetaTotal(betas)
   let short = 0, medium = 0, longScore = 0
   for (const ind of INDICATORS) {
-    const beta   = betas[ind.key] ?? ind.betaDoc
-    const z      = zScores[`${prefix}_${ind.key}`] ?? 0
+    const beta    = betas[ind.key] ?? ind.betaDoc
+    const z       = zScores[`${prefix}_${ind.key}`] ?? 0
     const contrib = (beta / betaTotal) * z * ind.sign * rm
     if (ind.horizon === 'SHORT')  short     += contrib
     if (ind.horizon === 'MEDIUM') medium    += contrib
     if (ind.horizon === 'LONG')   longScore += contrib
   }
-  return { composite: 0.20 * short + 0.50 * medium + 0.30 * longScore }
+  return 0.20 * short + 0.50 * medium + 0.30 * longScore
 }
 
 function getConviction(signal) {
@@ -43,12 +43,8 @@ function getConviction(signal) {
   return a > 0.6 ? 'FULL' : a > 0.4 ? 'HALF' : 'FLAT'
 }
 
-function convictionColor(conviction) {
-  return conviction === 'FULL' ? 'text-[#4ade80]' : conviction === 'HALF' ? 'text-[#f59e0b]' : 'text-[#555]'
-}
-
 function scoreColor(v) {
-  return v > 0 ? 'text-[#4ade80]' : v < 0 ? 'text-[#ef4444]' : 'text-[#e5e5e5]'
+  return v > 0 ? 'text-[#4ade80]' : v < 0 ? 'text-[#ef4444]' : 'text-[#555]'
 }
 
 function fmtScore(v) {
@@ -61,6 +57,7 @@ export default function DashboardPage() {
 
   const counts = useMemo(() => countByStatus(sources), [sources])
 
+  // ── World View derivations ────────────────────────────────────────────────
   const scoreGDP  = wv.gdpUsa * 0.25 + wv.gdpEur * 0.18 + wv.gdpChn * 0.18 + wv.gdpJpn * 0.05 + wv.gdpResto * 0.34
   const regimeOn  = wv.vix < 30 && wv.hyOas < 30 && wv.sp200dma === 1 && wv.embi < 40
   const regimeOff = wv.vix > 70 || wv.hyOas > 70 || wv.sp200dma === 0 || wv.embi > 70
@@ -69,42 +66,63 @@ export default function DashboardPage() {
   const usdBias   = wv.dxyRising === 1 && wv.dxy > 100 ? 'BULLISH' : wv.dxyRising === 0 && wv.dxy < 95 ? 'BEARISH' : 'NEUTRAL'
   const inflation = wv.cpiG7 > 3.0 || wv.breakevens > 2.5 ? 'INFLACIONARIO' : wv.cpiG7 < 2.0 && wv.breakevens < 2.0 ? 'DESINFLACIONARIO' : 'ESTABLE'
 
-  // ── Señales por par ──────────────────────────────────────────────────────────
+  // ── Scores G10 ───────────────────────────────────────────────────────────
   const countryScores = useMemo(() =>
-    COUNTRIES.map(c => ({ ...c, composite: computeCountryScore(c.prefix, c.cyclical, regime, zScores, betas).composite })),
+    COUNTRIES.map(c => ({
+      ...c,
+      score: computeCountryScore(c.prefix, c.cyclical, regime, zScores, betas),
+    })),
     [regime, zScores, betas]
   )
 
+  const hasZscores = useMemo(() =>
+    Object.keys(zScores).length > 0,
+    [zScores]
+  )
+
+  // ── Top pares (siempre top 5, sin filtro de conviction) ──────────────────
   const topPairs = useMemo(() => {
     const pairs = []
     for (let i = 0; i < COUNTRIES.length; i++) {
       for (let j = i + 1; j < COUNTRIES.length; j++) {
         const a = countryScores[i]
         const b = countryScores[j]
-        const signal = a.composite - b.composite
-        const conv = getConviction(signal)
-        if (conv !== 'FLAT') pairs.push({ a, b, signal, conv })
+        const signal = a.score - b.score
+        pairs.push({ a, b, signal, conv: getConviction(signal) })
       }
     }
-    return pairs.sort((x, y) => Math.abs(y.signal) - Math.abs(x.signal)).slice(0, 7)
+    return pairs.sort((x, y) => Math.abs(y.signal) - Math.abs(x.signal)).slice(0, 6)
   }, [countryScores])
 
-  // ── Salud Endogenous ─────────────────────────────────────────────────────────
-  const getCountryStatus = (country) => {
-    const cs = sources.filter(s => s.module === `Endogenous — ${country}`)
-    if (cs.length === 0) return { ok: 0, total: 0, pct: 0 }
+  // ── Ranking G10 ──────────────────────────────────────────────────────────
+  const ranked = useMemo(() =>
+    [...countryScores].sort((a, b) => b.score - a.score),
+    [countryScores]
+  )
+
+  const maxAbs = useMemo(() =>
+    Math.max(...countryScores.map(c => Math.abs(c.score)), 0.01),
+    [countryScores]
+  )
+
+  // ── Salud por módulo ─────────────────────────────────────────────────────
+  const getCountryStatus = (label) => {
+    const cs = sources.filter(s => s.module === `Endogenous — ${label}`)
+    if (!cs.length) return { ok: 0, total: 0, pct: 0 }
     const ok = cs.filter(s => getStatus(s).code === 'ok').length
     return { ok, total: cs.length, pct: Math.round((ok / cs.length) * 100) }
   }
 
-  const getExoStatus = () => {
-    const es = sources.filter(s => s.module?.startsWith('Exogenous'))
-    if (es.length === 0) return { ok: 0, total: 0, pct: 0 }
-    const ok = es.filter(s => getStatus(s).code === 'ok').length
-    return { ok, total: es.length, pct: Math.round((ok / es.length) * 100) }
-  }
+  const exoSources = sources.filter(s => s.module?.startsWith('Exogenous'))
+  const exoOk      = exoSources.filter(s => getStatus(s).code === 'ok').length
 
-  const exo = getExoStatus()
+  const wvSources = sources.filter(s => s.module === 'World View')
+  const wvOk      = wvSources.filter(s => getStatus(s).code === 'ok').length
+
+  const convColor = (conv) =>
+    conv === 'FULL' ? 'text-[#4ade80]' : conv === 'HALF' ? 'text-[#f59e0b]' : 'text-[#555]'
+
+  const regimeColor = regime === 'RISK-ON' ? 'text-[#4ade80]' : regime === 'RISK-OFF' ? 'text-[#ef4444]' : 'text-[#e5e5e5]'
 
   return (
     <div className="pt-12 min-h-screen">
@@ -114,61 +132,67 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-[#333]">
           <h1 className="text-2xl font-bold uppercase tracking-widest">DASHBOARD</h1>
           <div className="text-xs text-[#777] uppercase tracking-wider">
-            {new Date().toLocaleDateString('en-GB')} {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            {new Date().toLocaleDateString('en-GB')} · {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
 
-        {/* ===== WORLD VIEW STATE VECTOR ===== */}
-        <div className="border-2 border-[#333] mb-4">
-          <div className="px-3 py-2 bg-[#1a1a0d] border-b-2 border-[#ecd987] flex items-center justify-between">
-            <span className="text-base font-bold uppercase tracking-widest text-[#ecd987]">World View — Estado Global</span>
-            <Link to="/world-view/operativa" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">→ OPERATIVA</Link>
+        {/* ===== FILA 1: WORLD VIEW STATE + REGIMEN ===== */}
+        <div className="border-2 border-[#333] mb-3">
+          <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333] flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">I — World View</span>
+            <Link to="/world-view/operativa" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">OPERATIVA →</Link>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-0">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-0">
             {[
-              { label: 'REGIMEN',   value: regime,              color: regime === 'RISK-ON' ? 'text-[#4ade80]' : regime === 'RISK-OFF' ? 'text-[#ef4444]' : 'text-[#e5e5e5]' },
+              { label: 'REGIMEN',   value: regime,              color: regimeColor },
               { label: 'MOMENTUM',  value: scoreGDP.toFixed(2), color: scoreGDP > 0 ? 'text-[#4ade80]' : scoreGDP < 0 ? 'text-[#ef4444]' : 'text-[#e5e5e5]' },
               { label: 'WOC',       value: wocScore.toFixed(2), color: wocScore > 0 ? 'text-[#4ade80]' : wocScore < 0 ? 'text-[#ef4444]' : 'text-[#e5e5e5]' },
               { label: 'USD BIAS',  value: usdBias,             color: usdBias === 'BULLISH' ? 'text-[#4ade80]' : usdBias === 'BEARISH' ? 'text-[#ef4444]' : 'text-[#e5e5e5]' },
               { label: 'INFLACION', value: inflation,           color: inflation === 'INFLACIONARIO' ? 'text-[#f59e0b]' : inflation === 'DESINFLACIONARIO' ? 'text-[#60a5fa]' : 'text-[#e5e5e5]' },
+              { label: 'WV DATA',   value: `${wvOk}/${wvSources.length}`, color: wvOk >= wvSources.length * 0.7 ? 'text-[#4ade80]' : 'text-[#f59e0b]' },
             ].map(item => (
               <div key={item.label} className="p-3 border-r border-b border-[#222]">
-                <div className="text-xs text-[#777] uppercase tracking-wider mb-1">{item.label}</div>
-                <div className={`text-xl font-mono font-bold ${item.color}`}>{item.value}</div>
+                <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">{item.label}</div>
+                <div className={`text-lg font-mono font-bold ${item.color}`}>{item.value}</div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* ===== SEÑALES FX — TOP CONVICTION ===== */}
-        <div className="border-2 border-[#333] mb-4">
-          <div className="px-3 py-2 bg-[#1a1a0d] border-b-2 border-[#ecd987] flex items-center justify-between">
-            <span className="text-base font-bold uppercase tracking-widest text-[#ecd987]">Señales FX — Top Conviction</span>
-            <Link to="/endogenous" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">→ OPERATIVA</Link>
+        {/* ===== FILA 2: SEÑALES FX ===== */}
+        <div className="border-2 border-[#333] mb-3">
+          <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333] flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">II — Señales FX Endogenous</span>
+            <Link to="/endogenous" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">OPERATIVA →</Link>
           </div>
-          {topPairs.length === 0 ? (
-            <div className="px-3 py-4 text-sm text-[#555] uppercase tracking-wider">Sin señales activas — actualizar z-scores en /model-inputs</div>
+          {!hasZscores ? (
+            <div className="px-4 py-3 flex items-center justify-between">
+              <span className="text-sm text-[#555] uppercase tracking-wider">Sin z-scores — carga series históricas primero</span>
+              <Link to="/model-inputs" className="text-xs font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">
+                → MODEL INPUTS
+              </Link>
+            </div>
           ) : (
             <table className="w-full text-sm table-fixed">
               <thead>
-                <tr className="bg-[#111] border-b border-[#333] text-left text-[#555]">
-                  <th className="px-3 py-1.5 text-xs font-bold uppercase tracking-widest w-[22%]">Par</th>
-                  <th className="px-3 py-1.5 text-xs font-bold uppercase tracking-widest w-[18%]">Señal</th>
-                  <th className="px-3 py-1.5 text-xs font-bold uppercase tracking-widest w-[18%]">Conv</th>
-                  <th className="px-3 py-1.5 text-xs font-bold uppercase tracking-widest w-[42%]">Dirección</th>
+                <tr className="bg-[#111] border-b border-[#222] text-left text-[#555]">
+                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[18%]">Par</th>
+                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[15%]">Señal</th>
+                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[14%]">Conv</th>
+                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[53%]">Dirección</th>
                 </tr>
               </thead>
               <tbody>
                 {topPairs.map(({ a, b, signal, conv }) => {
-                  const long  = signal > 0 ? a.label : b.label
-                  const short = signal > 0 ? b.label : a.label
+                  const long  = signal >= 0 ? a.label : b.label
+                  const short = signal >= 0 ? b.label : a.label
                   return (
-                    <tr key={`${a.prefix}-${b.prefix}`} className="border-b border-[#222] hover:bg-[#0a0a0a]">
-                      <td className="px-3 py-1.5 font-mono font-bold text-[#a3a3a3]">{a.label}/{b.label}</td>
-                      <td className={`px-3 py-1.5 font-mono font-bold ${scoreColor(signal)}`}>{fmtScore(signal)}</td>
-                      <td className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider ${convictionColor(conv)}`}>{conv}</td>
-                      <td className="px-3 py-1.5 text-sm font-bold text-white uppercase tracking-wide">
-                        LONG {long} / SHORT {short}
+                    <tr key={`${a.prefix}-${b.prefix}`} className="border-b border-[#1a1a1a] hover:bg-[#0a0a0a]">
+                      <td className="px-3 py-1.5 font-mono font-bold text-[#a3a3a3] text-xs">{a.label}/{b.label}</td>
+                      <td className={`px-3 py-1.5 font-mono font-bold text-sm ${scoreColor(signal)}`}>{fmtScore(signal)}</td>
+                      <td className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider ${convColor(conv)}`}>{conv}</td>
+                      <td className={`px-3 py-1.5 text-sm font-bold uppercase tracking-wide ${conv === 'FLAT' ? 'text-[#444]' : 'text-white'}`}>
+                        {conv === 'FLAT' ? '— sin señal' : `LONG ${long} / SHORT ${short}`}
                       </td>
                     </tr>
                   )
@@ -178,101 +202,94 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* ===== GRID: ENDOGENOUS + DATA HEALTH ===== */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-          {/* Endogenous by country */}
+        {/* ===== FILA 3: RANKING G10 ===== */}
+        <div className="border-2 border-[#333] mb-3">
+          <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333]">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Ranking G10 — Fortaleza Endogenous</span>
+          </div>
+          <div className="grid grid-cols-5 sm:grid-cols-10 gap-0">
+            {ranked.map((c, i) => {
+              const barPct = maxAbs > 0 ? Math.abs(c.score) / maxAbs * 100 : 0
+              return (
+                <div key={c.prefix} className="p-2 border-r border-b border-[#222] text-center">
+                  <div className="text-[10px] text-[#555] uppercase tracking-widest mb-0.5">#{i + 1}</div>
+                  <div className="text-xs font-bold text-[#a3a3a3] uppercase mb-1">{c.label}</div>
+                  <div className={`text-sm font-mono font-bold ${scoreColor(c.score)}`}>{fmtScore(c.score)}</div>
+                  <div className="mt-1 h-1 bg-[#1a1a1a] rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${c.score > 0 ? 'bg-[#4ade80]' : c.score < 0 ? 'bg-[#ef4444]' : 'bg-[#333]'}`}
+                      style={{ width: `${barPct}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* ===== FILA 4: SALUD DE DATOS ===== */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
+
+          {/* Endogenous data health */}
           <div className="lg:col-span-2 border-2 border-[#333]">
-            <div className="px-3 py-2 bg-[#1a1a0d] border-b-2 border-[#ecd987] flex items-center justify-between">
-              <span className="text-base font-bold uppercase tracking-widest text-[#ecd987]">Endogenous — Salud por Pais</span>
+            <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333] flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Endogenous — Cobertura de Datos</span>
               <Link to="/model-inputs" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">→ MODEL INPUTS</Link>
             </div>
             <div className="grid grid-cols-5 gap-0">
               {COUNTRIES.map(c => {
-                const st  = getCountryStatus(c.label)
-                const sc  = countryScores.find(x => x.prefix === c.prefix)
+                const st = getCountryStatus(c.label)
                 return (
-                  <div key={c.prefix} className="p-2 border-r border-b border-[#222]">
-                    <div className="text-xs text-[#777] uppercase tracking-wider mb-0.5">{c.label}</div>
+                  <div key={c.prefix} className="p-2 border-r border-b border-[#222] text-center">
+                    <div className="text-[10px] text-[#555] uppercase tracking-wider mb-0.5">{c.label}</div>
                     <div className={`text-sm font-mono font-bold ${st.pct >= 80 ? 'text-[#4ade80]' : st.pct >= 50 ? 'text-[#f59e0b]' : 'text-[#ef4444]'}`}>
                       {st.ok}/{st.total}
                     </div>
-                    {sc && (
-                      <div className={`text-[10px] font-mono ${scoreColor(sc.composite)}`}>
-                        {fmtScore(sc.composite)}
-                      </div>
-                    )}
+                    <div className="text-[9px] text-[#444]">{st.pct}%</div>
                   </div>
                 )
               })}
             </div>
           </div>
 
-          {/* Data health summary */}
+          {/* Control center */}
           <div className="border-2 border-[#333]">
-            <div className="px-3 py-2 bg-[#1a1a0d] border-b-2 border-[#ecd987]">
-              <span className="text-base font-bold uppercase tracking-widest text-[#ecd987]">Centro de Control</span>
+            <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333] flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Sistema</span>
+              <Link to="/data" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">→ DATA</Link>
             </div>
             <div className="p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-[#777] uppercase tracking-wider">Actualizados</span>
-                <span className="text-lg font-mono font-bold text-[#4ade80]">{counts.ok}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-[#777] uppercase tracking-wider">Proximos</span>
-                <span className="text-lg font-mono font-bold text-[#f59e0b]">{counts.warning}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-[#777] uppercase tracking-wider">Desactualizados</span>
-                <span className="text-lg font-mono font-bold text-[#ef4444]">{counts.stale}</span>
-              </div>
-              <div className="border-t border-[#333] pt-2 mt-2 space-y-1.5">
+              {[
+                { label: 'Fuentes OK',         value: counts.ok,    color: 'text-[#4ade80]' },
+                { label: 'Por vencer',          value: counts.warning, color: 'text-[#f59e0b]' },
+                { label: 'Desactualizadas',     value: counts.stale, color: 'text-[#ef4444]' },
+              ].map(row => (
+                <div key={row.label} className="flex items-center justify-between">
+                  <span className="text-xs text-[#555] uppercase tracking-wider">{row.label}</span>
+                  <span className={`text-base font-mono font-bold ${row.color}`}>{row.value}</span>
+                </div>
+              ))}
+              <div className="border-t border-[#222] pt-2 space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-[#777] uppercase tracking-wider">Exogenos OK</span>
-                  <span className={`text-sm font-mono font-bold ${exo.pct >= 80 ? 'text-[#4ade80]' : exo.pct >= 50 ? 'text-[#f59e0b]' : 'text-[#ef4444]'}`}>
-                    {exo.ok}/{exo.total}
+                  <span className="text-xs text-[#555] uppercase tracking-wider">Exógenos OK</span>
+                  <span className={`text-sm font-mono font-bold ${exoOk >= exoSources.length * 0.7 ? 'text-[#4ade80]' : 'text-[#f59e0b]'}`}>
+                    {exoOk}/{exoSources.length}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-[#777] uppercase tracking-wider">Régimen</span>
-                  <span className={`text-sm font-mono font-bold ${regime === 'RISK-ON' ? 'text-[#4ade80]' : regime === 'RISK-OFF' ? 'text-[#ef4444]' : 'text-[#e5e5e5]'}`}>
-                    {regime}
+                  <span className="text-xs text-[#555] uppercase tracking-wider">Z-scores</span>
+                  <span className={`text-sm font-mono font-bold ${hasZscores ? 'text-[#4ade80]' : 'text-[#ef4444]'}`}>
+                    {hasZscores ? `${Object.keys(zScores).length} vars` : 'SIN DATOS'}
                   </span>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* ===== QUICK LINKS ===== */}
-        <div className="border-2 border-[#333] mb-4">
-          <div className="px-3 py-2 bg-[#1a1a0d] border-b-2 border-[#ecd987]">
-            <span className="text-base font-bold uppercase tracking-widest text-[#ecd987]">Navegacion Rapida</span>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-0">
-            {[
-              { to: '/world-view/operativa', label: 'World View Ops',   desc: 'Vector de estado + parámetros' },
-              { to: '/endogenous',           label: 'Endogenous Ops',   desc: 'Señales + ranking G10' },
-              { to: '/model-inputs',         label: 'Model Inputs',     desc: 'Z-scores + historial series' },
-              { to: '/exogenous/operativa',   label: 'Exogenous Ops',    desc: 'Commodities, China, Rates' },
-              { to: '/data',                 label: 'Centro de Datos',  desc: 'Fuentes + cobertura' },
-            ].map(link => (
-              <Link
-                key={link.to}
-                to={link.to}
-                className="p-3 border-r border-b border-[#222] hover:bg-[#0a0a0a] group"
-              >
-                <div className="text-sm font-bold uppercase tracking-wider text-white group-hover:text-[#ecd987]">
-                  {link.label} →
-                </div>
-                <div className="text-[10px] text-[#555] mt-0.5">{link.desc}</div>
-              </Link>
-            ))}
           </div>
         </div>
 
         {/* ===== FOOTER ===== */}
-        <div className="flex items-center justify-between text-xs text-[#555] uppercase tracking-wider">
-          <span>{sources.length} INDICADORES EN BASE DE DATOS</span>
+        <div className="flex items-center justify-between text-[10px] text-[#444] uppercase tracking-wider">
+          <span>{sources.length} indicadores · {Object.keys(zScores).length} z-scores cargados</span>
           <span>POLARIS FRAMEWORK v0.1</span>
         </div>
 
