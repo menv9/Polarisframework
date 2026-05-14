@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { classifyCalendarEvent } from '../data/calendarMapping'
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000
+const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function eventTitle(event) {
   return String(event?.title || event?.event || event?.name || '').trim()
@@ -61,6 +62,51 @@ function formatDateTime(event) {
   })
 }
 
+function formatTime(event) {
+  const date = eventDateTime(event)
+  if (!date) return '--:--'
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
+function dateKey(date) {
+  if (!date) return ''
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function monthLabel(date) {
+  return date.toLocaleString('en-US', { month: 'long', year: 'numeric' })
+}
+
+function buildMonthCells(monthDate, eventsByDay) {
+  const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1)
+  const last = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0)
+  const start = new Date(first)
+  const mondayOffset = (first.getDay() + 6) % 7
+  start.setDate(first.getDate() - mondayOffset)
+
+  const cells = []
+  for (let index = 0; index < 42; index += 1) {
+    const day = new Date(start)
+    day.setDate(start.getDate() + index)
+    const key = dateKey(day)
+    cells.push({
+      date: day,
+      key,
+      inMonth: day >= first && day <= last,
+      isToday: key === dateKey(new Date()),
+      events: eventsByDay.get(key) || [],
+    })
+  }
+  return cells
+}
+
 function isBlackout(event) {
   const date = eventDateTime(event)
   if (!date) return false
@@ -88,6 +134,11 @@ export default function EconomicCalendarPage() {
   const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState(null)
   const [lastSync, setLastSync] = useState(null)
+  const [activeView, setActiveView] = useState('month')
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const today = new Date()
+    return new Date(today.getFullYear(), today.getMonth(), 1)
+  })
 
   const savedKeys = useMemo(() => new Set(releases.map(releaseKey)), [releases])
 
@@ -153,6 +204,25 @@ export default function EconomicCalendarPage() {
     })
   }, [events])
 
+  const eventsByDay = useMemo(() => {
+    const grouped = new Map()
+    sortedEvents.forEach((event) => {
+      const date = eventDateTime(event)
+      if (!date) return
+      const key = dateKey(date)
+      const list = grouped.get(key) || []
+      list.push(event)
+      grouped.set(key, list)
+    })
+    return grouped
+  }, [sortedEvents])
+
+  const monthCells = useMemo(() => buildMonthCells(visibleMonth, eventsByDay), [visibleMonth, eventsByDay])
+
+  const moveMonth = (delta) => {
+    setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1))
+  }
+
   return (
     <div className="pt-12 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 py-4">
@@ -176,6 +246,19 @@ export default function EconomicCalendarPage() {
             >
               {syncing ? 'SYNCING...' : 'SYNC NOW'}
             </button>
+            <div className="flex items-center border-2 border-[#333]">
+              {['month', 'timeline'].map((view) => (
+                <button
+                  key={view}
+                  onClick={() => setActiveView(view)}
+                  className={`px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-r border-[#333] last:border-r-0 ${
+                    activeView === view ? 'bg-[#111] text-[#ecd987]' : 'text-[#777] hover:text-white'
+                  }`}
+                >
+                  {view}
+                </button>
+              ))}
+            </div>
             <Link
               to="/data"
               className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#333] text-[#aaa] hover:text-white hover:border-white"
@@ -199,8 +282,107 @@ export default function EconomicCalendarPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_520px] gap-4">
-          <section className="border-2 border-[#333] bg-[#080808]">
+        {activeView === 'month' && (
+          <section className="border-2 border-[#333] bg-[#080808] mb-4">
+            <div className="px-4 py-3 border-b-2 border-[#333] flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-bold uppercase tracking-widest text-white">Monthly Calendar</div>
+                <div className="text-[10px] text-[#777] uppercase tracking-wider mt-1">
+                  Eventos agrupados por dia de publicacion
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => moveMonth(-1)}
+                  className="px-3 py-1 text-xs font-bold uppercase tracking-wider border-2 border-[#333] text-[#aaa] hover:text-white hover:border-white"
+                >
+                  Prev
+                </button>
+                <div className="min-w-[190px] text-center text-sm font-bold uppercase tracking-widest text-[#ecd987]">
+                  {monthLabel(visibleMonth)}
+                </div>
+                <button
+                  onClick={() => moveMonth(1)}
+                  className="px-3 py-1 text-xs font-bold uppercase tracking-wider border-2 border-[#333] text-[#aaa] hover:text-white hover:border-white"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <div className="min-w-[980px]">
+                <div className="grid grid-cols-7 border-b-2 border-[#333]">
+                  {WEEK_DAYS.map((day) => (
+                    <div key={day} className="px-2 py-2 text-[10px] font-bold uppercase tracking-widest text-[#777] border-r border-[#222] last:border-r-0">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-7">
+                  {monthCells.map((cell) => (
+                    <div
+                      key={cell.key}
+                      className={`min-h-[180px] border-r border-b border-[#222] p-2 ${
+                        cell.inMonth ? 'bg-[#080808]' : 'bg-[#040404] text-[#444]'
+                      } ${cell.isToday ? 'outline outline-1 outline-[#ecd987] outline-offset-[-1px]' : ''}`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`font-mono text-xs ${cell.isToday ? 'text-[#ecd987]' : cell.inMonth ? 'text-[#aaa]' : 'text-[#444]'}`}>
+                          {cell.date.getDate()}
+                        </span>
+                        {cell.events.length > 0 && (
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#4ade80]">
+                            {cell.events.length}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {cell.events.slice(0, 5).map((event) => {
+                          const saved = savedKeys.has(eventKey(event))
+                          const released = hasActual(event)
+                          const title = eventTitle(event)
+                          return (
+                            <div
+                              key={eventKey(event)}
+                              className={`border px-1.5 py-1 bg-[#050505] ${
+                                released ? 'border-[#4ade80]' : saved ? 'border-[#ecd987]' : 'border-[#222]'
+                              }`}
+                              title={`${eventCurrency(event)} - ${title}`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-mono text-[10px] text-[#777]">{formatTime(event)}</span>
+                                <span className={`border px-1 text-[9px] font-bold uppercase tracking-wider ${impactClass(event.impact)}`}>
+                                  {event.impact || 'N/A'}
+                                </span>
+                              </div>
+                              <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-white truncate">
+                                {eventCurrency(event)} - {title}
+                              </div>
+                              <div className="mt-1 text-[10px] font-mono text-[#777] truncate">
+                                A {event.actual || '-'} / F {event.forecast || '-'}
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {cell.events.length > 5 && (
+                          <div className="text-[10px] text-[#777] uppercase tracking-wider">
+                            +{cell.events.length - 5} more
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        <div className={`grid grid-cols-1 gap-4 ${activeView === 'timeline' ? 'xl:grid-cols-[1fr_520px]' : ''}`}>
+          <section className={`border-2 border-[#333] bg-[#080808] ${activeView === 'timeline' ? '' : 'hidden'}`}>
             <div className="px-4 py-3 border-b-2 border-[#333] flex items-center justify-between">
               <div>
                 <div className="text-sm font-bold uppercase tracking-widest text-white">Timeline</div>
@@ -242,7 +424,7 @@ export default function EconomicCalendarPage() {
                           )}
                         </div>
                         <h2 className="mt-2 text-sm font-bold uppercase tracking-wider text-white break-words">
-                          {eventCurrency(event)} · {title}
+                          {eventCurrency(event)} - {title}
                         </h2>
                         <div className="mt-2 grid grid-cols-3 gap-2 text-xs font-mono">
                           <Value label="Actual" value={event.actual} color={released ? 'text-[#4ade80]' : 'text-[#555]'} />
@@ -291,10 +473,10 @@ export default function EconomicCalendarPage() {
                       <td className="px-2 py-2 font-mono text-xs text-[#aaa]">{row.event_date || '-'}</td>
                       <td className="px-2 py-2">
                         <div className="text-xs font-bold text-white uppercase tracking-wider">
-                          {row.currency || '-'} · {row.event_name}
+                          {row.currency || '-'} - {row.event_name}
                         </div>
                         <div className="text-[10px] text-[#777] mt-1">
-                          F {row.forecast_value || '-'} · P {row.previous_value || '-'} · {row.impact || 'N/A'}
+                          F {row.forecast_value || '-'} / P {row.previous_value || '-'} / {row.impact || 'N/A'}
                         </div>
                       </td>
                       <td className="px-2 py-2 font-mono text-xs text-[#4ade80]">{row.actual_value || '-'}</td>
