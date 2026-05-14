@@ -234,6 +234,50 @@ function zBar(z) {
   return { pct, color, align }
 }
 
+function exportModelInputsCsv({ history, activeTab, activeCountry, activeStats }) {
+  const headers = [
+    'country', 'indicator_key', 'indicator', 'category', 'observations',
+    'start_date', 'end_date', 'mean', 'std', 'last_value', 'z_score',
+    'last_imported', 'source_id',
+  ]
+
+  const escape = (value) => {
+    if (value === null || value === undefined) return ''
+    const text = String(value).replace(/"/g, '""')
+    return text.includes(',') || text.includes('"') || text.includes('\n') ? `"${text}"` : text
+  }
+
+  const rows = INDICATORS.map((indicator) => {
+    const storageKey = `${activeTab}_${indicator.key}`
+    const entry = history[storageKey]
+    const stats = activeStats[indicator.key]
+    return [
+      activeCountry?.label || activeTab,
+      indicator.key,
+      getIndLabel(indicator.key, activeTab),
+      indicator.category,
+      stats?.n || 0,
+      stats?.firstDate || '',
+      stats?.lastDate || '',
+      stats?.mean ?? '',
+      stats?.std ?? '',
+      stats?.last ?? '',
+      stats?.z ?? '',
+      entry?.lastImported || '',
+      getSourceId(activeTab, indicator.key),
+    ].map(escape).join(',')
+  })
+
+  const csv = [headers.join(','), ...rows].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `polaris_model_inputs_${activeTab}_${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 // ── Componente ────────────────────────────────────────────────────────────────
 export default function ModelInputsPage() {
   const [history, setHistory]           = useState(loadHistory)
@@ -395,6 +439,12 @@ export default function ModelInputsPage() {
           <div className="flex items-center gap-3">
             {syncMsg && <span className="text-xs font-bold text-[#4ade80] uppercase tracking-wider">{syncMsg}</span>}
             {featureMsg && <span className={`text-xs font-bold uppercase tracking-wider ${featureMsg.startsWith('Error') ? 'text-[#ef4444]' : 'text-[#4ade80]'}`}>{featureMsg}</span>}
+            <button
+              onClick={() => exportModelInputsCsv({ history, activeTab, activeCountry, activeStats })}
+              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#4ade80] text-[#4ade80] hover:text-white hover:border-white"
+            >
+              EXPORT CSV
+            </button>
             <button
               onClick={handleBuildFeatures}
               disabled={buildingFeatures}

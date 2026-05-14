@@ -17,6 +17,47 @@ function endpointOf(source) {
   return source.apiPath || (source.fredSeriesId ? `/api/fred/${source.fredYoY ? 'yoy' : 'latest'}/${source.fredSeriesId}` : '')
 }
 
+function exportHistoryCsv(rows) {
+  const headers = [
+    'source_id', 'indicator', 'module', 'category', 'status',
+    'observations', 'start_date', 'end_date', 'storage', 'automatable',
+    'endpoint_or_error', 'fetched_at',
+  ]
+
+  const escape = (value) => {
+    if (value === null || value === undefined) return ''
+    const text = String(value).replace(/"/g, '""')
+    return text.includes(',') || text.includes('"') || text.includes('\n') ? `"${text}"` : text
+  }
+
+  const body = rows.map((source) => {
+    const history = source.history || {}
+    return [
+      source.id,
+      source.indicator,
+      source.module,
+      source.category,
+      history.status || 'missing',
+      history.count || 0,
+      history.start || '',
+      history.end || '',
+      history.storage || '',
+      source.automatable ? 'yes' : 'no',
+      history.error || history.file || source.endpoint || '',
+      history.fetchedAt || '',
+    ].map(escape).join(',')
+  })
+
+  const csv = [headers.join(','), ...body].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `polaris_history_${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function HistoryPage() {
   const [status, setStatus] = useState({})
   const [loadingId, setLoadingId] = useState(null)
@@ -117,6 +158,12 @@ export default function HistoryPage() {
                 OK {result.ok || 0} / ERR {result.errors || 0} / SKIP {result.skipped || 0}
               </span>
             )}
+            <button
+              onClick={() => exportHistoryCsv(visibleSources)}
+              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#4ade80] text-[#4ade80] hover:text-white hover:border-white"
+            >
+              EXPORT CSV
+            </button>
             <button
               onClick={ingestAll}
               disabled={runningAll}
