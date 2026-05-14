@@ -2343,6 +2343,15 @@ const SOURCE_OVERRIDES = {
   endo_nzl_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=NZL&indicator=BN.CAB.XOKA.GD.ZS' },
   endo_swe_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=SWE&indicator=BN.CAB.XOKA.GD.ZS' },
   endo_nor_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=NOR&indicator=BN.CAB.XOKA.GD.ZS' },
+  // NIIP (annual, USD millions) — OECD BPM6 IIP dataset
+  endo_jpn_niip: { apiPath: '/api/source/oecd/niip/latest?country=JPN' },
+  endo_gbr_niip: { apiPath: '/api/source/oecd/niip/latest?country=GBR' },
+  endo_che_niip: { apiPath: '/api/source/oecd/niip/latest?country=CHE' },
+  endo_can_niip: { apiPath: '/api/source/oecd/niip/latest?country=CAN' },
+  endo_aus_niip: { apiPath: '/api/source/oecd/niip/latest?country=AUS' },
+  endo_nzl_niip: { apiPath: '/api/source/oecd/niip/latest?country=NZL' },
+  endo_swe_niip: { apiPath: '/api/source/oecd/niip/latest?country=SWE' },
+  endo_nor_niip: { apiPath: '/api/source/oecd/niip/latest?country=NOR' },
   // World Bank Central Govt Debt/GDP (annual)
   endo_jpn_debt: { apiPath: '/api/source/imf-datamapper/latest?indicator=GGXWDG_NGDP&country=JPN' },
   endo_gbr_debt: { apiPath: '/api/source/imf-datamapper/latest?indicator=GGXWDG_NGDP&country=GBR' },
@@ -2468,6 +2477,7 @@ function inferDataQuality(source) {
 function inferFreeAccess(source) {
   const text = `${source.id} ${source.indicator} ${source.category} ${source.module} ${source.notes} ${source.scrapeUrl}`.toLowerCase()
   const isPmi = text.includes('pmi') && !source.id.includes('usa')
+  const isTot = source.id.endsWith('_tot') || text.includes('terms of trade')
 
   if (isPmi) {
     return {
@@ -2476,6 +2486,16 @@ function inferFreeAccess(source) {
       accessMode: 'Manual mensual',
       accessCost: 'Gratis',
       coverage: 'Dato de pago en APIs limpias; input 1x/mes',
+    }
+  }
+
+  if (isTot) {
+    return {
+      primarySource: 'Stats office manual',
+      accessKind: 'manual',
+      accessMode: 'Manual trimestral',
+      accessCost: 'Gratis',
+      coverage: 'Sin API unificada free — input trimestral desde la oficina estadística (BEA, Eurostat, MoF, ONS, etc.)',
     }
   }
 

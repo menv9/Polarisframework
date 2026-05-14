@@ -526,6 +526,38 @@ async function fetchImfLatest(dataset, seriesKey, startPeriod = '2000') {
   })
 }
 
+async function fetchOecdNiipLatest(country) {
+  const url = `https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_BOP@DF_IIP,1.0/${encodeURIComponent(country)}.WXD.FA.N.LE.A.USD_EXC.N?lastNObservations=10&dimensionAtObservation=AllDimensions`
+  const { data } = await axios.get(url, {
+    timeout: 30000,
+    headers: { Accept: 'application/vnd.sdmx.data+json' },
+  })
+  const struct = data?.data?.structures?.[0]
+  const dims = struct?.dimensions?.observation || []
+  const timeIdx = dims.findIndex((d) => d.id === 'TIME_PERIOD')
+  const timeValues = dims[timeIdx]?.values || []
+  const observations = data?.data?.dataSets?.[0]?.observations || {}
+  let latest = null
+  for (const [key, val] of Object.entries(observations)) {
+    const indices = key.split(':').map((n) => parseInt(n, 10))
+    const tIdx = indices[timeIdx]
+    const v = Number(val?.[0])
+    if (!Number.isFinite(v)) continue
+    if (!latest || tIdx > latest.tIdx) {
+      latest = { tIdx, value: v, date: timeValues[tIdx]?.id || null }
+    }
+  }
+  if (!latest) throw new Error(`No OECD IIP observations for ${country}`)
+  return normalizeLatest({
+    provider: 'oecd-sdmx',
+    seriesId: `IIP/${country}`,
+    date: latest.date,
+    value: latest.value,
+    raw: latest.value,
+    meta: { country, unit: 'USD millions', dataflow: 'DSD_BOP@DF_IIP' },
+  })
+}
+
 async function fetchImfDataMapperLatest(indicator, country) {
   const url = `https://www.imf.org/external/datamapper/api/v1/${encodeURIComponent(indicator)}/${encodeURIComponent(country)}`
   const { data } = await axios.get(url, { timeout: 20000 })
@@ -809,6 +841,15 @@ app.get('/api/source/imf/latest', async (req, res) => {
     res.json(await fetchImfLatest(String(req.query.dataset), String(req.query.seriesKey), String(req.query.startPeriod || '2000')))
   } catch (err) {
     res.status(502).json({ error: 'IMF fetch failed', message: err.message })
+  }
+})
+
+app.get('/api/source/oecd/niip/latest', async (req, res) => {
+  try {
+    if (!req.query.country) return res.status(400).json({ error: 'country required (ISO3)' })
+    res.json(await fetchOecdNiipLatest(String(req.query.country)))
+  } catch (err) {
+    res.status(502).json({ error: 'OECD NIIP fetch failed', message: err.message })
   }
 })
 
