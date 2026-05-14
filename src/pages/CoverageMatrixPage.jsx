@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { coverageCountries, getCoverageRows, getCoverageSummary, getPrioritySummary } from '../data/coverageMatrix'
 
@@ -22,10 +23,34 @@ const priorityConfig = {
   FULL: { label: 'FULL', color: 'border-[#777] text-[#aaa]' },
 }
 
+const fitOrder = {
+  exact: 0,
+  derived: 1,
+  proxy: 2,
+  manual: 3,
+  pending: 4,
+  missing: 5,
+}
+
+const priorityOrder = {
+  MVP: 0,
+  RECOMMENDED: 1,
+  FULL: 2,
+}
+
 export default function CoverageMatrixPage() {
   const rows = getCoverageRows()
+  const [sort, setSort] = useState({ key: 'docNo', direction: 'asc' })
+  const sortedRows = useMemo(() => sortRows(rows, sort), [rows, sort])
   const summary = getCoverageSummary(rows)
   const prioritySummary = getPrioritySummary(rows)
+
+  const requestSort = (key) => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
 
   return (
     <div className="pt-12 min-h-screen">
@@ -74,18 +99,24 @@ export default function CoverageMatrixPage() {
           <table className="w-full min-w-[1180px] text-sm table-fixed">
             <thead>
               <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#777]">
-                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[250px]">Variable Canonica</th>
-                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[115px]">Comparacion</th>
-                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[120px]">Transform</th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[250px]">
+                  <SortHeader label="Variable Canonica" sortKey="docNo" sort={sort} onSort={requestSort} />
+                </th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[115px]">
+                  <SortHeader label="Comparacion" sortKey="comparable" sort={sort} onSort={requestSort} />
+                </th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[120px]">
+                  <SortHeader label="Transform" sortKey="transform" sort={sort} onSort={requestSort} />
+                </th>
                 {coverageCountries.map((country) => (
                   <th key={country.code} className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[86px] text-center">
-                    {country.label}
+                    <SortHeader label={country.label} sortKey={`country:${country.code}`} sort={sort} onSort={requestSort} align="center" />
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {sortedRows.map((row) => (
                 <tr key={row.key} className="border-b border-[#222] align-top">
                   <td className="px-2 py-2">
                     <div className="flex items-start justify-between gap-2">
@@ -119,6 +150,64 @@ export default function CoverageMatrixPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+function sortRows(rows, sort) {
+  const direction = sort.direction === 'desc' ? -1 : 1
+
+  return [...rows].sort((a, b) => {
+    let result = 0
+
+    if (sort.key.startsWith('country:')) {
+      const countryCode = sort.key.split(':')[1]
+      const aCell = a.cells.find((cell) => cell.country.code === countryCode)
+      const bCell = b.cells.find((cell) => cell.country.code === countryCode)
+      result = compareNumber(fitOrder[aCell?.fit] ?? 99, fitOrder[bCell?.fit] ?? 99)
+    } else if (sort.key === 'docNo') {
+      result = compareNumber(a.docNo, b.docNo)
+    } else if (sort.key === 'comparable') {
+      result = compareText(a.comparable, b.comparable)
+    } else if (sort.key === 'transform') {
+      result = compareText(a.transform, b.transform)
+    }
+
+    if (result === 0) {
+      result = compareNumber(priorityOrder[a.priority] ?? 99, priorityOrder[b.priority] ?? 99)
+    }
+
+    if (result === 0) {
+      result = compareNumber(a.docNo, b.docNo)
+    }
+
+    return result * direction
+  })
+}
+
+function compareNumber(a, b) {
+  return a === b ? 0 : a > b ? 1 : -1
+}
+
+function compareText(a, b) {
+  return String(a).localeCompare(String(b))
+}
+
+function SortHeader({ label, sortKey, sort, onSort, align = 'left' }) {
+  const active = sort.key === sortKey
+  const marker = active ? (sort.direction === 'asc' ? '↑' : '↓') : ''
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(sortKey)}
+      className={`w-full text-xs font-bold uppercase tracking-widest hover:text-white ${active ? 'text-[#ecd987]' : 'text-[#777]'} ${
+        align === 'center' ? 'text-center' : 'text-left'
+      }`}
+      title="Ordenar columna"
+    >
+      <span>{label}</span>
+      {marker && <span className="ml-1">{marker}</span>}
+    </button>
   )
 }
 
