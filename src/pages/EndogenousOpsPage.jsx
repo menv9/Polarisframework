@@ -286,10 +286,10 @@ export default function EndogenousOpsPage() {
               RESET Z-SCORES
             </button>
             <Link
-              to="/endogenous/zscores"
+              to="/model-inputs"
               className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#333] text-[#777] hover:text-white hover:border-white"
             >
-              Z-SCORES →
+              MODEL INPUTS →
             </Link>
             <Link
               to="/endogenous/betas"
@@ -471,7 +471,7 @@ export default function EndogenousOpsPage() {
                   <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[13%]">Cat</th>
                   <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[26%]">Indicador</th>
                   <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[14%]">
-                    Z-Score<Tooltip text="Desviaciones estándar del valor actual respecto a la media histórica de 10Y. Rango recortado a [−4, +4]. Se calcula en /endogenous/zscores." />
+                    Z-Score<Tooltip text="Desviaciones estándar del valor actual respecto a la media histórica de 10Y. Rango recortado a [−4, +4]. Se calcula en /model-inputs." />
                   </th>
                   <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[9%]">
                     β norm<Tooltip text="Beta normalizado = β_doc / Σβ_impl (0.76). Peso relativo de este indicador dentro del score. Suma de todos los β_norm = 1.00." />

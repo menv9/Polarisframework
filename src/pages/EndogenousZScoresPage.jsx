@@ -235,7 +235,7 @@ function zBar(z) {
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
-export default function EndogenousZScoresPage() {
+export default function ModelInputsPage() {
   const [history, setHistory]           = useState(loadHistory)
   const [sourceUrls]                    = useState(loadSourceUrls)
   const [customUrls, setCustomUrls]     = useState(loadCustomUrls)
@@ -366,9 +366,9 @@ export default function EndogenousZScoresPage() {
         {/* ===== HEADER ===== */}
         <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-[#333]">
           <div>
-            <h1 className="text-2xl font-bold uppercase tracking-widest">Z-SCORES — ENDOGENOUS</h1>
+            <h1 className="text-2xl font-bold uppercase tracking-widest">MODEL INPUTS</h1>
             <p className="text-xs text-[#555] uppercase tracking-wider mt-0.5">
-              Importa el histórico · La app calcula media, std y z-score · Se sincronizan automáticamente a Operativa
+              Historicos raw {'->'} transformaciones {'->'} z-scores. No es Data: es la capa de features del modelo.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -377,20 +377,23 @@ export default function EndogenousZScoresPage() {
               onClick={handleSyncManual}
               className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#4ade80] text-[#4ade80] hover:text-white hover:border-white"
             >
-              SINCRONIZAR →
+              SYNC →
             </button>
             <Link
               to="/endogenous"
               className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white"
             >
-              OPERATIVA →
+              ENDOGENOUS →
             </Link>
           </div>
         </div>
 
         {/* ===== INSTRUCCIONES ===== */}
         <div className="border border-[#333] bg-[#0a0a0a] px-4 py-3 mb-4 text-xs text-[#777] leading-relaxed">
-          <span className="text-[#ecd987] font-bold uppercase tracking-wider">Cómo importar: </span>
+          <span className="text-[#ecd987] font-bold uppercase tracking-wider">Capa correcta: </span>
+          Aqui se calculan features internas: media, std y z-score. Las fuentes externas viven en <span className="text-white">Data</span> y su cobertura en <span className="text-white">Coverage Matrix</span>.
+          <br />
+          <span className="text-[#ecd987] font-bold uppercase tracking-wider">Como importar: </span>
           Haz clic en <span className="text-white font-bold">IMPORTAR</span> o sube un archivo CSV.
           Formatos: <span className="text-white">una columna de valores</span> · <span className="text-white">fecha,valor por fila (YYYY-MM,X)</span> · <span className="text-white">valores separados por comas</span>.
           Sin fechas, la app asigna meses automáticos terminando hoy.

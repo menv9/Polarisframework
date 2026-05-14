@@ -32,6 +32,9 @@ export default function Navbar() {
               <Link to="/data" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
                 Data
               </Link>
+              <Link to="/model-inputs" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
+                Model Inputs
+              </Link>
             </>
           ) : (
             <>
@@ -46,6 +49,9 @@ export default function Navbar() {
               </Link>
               <Link to="/data" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
                 Data
+              </Link>
+              <Link to="/model-inputs" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
+                Model Inputs
               </Link>
             </>
           )}

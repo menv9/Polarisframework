@@ -55,8 +55,8 @@ export default function EndogenousBetasPage() {
             >
               RESET A DOC
             </button>
-            <Link to="/endogenous/zscores" className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#333] text-[#777] hover:text-white hover:border-white">
-              Z-SCORES →
+            <Link to="/model-inputs" className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#333] text-[#777] hover:text-white hover:border-white">
+              MODEL INPUTS →
             </Link>
             <Link to="/endogenous" className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white">
               OPERATIVA →
