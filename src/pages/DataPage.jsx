@@ -417,6 +417,12 @@ export default function DataPage() {
             >
               EXPORT CSV
             </button>
+            <Link
+              to="/data/coverage-matrix"
+              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#60a5fa] text-[#60a5fa] hover:text-white hover:border-white"
+            >
+              COVERAGE MATRIX
+            </Link>
             <button
               onClick={refreshAllSources}
               disabled={loadingAll}

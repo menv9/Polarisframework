@@ -4,6 +4,7 @@ import HomePage from './pages/HomePage'
 import WorldViewTheoryPage from './pages/WorldViewTheoryPage'
 import WorldViewOpsPage from './pages/WorldViewOpsPage'
 import DataPage from './pages/DataPage'
+import CoverageMatrixPage from './pages/CoverageMatrixPage'
 import DashboardPage from './pages/DashboardPage'
 import EndogenousOpsPage from './pages/EndogenousOpsPage'
 import EndogenousZScoresPage from './pages/EndogenousZScoresPage'
@@ -22,6 +23,7 @@ export default function AppRoutes() {
         <Route path="/endogenous/zscores" element={<EndogenousZScoresPage />} />
         <Route path="/endogenous/betas" element={<EndogenousBetasPage />} />
         <Route path="/data" element={<DataPage />} />
+        <Route path="/data/coverage-matrix" element={<CoverageMatrixPage />} />
       </Routes>
     </div>
   )
