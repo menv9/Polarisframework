@@ -612,6 +612,18 @@ const rawDataSources = [
     lastUpdate: '2026-05-09',
     notes: 'ß=0.00. ECB consolidated balance sheet / GDP',
   },
+  {
+    id: 'endo_eur_umcsi',
+    indicator: 'Consumer Confidence (OECD)',
+    category: 'CRECIMIENTO',
+    module: 'Endogenous — EUR',
+    scraper: 'api',
+    scrapeUrl: 'https://fred.stlouisfed.org/series/CSCICP03EZM665S',
+    frequency: 'Mensual',
+    frequencyDays: 30,
+    lastUpdate: '2026-04-30',
+    notes: 'ß=0.02. FRED CSCICP03EZM665S. OECD harmonised consumer confidence — Euro Area',
+  },
 
   // --- Japan ---
   {
@@ -781,6 +793,18 @@ const rawDataSources = [
     frequencyDays: 30,
     lastUpdate: '2026-04-30',
     notes: 'ß=0.00. BoJ total assets / GDP',
+  },
+  {
+    id: 'endo_jpn_umcsi',
+    indicator: 'Consumer Confidence (OECD)',
+    category: 'CRECIMIENTO',
+    module: 'Endogenous — JPN',
+    scraper: 'api',
+    scrapeUrl: 'https://fred.stlouisfed.org/series/CSCICP03JPM665S',
+    frequency: 'Mensual',
+    frequencyDays: 30,
+    lastUpdate: '2026-04-30',
+    notes: 'ß=0.02. FRED CSCICP03JPM665S. OECD harmonised consumer confidence — Japan',
   },
 
   // --- UK ---
@@ -952,6 +976,18 @@ const rawDataSources = [
     lastUpdate: '2026-05-09',
     notes: 'ß=0.00. BoE balance sheet / GDP',
   },
+  {
+    id: 'endo_gbr_umcsi',
+    indicator: 'Consumer Confidence (OECD)',
+    category: 'CRECIMIENTO',
+    module: 'Endogenous — GBP',
+    scraper: 'api',
+    scrapeUrl: 'https://fred.stlouisfed.org/series/CSCICP03GBM665S',
+    frequency: 'Mensual',
+    frequencyDays: 30,
+    lastUpdate: '2026-04-30',
+    notes: 'ß=0.02. FRED CSCICP03GBM665S. OECD harmonised consumer confidence — UK',
+  },
 
   // --- Switzerland ---
   {
@@ -1121,6 +1157,18 @@ const rawDataSources = [
     frequencyDays: 30,
     lastUpdate: '2026-04-30',
     notes: 'ß=0.00. SNB balance sheet / GDP',
+  },
+  {
+    id: 'endo_che_umcsi',
+    indicator: 'Consumer Confidence (OECD)',
+    category: 'CRECIMIENTO',
+    module: 'Endogenous — CHF',
+    scraper: 'api',
+    scrapeUrl: 'https://fred.stlouisfed.org/series/CSCICP03CHM665S',
+    frequency: 'Mensual',
+    frequencyDays: 30,
+    lastUpdate: '2026-04-30',
+    notes: 'ß=0.02. FRED CSCICP03CHM665S. OECD harmonised consumer confidence — Switzerland',
   },
 
   // --- Canada ---
@@ -1292,6 +1340,18 @@ const rawDataSources = [
     lastUpdate: '2026-05-09',
     notes: 'ß=0.00. BoC balance sheet / GDP',
   },
+  {
+    id: 'endo_can_umcsi',
+    indicator: 'Consumer Confidence (OECD)',
+    category: 'CRECIMIENTO',
+    module: 'Endogenous — CAD',
+    scraper: 'api',
+    scrapeUrl: 'https://fred.stlouisfed.org/series/CSCICP03CAM665S',
+    frequency: 'Mensual',
+    frequencyDays: 30,
+    lastUpdate: '2026-04-30',
+    notes: 'ß=0.02. FRED CSCICP03CAM665S. OECD harmonised consumer confidence — Canada',
+  },
 
   // --- Australia ---
   {
@@ -1461,6 +1521,18 @@ const rawDataSources = [
     frequencyDays: 7,
     lastUpdate: '2026-05-09',
     notes: 'ß=0.00. RBA balance sheet / GDP',
+  },
+  {
+    id: 'endo_aus_umcsi',
+    indicator: 'Consumer Confidence (OECD)',
+    category: 'CRECIMIENTO',
+    module: 'Endogenous — AUD',
+    scraper: 'api',
+    scrapeUrl: 'https://fred.stlouisfed.org/series/CSCICP03AUM665S',
+    frequency: 'Mensual',
+    frequencyDays: 30,
+    lastUpdate: '2026-04-30',
+    notes: 'ß=0.02. FRED CSCICP03AUM665S. OECD harmonised consumer confidence — Australia',
   },
 
   // --- New Zealand ---
@@ -1632,6 +1704,18 @@ const rawDataSources = [
     lastUpdate: '2026-04-30',
     notes: 'ß=0.00. RBNZ balance sheet / GDP',
   },
+  {
+    id: 'endo_nzl_umcsi',
+    indicator: 'Consumer Confidence (OECD)',
+    category: 'CRECIMIENTO',
+    module: 'Endogenous — NZD',
+    scraper: 'api',
+    scrapeUrl: 'https://fred.stlouisfed.org/series/CSCICP03NZM665S',
+    frequency: 'Mensual',
+    frequencyDays: 30,
+    lastUpdate: '2026-04-30',
+    notes: 'ß=0.02. FRED CSCICP03NZM665S. OECD harmonised consumer confidence — New Zealand',
+  },
 
   // --- Sweden ---
   {
@@ -1802,6 +1886,18 @@ const rawDataSources = [
     lastUpdate: '2026-04-30',
     notes: 'ß=0.00. Riksbank balance sheet / GDP',
   },
+  {
+    id: 'endo_swe_umcsi',
+    indicator: 'Consumer Confidence (OECD)',
+    category: 'CRECIMIENTO',
+    module: 'Endogenous — SEK',
+    scraper: 'api',
+    scrapeUrl: 'https://fred.stlouisfed.org/series/CSCICP03SEM665S',
+    frequency: 'Mensual',
+    frequencyDays: 30,
+    lastUpdate: '2026-04-30',
+    notes: 'ß=0.02. FRED CSCICP03SEM665S. OECD harmonised consumer confidence — Sweden',
+  },
 
   // --- Norway ---
   {
@@ -1971,6 +2067,18 @@ const rawDataSources = [
     frequencyDays: 30,
     lastUpdate: '2026-04-30',
     notes: 'ß=0.00. Norges Bank balance sheet / GDP',
+  },
+  {
+    id: 'endo_nor_umcsi',
+    indicator: 'Consumer Confidence (OECD)',
+    category: 'CRECIMIENTO',
+    module: 'Endogenous — NOK',
+    scraper: 'api',
+    scrapeUrl: 'https://fred.stlouisfed.org/series/CSCICP03NOM665S',
+    frequency: 'Mensual',
+    frequencyDays: 30,
+    lastUpdate: '2026-04-30',
+    notes: 'ß=0.02. FRED CSCICP03NOM665S. OECD harmonised consumer confidence — Norway',
   },
 
   // ============================================================
@@ -2232,6 +2340,16 @@ const SOURCE_OVERRIDES = {
   endo_usa_debt: { scraper: 'fred', fredSeriesId: 'GFDEGDQ188S' },
   endo_usa_niip: { scraper: 'fred', fredSeriesId: 'IIPUSNETIQ' },
   endo_usa_umcsi: { scraper: 'fred', fredSeriesId: 'UMCSENT' },
+  // OECD harmonised consumer confidence for non-USD countries
+  endo_eur_umcsi: { scraper: 'fred', fredSeriesId: 'CSCICP03EZM665S' },
+  endo_jpn_umcsi: { scraper: 'fred', fredSeriesId: 'CSCICP03JPM665S' },
+  endo_gbr_umcsi: { scraper: 'fred', fredSeriesId: 'CSCICP03GBM665S' },
+  endo_che_umcsi: { scraper: 'fred', fredSeriesId: 'CSCICP03CHM665S' },
+  endo_can_umcsi: { scraper: 'fred', fredSeriesId: 'CSCICP03CAM665S' },
+  endo_aus_umcsi: { scraper: 'fred', fredSeriesId: 'CSCICP03AUM665S' },
+  endo_nzl_umcsi: { scraper: 'fred', fredSeriesId: 'CSCICP03NZM665S' },
+  endo_swe_umcsi: { scraper: 'fred', fredSeriesId: 'CSCICP03SEM665S' },
+  endo_nor_umcsi: { scraper: 'fred', fredSeriesId: 'CSCICP03NOM665S' },
   endo_usa_cb_balance: { scraper: 'fred', fredSeriesId: 'WALCL' },
   endo_eur_cb_balance: { scraper: 'fred', fredSeriesId: 'ECBASSETSW' },
   endo_jpn_cb_balance: { scraper: 'fred', fredSeriesId: 'JPNASSETS' },
