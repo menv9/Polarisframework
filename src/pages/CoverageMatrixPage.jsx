@@ -45,6 +45,102 @@ const priorityOrder = {
   FULL: 2,
 }
 
+function exportCoverageCsv(filename, rows = [], externalGroups = []) {
+  const headers = [
+    'section',
+    'group',
+    'variable_key',
+    'variable',
+    'country',
+    'source_id',
+    'fit',
+    'refreshable',
+    'priority',
+    'comparable',
+    'transform',
+    'beta',
+    'horizon',
+    'category',
+    'data_measure',
+    'data_check',
+    'endpoint',
+    'doc_ref',
+    'description',
+  ]
+
+  const escape = (value) => {
+    if (value === null || value === undefined) return ''
+    const text = String(value).replace(/"/g, '""')
+    return text.includes(',') || text.includes('"') || text.includes('\n') ? `"${text}"` : text
+  }
+
+  const slug = String(filename || 'coverage_matrix')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+
+  const endogenousRows = rows.flatMap((row) =>
+    row.cells.map((cell) => [
+      'endogenous_g10',
+      'Endogenous G10',
+      row.key,
+      row.label,
+      cell.country.label,
+      cell.sourceId || '',
+      cell.fit,
+      cell.refreshable ? 'yes' : 'no',
+      row.priority,
+      row.comparable,
+      row.transform,
+      row.beta,
+      row.horizon,
+      row.category,
+      cell.source?.dataMeasure || '',
+      cell.source?.dataCheck || 'Sin fila en Data',
+      cell.source?.apiPath || cell.source?.fredSeriesId || '',
+      `Docs #${row.docNo}`,
+      row.description,
+    ])
+  )
+
+  const externalRows = externalGroups.flatMap((group) =>
+    group.rows.flatMap((row) =>
+      row.sources.map((item) => [
+        'external',
+        group.title,
+        row.key,
+        row.label,
+        '',
+        item.sourceId,
+        item.source?.dataFit || 'missing',
+        item.source?.apiPath || item.source?.fredSeriesId ? 'yes' : 'no',
+        '',
+        '',
+        row.transform,
+        '',
+        '',
+        row.category,
+        item.source?.dataMeasure || '',
+        item.source?.dataCheck || 'Sin fila en Data',
+        item.source?.apiPath || item.source?.fredSeriesId || '',
+        row.docRef,
+        group.description,
+      ])
+    )
+  )
+
+  const csv = `\uFEFF${[headers, ...endogenousRows, ...externalRows]
+    .map((line) => line.map(escape).join(','))
+    .join('\n')}`
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `polaris_${slug}_${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function CoverageMatrixPage() {
   const rows = getCoverageRows()
   const [sort, setSort] = useState({ key: 'docNo', direction: 'asc' })
@@ -113,9 +209,19 @@ export default function CoverageMatrixPage() {
 
         <div className="border-2 border-[#333] overflow-x-auto">
           <div className="px-3 py-2 bg-[#111] border-b-2 border-[#333]">
-            <div className="text-sm font-bold uppercase tracking-widest text-white">Endogenous G10</div>
-            <div className="text-[10px] text-[#777] uppercase tracking-wider mt-1">
-              24 indicadores por pais segun FX_Endogenous_Module.
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-sm font-bold uppercase tracking-widest text-white">Endogenous G10</div>
+                <div className="text-[10px] text-[#777] uppercase tracking-wider mt-1">
+                  24 indicadores por pais segun FX_Endogenous_Module.
+                </div>
+              </div>
+              <button
+                onClick={() => exportCoverageCsv('coverage_endogenous_g10', sortedRows, [])}
+                className="shrink-0 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border-2 border-[#4ade80] text-[#4ade80] hover:text-white hover:border-white"
+              >
+                EXPORT ENDOGENOUS CSV
+              </button>
             </div>
           </div>
           <table className="w-full min-w-[1180px] text-sm table-fixed">
@@ -246,7 +352,15 @@ function ExternalCoverageSections({ groups }) {
                 <h2 className="text-sm font-bold uppercase tracking-widest text-white">{group.title}</h2>
                 <div className="text-[10px] text-[#777] uppercase tracking-wider mt-1">{group.description}</div>
               </div>
-              <div className="text-[10px] text-[#ecd987] uppercase tracking-wider text-right">{group.docRef}</div>
+              <div className="flex shrink-0 items-center gap-3">
+                <div className="text-[10px] text-[#ecd987] uppercase tracking-wider text-right">{group.docRef}</div>
+                <button
+                  onClick={() => exportCoverageCsv(`coverage_${group.key}`, [], [group])}
+                  className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border-2 border-[#4ade80] text-[#4ade80] hover:text-white hover:border-white"
+                >
+                  EXPORT {group.title} CSV
+                </button>
+              </div>
             </div>
           </div>
           <table className="w-full min-w-[980px] text-sm table-fixed">
