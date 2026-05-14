@@ -286,6 +286,34 @@ function parseCsv(text) {
   })
 }
 
+function parseCsvLine(line) {
+  const cells = []
+  let cell = ''
+  let quoted = false
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index]
+    if (quoted) {
+      if (char === '"' && line[index + 1] === '"') {
+        cell += '"'
+        index += 1
+      } else if (char === '"') {
+        quoted = false
+      } else {
+        cell += char
+      }
+    } else if (char === '"') {
+      quoted = true
+    } else if (char === ',') {
+      cells.push(cell)
+      cell = ''
+    } else {
+      cell += char
+    }
+  }
+  cells.push(cell)
+  return cells
+}
+
 async function fetchYahooLatest(symbol) {
   const encoded = encodeURIComponent(symbol)
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?range=5d&interval=1d`
@@ -751,6 +779,82 @@ async function fetchWorldBankTotLatest(country) {
   })
 }
 
+function quarterToDate(period) {
+  const match = String(period || '').match(/^(\d{4})-Q([1-4])$/)
+  if (!match) return normalizeHistoryDate(period)
+  const month = String((Number(match[2]) - 1) * 3 + 1).padStart(2, '0')
+  return `${match[1]}-${month}-01`
+}
+
+async function loadBisCbtaRowsByRefArea() {
+  if (bisCbtaCache.rowsByRefArea && Date.now() - bisCbtaCache.timestamp < 24 * 60 * 60 * 1000) {
+    return bisCbtaCache.rowsByRefArea
+  }
+
+  const { data } = await getWithRetry(BIS_CBTA_BULK_URL, { responseType: 'arraybuffer', timeout: 60000 }, 3, '[BIS CBTA] bulk')
+  const zip = new AdmZip(Buffer.from(data))
+  const entry = zip.getEntries().find((item) => item.entryName.toLowerCase().endsWith('.csv'))
+  if (!entry) throw new Error('No BIS CBTA CSV file in zip')
+
+  const lines = entry.getData().toString('utf8').split(/\r?\n/)
+  const headers = parseCsvLine(lines.shift() || '')
+  const idx = Object.fromEntries(headers.map((header, index) => [header, index]))
+  const rowsByRefArea = new Map()
+
+  for (const line of lines) {
+    if (!line) continue
+    const cells = parseCsvLine(line)
+    const frequency = cells[idx['FREQ:Frequency']]
+    const refArea = cells[idx['REF_AREA:Reference area']]
+    const compMethod = cells[idx['COMP_METHOD:Compilation methodology']]
+    const unit = cells[idx['UNIT_MEASURE:Unit of measure']]
+    const transformation = cells[idx['TRANSFORMATION:Transformation']]
+    if (!frequency?.startsWith('Q:')) continue
+    if (!compMethod?.startsWith('B:')) continue
+    if (!unit?.startsWith('XDC:')) continue
+    if (!transformation?.startsWith('B:')) continue
+
+    const code = refArea?.split(':')[0]
+    const value = Number(cells[idx['OBS_VALUE:Observation Value']])
+    const date = quarterToDate(cells[idx['TIME_PERIOD:Time period or range']])
+    if (!code || !date || !Number.isFinite(value)) continue
+    if (!rowsByRefArea.has(code)) rowsByRefArea.set(code, [])
+    rowsByRefArea.get(code).push({ date, value, raw: value })
+  }
+
+  for (const rows of rowsByRefArea.values()) {
+    rows.sort((a, b) => a.date.localeCompare(b.date))
+  }
+
+  bisCbtaCache = { timestamp: Date.now(), rowsByRefArea }
+  return rowsByRefArea
+}
+
+async function fetchBisCbtaHistory(refArea) {
+  const rowsByRefArea = await loadBisCbtaRowsByRefArea()
+  const rows = rowsByRefArea.get(String(refArea || '').toUpperCase()) || []
+  if (!rows.length) throw new Error(`No BIS CBTA observations for ${refArea}`)
+  return {
+    provider: 'bis-cbta',
+    transform: 'central_bank_assets_yoy',
+    series: annualPercentChange(rows, 4),
+  }
+}
+
+async function fetchBisCbtaLatest(refArea) {
+  const result = await fetchBisCbtaHistory(refArea)
+  const latest = result.series.at(-1)
+  if (!latest) throw new Error(`No BIS CBTA YoY observations for ${refArea}`)
+  return normalizeLatest({
+    provider: result.provider,
+    seriesId: `BIS_CBTA/${String(refArea || '').toUpperCase()}`,
+    date: latest.date,
+    value: latest.value,
+    raw: latest.raw,
+    meta: { refArea, transform: result.transform, unit: 'domestic currency, YoY %' },
+  })
+}
+
 async function fetchBankOfCanadaPolicyRate() {
   const url = 'https://www.bankofcanada.ca/valet/observations/V39079/json'
   const { data } = await getWithRetry(url, { timeout: 15000 }, 3, '[BOC] V39079 latest')
@@ -791,6 +895,8 @@ const HISTORY_ROOT = path.join(process.cwd(), 'data', 'history')
 const HISTORY_SERIES_DIR = path.join(HISTORY_ROOT, 'series')
 const HISTORY_STATUS_PATH = path.join(HISTORY_ROOT, 'status.json')
 const HISTORY_FRED_LIMIT = 5000
+const BIS_CBTA_BULK_URL = 'https://data.bis.org/static/bulk/WS_CBTA_csv_flat.zip'
+let bisCbtaCache = { timestamp: 0, rowsByRefArea: null }
 
 async function ensureHistoryDirs() {
   await fs.mkdir(HISTORY_SERIES_DIR, { recursive: true })
@@ -1399,6 +1505,9 @@ async function fetchHistoryForSource(source) {
   if (url.pathname === '/api/source/bis/reer/latest') {
     return fetchBisReerHistory(url.searchParams.get('currency'))
   }
+  if (url.pathname === '/api/source/bis/cb-assets/latest') {
+    return fetchBisCbtaHistory(url.searchParams.get('refArea'))
+  }
   if (url.pathname === '/api/source/central-bank/boc/policy-rate/latest') {
     return fetchBankOfCanadaPolicyRateHistory()
   }
@@ -1708,6 +1817,15 @@ app.get('/api/source/bis/reer/latest', async (req, res) => {
     res.json(await fetchBisReerLatest(String(req.query.currency)))
   } catch (err) {
     res.status(502).json({ error: 'BIS fetch failed', message: err.message })
+  }
+})
+
+app.get('/api/source/bis/cb-assets/latest', async (req, res) => {
+  try {
+    if (!req.query.refArea) return res.status(400).json({ error: 'refArea required' })
+    res.json(await fetchBisCbtaLatest(String(req.query.refArea)))
+  } catch (err) {
+    res.status(502).json({ error: 'BIS CBTA fetch failed', message: err.message })
   }
 })
 
