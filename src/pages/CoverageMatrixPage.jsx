@@ -1,6 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { coverageCountries, getCoverageRows, getCoverageSummary, getPrioritySummary } from '../data/coverageMatrix'
+import {
+  coverageCountries,
+  getCoverageRows,
+  getCoverageSummary,
+  getExternalCoverageGroups,
+  getExternalCoverageSummary,
+  getPrioritySummary,
+} from '../data/coverageMatrix'
 
 const fitConfig = {
   exact: { label: 'OK', color: 'border-[#4ade80] text-[#4ade80] bg-[#06140b]' },
@@ -44,6 +51,8 @@ export default function CoverageMatrixPage() {
   const sortedRows = useMemo(() => sortRows(rows, sort), [rows, sort])
   const summary = getCoverageSummary(rows)
   const prioritySummary = getPrioritySummary(rows)
+  const externalGroups = getExternalCoverageGroups()
+  const externalSummary = getExternalCoverageSummary(externalGroups)
 
   const requestSort = (key) => {
     setSort((current) => ({
@@ -79,6 +88,13 @@ export default function CoverageMatrixPage() {
           <Metric label="Revisar/Falta" value={(summary.pending || 0) + (summary.missing || 0)} color="text-[#ef4444]" />
         </div>
 
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border-2 border-[#333] mb-4">
+          <Metric label="Inputs externos" value={externalSummary.total} color="text-white" />
+          <Metric label="Auto externos" value={externalSummary.refreshable} color="text-[#4ade80]" />
+          <Metric label="Proxy/Manual ext" value={(externalSummary.proxy || 0) + (externalSummary.manual || 0)} color="text-[#f59e0b]" />
+          <Metric label="Revisar/Falta ext" value={(externalSummary.pending || 0) + (externalSummary.missing || 0)} color="text-[#ef4444]" />
+        </div>
+
         <div className="grid grid-cols-3 gap-0 border-2 border-[#333] mb-4">
           <PriorityMetric label="MVP modelo" value={prioritySummary.MVP || 0} config={priorityConfig.MVP} />
           <PriorityMetric label="Recomendado" value={prioritySummary.RECOMMENDED || 0} config={priorityConfig.RECOMMENDED} />
@@ -96,6 +112,12 @@ export default function CoverageMatrixPage() {
         </div>
 
         <div className="border-2 border-[#333] overflow-x-auto">
+          <div className="px-3 py-2 bg-[#111] border-b-2 border-[#333]">
+            <div className="text-sm font-bold uppercase tracking-widest text-white">Endogenous G10</div>
+            <div className="text-[10px] text-[#777] uppercase tracking-wider mt-1">
+              24 indicadores por pais segun FX_Endogenous_Module.
+            </div>
+          </div>
           <table className="w-full min-w-[1180px] text-sm table-fixed">
             <thead>
               <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#777]">
@@ -148,6 +170,8 @@ export default function CoverageMatrixPage() {
             </tbody>
           </table>
         </div>
+
+        <ExternalCoverageSections groups={externalGroups} />
       </div>
     </div>
   )
@@ -208,6 +232,78 @@ function SortHeader({ label, sortKey, sort, onSort, align = 'left' }) {
       <span>{label}</span>
       {marker && <span className="ml-1">{marker}</span>}
     </button>
+  )
+}
+
+function ExternalCoverageSections({ groups }) {
+  return (
+    <div className="mt-5 space-y-5">
+      {groups.map((group) => (
+        <section key={group.key} className="border-2 border-[#333] overflow-x-auto">
+          <div className="px-3 py-2 bg-[#111] border-b-2 border-[#333]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-widest text-white">{group.title}</h2>
+                <div className="text-[10px] text-[#777] uppercase tracking-wider mt-1">{group.description}</div>
+              </div>
+              <div className="text-[10px] text-[#ecd987] uppercase tracking-wider text-right">{group.docRef}</div>
+            </div>
+          </div>
+          <table className="w-full min-w-[980px] text-sm table-fixed">
+            <thead>
+              <tr className="bg-[#0b0b0b] border-b border-[#333] text-left text-[#777]">
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[250px]">Input externo</th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[120px]">Categoria</th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[145px]">Transform</th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[130px]">Doc</th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest">Cobertura en Data</th>
+              </tr>
+            </thead>
+            <tbody>
+              {group.rows.map((row) => (
+                <tr key={row.key} className="border-b border-[#222] align-top">
+                  <td className="px-2 py-2">
+                    <div className="text-sm font-bold text-white uppercase tracking-wider">{row.label}</div>
+                    <div className="mt-1">
+                      <span className={`inline-block px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${fitConfig[row.fit]?.color || fitConfig.missing.color}`}>
+                        {fitConfig[row.fit]?.label || row.fit}
+                      </span>
+                      {row.refreshable && <span className="ml-2 text-[9px] text-[#4ade80] uppercase tracking-wider">AUTO</span>}
+                    </div>
+                  </td>
+                  <td className="px-2 py-2 text-[10px] text-[#aaa] uppercase tracking-wider">{row.category}</td>
+                  <td className="px-2 py-2 text-[10px] text-[#aaa] uppercase tracking-wider">{row.transform}</td>
+                  <td className="px-2 py-2 text-[10px] text-[#777] uppercase tracking-wider">{row.docRef}</td>
+                  <td className="px-2 py-2">
+                    <div className="flex flex-wrap gap-1.5">
+                      {row.sources.map((item) =>
+                        item.source ? (
+                          <Link
+                            key={item.sourceId}
+                            to={`/data?highlight=${item.source.id}`}
+                            title={item.source.dataCheck}
+                            className={`border px-1.5 py-1 text-[10px] font-bold uppercase tracking-wider hover:border-white ${fitConfig[item.source.dataFit]?.color || fitConfig.pending.color}`}
+                          >
+                            {item.source.id}
+                          </Link>
+                        ) : (
+                          <span
+                            key={item.sourceId}
+                            className={`border px-1.5 py-1 text-[10px] font-bold uppercase tracking-wider ${fitConfig.missing.color}`}
+                          >
+                            {item.sourceId}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ))}
+    </div>
   )
 }
 

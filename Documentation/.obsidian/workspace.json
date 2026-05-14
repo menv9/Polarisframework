@@ -1,0 +1,241 @@
+{
+  "main": {
+    "id": "bd9f7e352a09e2c5",
+    "type": "split",
+    "children": [
+      {
+        "id": "fe0cd6aee18c0f79",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "b3cbed05f9cb24ad",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "01_FX_Trading_Framework/FX_Trading_Framework/04_PARTE_III_—_Timing_the_Market.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "04_PARTE_III_—_Timing_the_Market"
+            }
+          },
+          {
+            "id": "7acfcb0832232e3b",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "00_Referencia_Rapida/Coverage matrix.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Coverage matrix"
+            }
+          }
+        ],
+        "currentTab": 1
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "d967be4a76cc7f09",
+    "type": "split",
+    "children": [
+      {
+        "id": "d742474abbb64a80",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "6eeed2cbd0ce6d2f",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "7de109a7ae95a3b5",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "705db028b2e972c6",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 373
+  },
+  "right": {
+    "id": "1d4d2307e679ad08",
+    "type": "split",
+    "children": [
+      {
+        "id": "35141bf7e6ed926d",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "e32100ea75047cd6",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "FX_Endogenous_Module/11_11._Plantilla_de_Replicación_FX_(Dos_Países).md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for 11_11._Plantilla_de_Replicación_FX_(Dos_Países)"
+            }
+          },
+          {
+            "id": "540c82ded0e3b514",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "FX_Endogenous_Module/11_11._Plantilla_de_Replicación_FX_(Dos_Países).md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from 11_11._Plantilla_de_Replicación_FX_(Dos_Países)"
+            }
+          },
+          {
+            "id": "3073d0602a801d0d",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "b767f268edf8fb02",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "0e39570eb3951b8b",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "FX_Endogenous_Module/11_11._Plantilla_de_Replicación_FX_(Dos_Países).md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of 11_11._Plantilla_de_Replicación_FX_(Dos_Países)"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false,
+      "graph:Open graph view": false,
+      "3d-graph:3D Graph": false
+    }
+  },
+  "active": "7acfcb0832232e3b",
+  "lastOpenFiles": [
+    "00_Referencia_Rapida/endogenous_data_minimal.md",
+    "00_Referencia_Rapida/Coverage matrix.md",
+    "00_Referencia_Rapida/world_view_data_sources.md",
+    "02_FX_Framework_Schema/FX_Framework_Schema/03_3._Diagrama_jerárquico_completo.md",
+    "02_FX_Framework_Schema/FX_Framework_Schema/02_2._Mapa_de_archivos.md",
+    "02_FX_Framework_Schema/FX_Framework_Schema/01_1._Visión_de_conjunto_en_una_página.md",
+    "01_FX_Trading_Framework/FX_Trading_Framework/04_PARTE_III_—_Timing_the_Market.md",
+    "03_CAPA_1_FX_Macro/FX_Endogenous_Module/19_Apéndice_A_—_Matrices_de_Juicio_Experto_v1_(Legacy).md",
+    "08_Meta_Documentos/Implementation_Roadmap/04_3._FASE_B_—_MVP_Construcción_(3-4_meses).md",
+    "08_Meta_Documentos/Implementation_Roadmap/03_2._FASE_A_—_Preparación_(4-8_semanas).md",
+    "08_Meta_Documentos/Implementation_Roadmap/02_1._Visión_General_del_Plan.md",
+    "08_Meta_Documentos/Implementation_Roadmap/01_0._Estado_de_Partida.md",
+    "00_Referencia_Rapida/capa1_cheatsheet.md",
+    "05_Implementacion/Implementation_Stack_Module/01_1._Stack_Recomendado.md",
+    "04_CAPAS_Adicionales/Equities_Macro_Layer_Module/01_1._Filosofía_y_Diferencias_vs_FX.md",
+    "00_Referencia_Rapida/endogenous_data_sources.md",
+    "03_CAPA_1_FX_Macro/FX_Endogenous_Module/03_3._Scoring_Estadístico_(Z-scores).md",
+    "03_CAPA_1_FX_Macro/FX_Endogenous_Module/04_4._Mapeo_de_Signos_FX_(Reorientación).md",
+    "03_CAPA_1_FX_Macro/FX_Endogenous_Module/02_2._Arquitectura_Diferencial.md",
+    "03_CAPA_1_FX_Macro/FX_Endogenous_Module/01_1._Filosofía_del_Modelo_(v1_→_v2).md",
+    "03_CAPA_1_FX_Macro/FX_Endogenous_Module/10_10._Limpieza_de_v1.md",
+    "03_CAPA_1_FX_Macro/FX_Endogenous_Module/07_7._Filtro_de_Régimen.md",
+    "03_CAPA_1_FX_Macro/FX_Endogenous_Module/08_8._Indicadores_Forward-Looking.md",
+    "03_CAPA_1_FX_Macro/FX_Endogenous_Module/09_9._Calibración_de_Pesos_por_Regresión.md",
+    "03_CAPA_1_FX_Macro/FX_Endogenous_Module/06_6._Estratificación_por_Horizonte.md",
+    "03_CAPA_1_FX_Macro/FX_Endogenous_Module/05_5._Indicadores_Ampliados_(Drivers_FX_Específicos).md",
+    "00_Referencia_Rapida/capa1_historical_template.csv",
+    "00_Referencia_Rapida",
+    "09_Otros/gaps",
+    "09_Otros/Escenarios_Costes_Framework",
+    "09_Otros/automatizar si o no",
+    "08_Meta_Documentos/Implementation_Roadmap",
+    "08_Meta_Documentos/System_Weaknesses",
+    "07_Extensiones_Operativas/Multi_Broker_Module",
+    "07_Extensiones_Operativas/Cross_Asset_Crypto_Commodities_Module",
+    "07_Extensiones_Operativas/Behavioral_Finance_Module"
+  ]
+}

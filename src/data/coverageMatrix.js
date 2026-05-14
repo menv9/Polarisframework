@@ -333,6 +333,82 @@ export const canonicalVariables = [
 ]
 
 const sourceById = new Map(dataSources.map((source) => [source.id, source]))
+const fitSeverity = {
+  exact: 0,
+  derived: 1,
+  proxy: 2,
+  manual: 3,
+  pending: 4,
+  missing: 5,
+}
+
+export const externalCoverageGroups = [
+  {
+    key: 'world_view',
+    title: 'World View',
+    docRef: 'FX_World_View_Module §§2-8',
+    description: 'Inputs externos para regimen global, USD bias, inflacion global y wisdom of crowd.',
+    rows: [
+      externalRow('wv_risk_vix', 'VIX percentile 5Y', 'REGIMEN', 'World View §3', ['wv_vix'], 'percentile 5Y'),
+      externalRow('wv_risk_hy', 'HY OAS percentile 5Y', 'REGIMEN', 'World View §3', ['wv_hy_oas'], 'percentile 5Y'),
+      externalRow('wv_risk_sp500', 'S&P 500 vs 200dma', 'REGIMEN', 'World View §3', ['wv_sp500'], 'above/below 200dma'),
+      externalRow('wv_risk_embi', 'EMBI / EM credit spread', 'REGIMEN', 'World View §3', ['wv_embi'], 'percentile 5Y'),
+      externalRow('wv_risk_move', 'MOVE Index', 'REGIMEN+', 'World View §3.3', ['wv_move'], 'percentile 5Y'),
+      externalRow('wv_risk_gold_sp', 'Gold vs S&P ratio', 'REGIMEN+', 'World View §3.3', ['wv_gold_sp'], 'trend/ratio'),
+      externalRow('wv_gdp_core', 'GDP / nowcast core economies', 'GROWTH', 'World View §2/§8', ['wv_gdp_usa', 'wv_gdp_eur', 'wv_gdp_chn', 'wv_gdp_jpn'], 'weighted gap'),
+      externalRow('wv_cesi', 'Economic Surprise Index', 'GROWTH', 'World View §8', ['wv_cesi'], 'z-score/3m'),
+      externalRow('wv_cftc', 'CFTC Asset Managers', 'WOC', 'World View §4', ['wv_cftc'], 'z-score/percentile'),
+      externalRow('wv_epfr', 'EPFR fund flows', 'WOC', 'World View §4/§8', ['wv_epfr'], 'flow z-score'),
+      externalRow('wv_retail', 'Retail SSI sentiment', 'WOC', 'World View §4/§8', ['wv_retail'], 'contrarian'),
+      externalRow('wv_dxy', 'DXY', 'USD BIAS', 'World View §5', ['wv_dxy'], 'level/trend'),
+      externalRow('wv_dxy_200dma', 'DXY vs 200dma', 'USD BIAS', 'World View §5', ['wv_dxy_200dma'], 'above/below 200dma'),
+      externalRow('wv_cpi_g7', 'CPI G7 median inputs', 'INFLATION', 'World View §6', ['wv_cpi_usa', 'wv_cpi_eur'], 'YoY median'),
+      externalRow('wv_breakevens', '5Y5Y inflation expectations', 'INFLATION', 'World View §6', ['wv_breakevens'], 'level/trend'),
+    ],
+  },
+  {
+    key: 'exogenous',
+    title: 'Exogenous',
+    docRef: 'FX_Exogenous_Module §§2/5/8',
+    description: 'Drivers externos por divisa: commodities, China, Eurozona, risk y tipos globales.',
+    rows: [
+      externalRow('exo_brent', 'Brent crude', 'COMMODITIES', 'Exogenous §5.1', ['exo_brent'], 'level/return'),
+      externalRow('exo_wti', 'WTI crude', 'COMMODITIES', 'Exogenous §5.1', ['exo_wti'], 'level/return'),
+      externalRow('exo_iron', 'Iron ore 62% Fe China', 'COMMODITIES', 'Exogenous §5.1', ['exo_iron'], 'level/return'),
+      externalRow('exo_copper', 'Copper', 'COMMODITIES', 'Exogenous §5.1', ['exo_copper'], 'level/return'),
+      externalRow('exo_gold', 'Gold', 'COMMODITIES', 'Exogenous §5.1', ['exo_gold'], 'level/return'),
+      externalRow('exo_coal', 'Coal thermal/coking', 'COMMODITIES', 'Exogenous §5.1', ['exo_coal'], 'level/return'),
+      externalRow('exo_grains', 'Soy/corn/wheat', 'COMMODITIES', 'Exogenous §5.1', ['exo_grains'], 'level/return'),
+      externalRow('exo_gdt', 'Global Dairy Trade', 'COMMODITIES', 'Exogenous §5.1/§2.8', ['exo_gdt'], 'auction change'),
+      externalRow('exo_china_pmi', 'China PMI NBS', 'CHINA', 'Exogenous §5.2/§2.7', ['exo_chn_pmi'], 'level/z-score'),
+      externalRow('exo_china_caixin', 'China PMI Caixin', 'CHINA', 'Exogenous §5.2/§2.7', ['exo_chn_caixin'], 'level/z-score'),
+      externalRow('exo_china_credit', 'China credit impulse', 'CHINA', 'Exogenous §5.2/§2.7', ['exo_chn_credit'], '6-9m lead'),
+      externalRow('exo_eurozone_pmi', 'Eurozone PMI Composite', 'EUROZONE', 'Exogenous §5.2/§2.9', ['exo_eur_pmi_comp'], 'level/z-score'),
+      externalRow('exo_global_pmi', 'Global PMI', 'GLOBAL', 'Exogenous §5.2', ['exo_global_pmi'], 'level/z-score'),
+      externalRow('exo_us_rates', 'US 10Y / US 2Y / US real rate', 'RATES', 'Exogenous §5.3', ['exo_us10y', 'exo_us_2y', 'exo_us_real'], 'level/change'),
+      externalRow('exo_cross_fx', 'Key cross FX spot', 'FX', 'Exogenous §2', ['exo_eurusd', 'exo_usdjpy', 'exo_gbpusd'], 'return/trend'),
+      externalRow('exo_dxy', 'DXY general', 'FX', 'Exogenous §2', ['wv_dxy'], 'level/trend'),
+      externalRow('exo_embi', 'EMBI / EM spread', 'RISK', 'Exogenous §5.2', ['exo_embi'], 'spread/percentile'),
+      externalRow('exo_move', 'MOVE Index', 'RISK', 'Exogenous §5.2', ['wv_move'], 'percentile'),
+    ],
+  },
+  {
+    key: 'timing_risk',
+    title: 'Timing + Risk',
+    docRef: 'FX_Timing_Module §§2-6 + FX_Risk_Management_Module §§2/5',
+    description: 'Datos externos de mercado necesarios para entradas, volatilidad, correlaciones y blackouts.',
+    rows: [
+      externalRow('timing_fx_ohlc', 'FX spot OHLC G10 pairs', 'PRICE', 'Timing §3', ['exo_eurusd', 'exo_usdjpy', 'exo_gbpusd'], 'OHLC -> MA/RSI/MACD'),
+      externalRow('timing_cftc', 'CFTC positioning for timing', 'POSITIONING', 'Timing §2/§6', ['wv_cftc'], 'crowding z-score'),
+      externalRow('timing_calendar', 'Level 1 event calendar', 'EVENTS', 'Timing §5', ['timing_event_calendar'], '48h blackout'),
+      externalRow('risk_realized_vol', 'Realized vol 21d', 'VOL', 'Risk §2.1', ['exo_eurusd', 'exo_usdjpy', 'exo_gbpusd'], 'returns -> annual vol'),
+      externalRow('risk_atr', 'ATR 14d', 'VOL', 'Risk §2.1', ['exo_eurusd', 'exo_usdjpy', 'exo_gbpusd'], 'OHLC -> ATR'),
+      externalRow('risk_implied_vol', 'FX options 1M ATM IV', 'VOL', 'Risk §2.1/§2.3', ['risk_fx_iv_1m'], 'IV/RV ratio'),
+      externalRow('risk_correlations', 'FX correlation matrix 1Y', 'PORTFOLIO', 'Risk §5.3/§5.4', ['exo_eurusd', 'exo_usdjpy', 'exo_gbpusd'], 'returns correlation'),
+      externalRow('risk_spreads', 'Broker spreads / transaction costs', 'EXECUTION', 'Risk/Execution', ['risk_broker_spreads'], 'cost per pair'),
+    ],
+  },
+]
 
 export function getCoverageRows() {
   return canonicalVariables.map((variable) => ({
@@ -366,11 +442,55 @@ export function getCoverageSummary(rows = getCoverageRows()) {
     )
 }
 
+export function getExternalCoverageGroups() {
+  return externalCoverageGroups.map((group) => ({
+    ...group,
+    rows: group.rows.map((row) => enrichExternalRow(row)),
+  }))
+}
+
+export function getExternalCoverageSummary(groups = getExternalCoverageGroups()) {
+  return groups
+    .flatMap((group) => group.rows)
+    .reduce(
+      (acc, row) => {
+        acc.total += 1
+        acc[row.fit] = (acc[row.fit] || 0) + 1
+        if (row.refreshable) acc.refreshable += 1
+        return acc
+      },
+      { total: 0, refreshable: 0 }
+    )
+}
+
 export function getPrioritySummary(rows = getCoverageRows()) {
   return rows.reduce((acc, row) => {
     acc[row.priority] = (acc[row.priority] || 0) + 1
     return acc
   }, {})
+}
+
+function externalRow(key, label, category, docRef, sourceIds, transform) {
+  return { key, label, category, docRef, sourceIds, transform }
+}
+
+function enrichExternalRow(row) {
+  const sources = row.sourceIds.map((sourceId) => ({
+    sourceId,
+    source: sourceById.get(sourceId) || null,
+  }))
+
+  const fit = sources.reduce((worst, item) => {
+    const fit = item.source?.dataFit || 'missing'
+    return fitSeverity[fit] > fitSeverity[worst] ? fit : worst
+  }, 'exact')
+
+  return {
+    ...row,
+    sources,
+    fit,
+    refreshable: sources.some((item) => Boolean(item.source?.apiPath || item.source?.fredSeriesId)),
+  }
 }
 
 function mapCountryIds(suffix, overrides = {}) {
