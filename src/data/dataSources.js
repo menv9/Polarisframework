@@ -2307,6 +2307,8 @@ const SOURCE_OVERRIDES = {
   endo_jpn_cpi: { scraper: 'fred', fredSeriesId: 'FPCPITOTLZGJPN' },
   // EUR Debt/GDP via Eurostat
   endo_eur_debt: { apiPath: '/api/source/eurostat/latest/gov_10dd_edpt1?geo=EA20&na_item=GD&sector=S13&unit=PC_GDP' },
+  // EUR NIIP/GDP via Eurostat (annual, % GDP, partner = extra-EA20)
+  endo_eur_niip: { apiPath: '/api/source/eurostat/latest/tipsii10?geo=EA20&unit=PC_GDP&partner=EXT_EA20' },
   // USA CA/GDP via World Bank
   endo_usa_ca_gdp: { apiPath: '/api/source/worldbank/latest?country=USA&indicator=BN.CAB.XOKA.GD.ZS' },
   // 10Y nominal govt bond yields como proxy de 10Y real yield (9 países)
