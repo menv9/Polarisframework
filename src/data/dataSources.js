@@ -2433,6 +2433,7 @@ const SOURCE_OVERRIDES = {
   exo_usdjpy: { apiPath: '/api/source/yahoo/latest?symbol=JPY%3DX' },
   exo_gbpusd: { apiPath: '/api/source/yahoo/latest?symbol=GBPUSD%3DX' },
   exo_eur_pmi_comp: { scraper: 'fred', fredSeriesId: 'BSCICP02EZM460S' },
+  exo_chn_credit: { apiPath: '/api/fred/period-change/QCNCAM770A?periods=4&limit=24' },
   exo_vix: { scraper: 'fred', fredSeriesId: 'VIXCLS' },
   // Policy rates — 7 países vía FRED (series OECD immediate rates o tasa oficial)
   endo_jpn_policy: { scraper: 'fred', fredSeriesId: 'IRSTCI01JPM156N' },
@@ -2620,6 +2621,11 @@ const DATA_QUALITY_OVERRIDES = {
     dataFit: 'proxy',
     dataMeasure: 'OECD manufacturing business confidence (FRED BSCICP02EZM460S)',
     dataCheck: 'Proxy gratuito de Eurozone composite PMI; no es HCOB/S&P composite exacto.',
+  },
+  exo_chn_credit: {
+    dataFit: 'proxy',
+    dataMeasure: 'YoY pp change in BIS total non-financial credit/GDP (FRED QCNCAM770A)',
+    dataCheck: 'Proxy gratuito de China Credit Impulse; no es TSF mensual/PBoC ni el índice Bloomberg CTICUSD.',
   },
   exo_embi: {
     dataFit: 'proxy',

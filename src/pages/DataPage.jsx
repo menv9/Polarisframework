@@ -397,7 +397,12 @@ export default function DataPage() {
       <div className="max-w-6xl mx-auto px-4 py-4">
         {/* ===== HEADER ===== */}
         <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-[#333]">
-          <h1 className="text-2xl font-bold uppercase tracking-widest">RAW DATA</h1>
+          <div>
+            <h1 className="text-2xl font-bold uppercase tracking-widest">SOURCE REGISTRY</h1>
+            <div className="text-xs text-[#777] uppercase tracking-wider mt-1">
+              Fuentes externas, endpoints, latest values y calidad exact/proxy/manual.
+            </div>
+          </div>
           <div className="flex items-center gap-3">
             {lastGlobalRefresh && (
               <span className="text-xs text-[#777] uppercase tracking-wider">
@@ -452,7 +457,7 @@ export default function DataPage() {
             <div className="text-xl font-mono font-bold text-[#ef4444]">{counts.stale}</div>
           </div>
           <div className="p-3 border-l border-[#222]">
-            <div className="text-[10px] text-[#777] uppercase tracking-widest mb-1">Auto gratis</div>
+            <div className="text-[10px] text-[#777] uppercase tracking-widest mb-1">Automaticos</div>
             <div className="text-xl font-mono font-bold text-[#4ade80]">{accessSummary.automatic}</div>
           </div>
           <div className="p-3 border-l border-[#222]">

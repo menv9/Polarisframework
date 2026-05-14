@@ -9,6 +9,14 @@ const statusConfig = {
   missing: { label: 'SIN HIST', color: 'border-[#333] text-[#555] bg-[#080808]' },
 }
 
+const fitConfig = {
+  exact: { label: 'EXACT', color: 'border-[#4ade80] text-[#4ade80] bg-[#06140b]' },
+  derived: { label: 'DERIV', color: 'border-[#60a5fa] text-[#60a5fa] bg-[#07111f]' },
+  proxy: { label: 'PROXY', color: 'border-[#f59e0b] text-[#f59e0b] bg-[#1a1003]' },
+  manual: { label: 'MANUAL', color: 'border-[#888] text-[#aaa] bg-[#111]' },
+  pending: { label: 'REVISAR', color: 'border-[#ef4444] text-[#ef4444] bg-[#1a0505]' },
+}
+
 function isAutomatable(source) {
   return Boolean(source.apiPath || source.fredSeriesId)
 }
@@ -43,7 +51,7 @@ function freshnessOf(source) {
 
 function exportHistoryCsv(rows) {
   const headers = [
-    'fuente', 'indicador', 'modulo', 'estado', 'obs',
+    'fuente', 'indicador', 'modulo', 'fit', 'data_measure', 'estado', 'obs',
     'start', 'end', 'freshness', 'endpoint_error', 'accion',
   ]
 
@@ -58,6 +66,8 @@ function exportHistoryCsv(rows) {
       source.id,
       source.indicator,
       source.module,
+      source.dataFit || 'pending',
+      source.dataMeasure || '',
       displayStatusOf(source),
       source.history?.count || 0,
       source.history?.start || '-',
@@ -232,11 +242,12 @@ export default function HistoryPage() {
         </div>
 
         <div className="border-2 border-[#333] overflow-x-auto">
-          <table className="w-full min-w-[1180px] text-sm table-fixed">
+          <table className="w-full min-w-[1320px] text-sm table-fixed">
             <thead>
               <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#777]">
                 <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[230px]">Fuente</th>
                 <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[90px]">Estado</th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[150px]">Fit</th>
                 <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[95px]">Obs</th>
                 <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[110px]">Start</th>
                 <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[110px]">End</th>
@@ -248,6 +259,7 @@ export default function HistoryPage() {
               {visibleSources.map((source) => {
                 const rowStatus = rowStatusOf(source)
                 const cfg = statusConfig[rowStatus] || statusConfig.missing
+                const fit = fitConfig[source.dataFit] || fitConfig.pending
                 return (
                   <tr key={source.id} className="border-b border-[#222] align-top">
                     <td className="px-2 py-2">
@@ -261,6 +273,17 @@ export default function HistoryPage() {
                       <span className={`inline-block border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${cfg.color}`}>
                         {cfg.label}
                       </span>
+                    </td>
+                    <td className="px-2 py-2">
+                      <span
+                        className={`inline-block border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${fit.color}`}
+                        title={source.dataCheck}
+                      >
+                        {fit.label}
+                      </span>
+                      <div className="text-[10px] text-[#777] mt-1 leading-tight line-clamp-2">
+                        {source.dataMeasure || 'Sin fit definido'}
+                      </div>
                     </td>
                     <td className="px-2 py-2 font-mono text-xs text-[#aaa]">{source.history?.count || 0}</td>
                     <td className="px-2 py-2 font-mono text-xs text-[#aaa]">{source.history?.start || '-'}</td>

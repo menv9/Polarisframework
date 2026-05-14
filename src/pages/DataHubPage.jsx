@@ -2,11 +2,11 @@ import { Link } from 'react-router-dom'
 
 const cards = [
   {
-    title: 'Raw Data',
+    title: 'Source Registry',
     path: '/data/raw',
     tone: 'text-[#4ade80] border-[#4ade80]',
-    desc: 'Catalogo de fuentes: endpoints, latest values, refresh, estado, fit y metadata.',
-    meta: 'Fuente externa',
+    desc: 'Registro de fuentes: endpoint, latest value, refresh, estado, fit exacto/proxy/manual y metadata.',
+    meta: 'Fuentes y latest',
   },
   {
     title: 'Coverage Matrix',
@@ -23,11 +23,11 @@ const cards = [
     meta: 'Historico raw',
   },
   {
-    title: 'Model Inputs',
+    title: 'Model Features',
     path: '/model-inputs',
     tone: 'text-[#f59e0b] border-[#f59e0b]',
     desc: 'Transformaciones, z-scores y features internas calculadas desde los historicos.',
-    meta: 'Features del modelo',
+    meta: 'Z-scores del modelo',
   },
 ]
 
@@ -64,10 +64,10 @@ export default function DataHubPage() {
         <div className="mt-5 border-2 border-[#333] bg-[#0a0a0a] p-4">
           <div className="text-sm font-bold uppercase tracking-widest text-white mb-2">Flujo recomendado</div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-0 border border-[#222]">
-            <Step label="1. Raw Data" text="Conectar y validar fuentes externas." />
+            <Step label="1. Source Registry" text="Conectar y validar fuentes externas." />
             <Step label="2. Coverage" text="Ver que datos exige el framework." />
             <Step label="3. History" text="Guardar historicos persistentes." />
-            <Step label="4. Model Inputs" text="Crear features y z-scores." />
+            <Step label="4. Model Features" text="Crear features y z-scores." />
           </div>
         </div>
       </div>

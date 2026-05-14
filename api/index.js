@@ -261,6 +261,21 @@ async function fetchFredYoYChangeQuarterly(seriesId) {
   }
 }
 
+async function fetchFredPeriodChange(seriesId, periods = 4, limit = periods + 12) {
+  const observations = await fetchFredNumericObservations(seriesId, Math.max(limit, periods + 1))
+  if (observations.length <= periods) return null
+  const current = observations[0]
+  const prior = observations[periods]
+  const value = current.value - prior.value
+  return {
+    seriesId,
+    date: current.date,
+    value: Number(value.toFixed(2)),
+    raw: current.value,
+    meta: { current: current.value, prior: prior.value, periods },
+  }
+}
+
 function normalizeLatest({ provider, seriesId, date, value, raw, meta = {} }) {
   return {
     provider,
@@ -1297,6 +1312,20 @@ async function fetchFredHistorySeries(seriesId, transform = null, limit = 5000) 
   }
 }
 
+async function fetchFredPeriodChangeHistory(seriesId, periods = 4, limit = 5000) {
+  const series = normalizeHistorySeries(await fetchFredNumericObservations(seriesId, limit).then((rows) => rows.reverse()))
+  return {
+    provider: 'fred',
+    transform: `period_change_${periods}`,
+    series: series
+      .map((row, index) => {
+        if (index < periods) return null
+        return { date: row.date, value: Number((row.value - series[index - periods].value).toFixed(6)), raw: row.value }
+      })
+      .filter(Boolean),
+  }
+}
+
 async function fetchFredSpreadHistory(leftSeriesId, rightSeriesId, limit = 5000) {
   const [left, right] = await Promise.all([
     fetchFredNumericObservations(leftSeriesId, limit),
@@ -1485,6 +1514,13 @@ async function fetchHistoryForSource(source) {
   if (url.pathname.startsWith('/api/fred/above-ma/')) {
     return fetchFredHistorySeries(url.pathname.split('/').at(-1), `raw_for_${url.searchParams.get('window') || 200}dma`, HISTORY_FRED_LIMIT)
   }
+  if (url.pathname.startsWith('/api/fred/period-change/')) {
+    return fetchFredPeriodChangeHistory(
+      url.pathname.split('/').at(-1),
+      Math.max(Number(url.searchParams.get('periods') || 4), 1),
+      HISTORY_FRED_LIMIT
+    )
+  }
   if (url.pathname === '/api/source/yahoo/latest') {
     return { provider: 'yahoo', series: await fetchYahooHistory(url.searchParams.get('symbol'), '10y', '1d') }
   }
@@ -1659,6 +1695,22 @@ app.get('/api/fred/yoy/:seriesId', async (req, res) => {
   } catch (err) {
     console.error(`[FRED] Error fetching YoY ${seriesId}:`, err.message)
     res.status(502).json({ error: 'FRED fetch failed', message: err.message })
+  }
+})
+
+app.get('/api/fred/period-change/:seriesId', async (req, res) => {
+  const { seriesId } = req.params
+  const periods = Math.max(parseInt(req.query.periods || '4', 10), 1)
+  const limit = Math.min(parseInt(req.query.limit || String(periods + 12), 10), 5000)
+  try {
+    const result = await fetchFredPeriodChange(seriesId, periods, limit)
+    if (!result || result.value === null) {
+      return res.status(404).json({ error: 'Not enough data for period change', seriesId })
+    }
+    res.json(result)
+  } catch (err) {
+    console.error(`[FRED] Error fetching period change ${seriesId}:`, err.message)
+    res.status(502).json({ error: 'FRED period change failed', message: err.message })
   }
 })
 

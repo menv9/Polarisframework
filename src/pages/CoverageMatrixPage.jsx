@@ -68,7 +68,7 @@ export default function CoverageMatrixPage() {
           <div>
             <h1 className="text-2xl font-bold uppercase tracking-widest">Coverage Matrix</h1>
             <div className="text-xs text-[#777] uppercase tracking-wider mt-1">
-              24 indicadores Endogenous G10 segun docs 15.2/15.4. Raw Data sigue siendo el aparcamiento.
+              24 indicadores Endogenous G10 segun docs 15.2/15.4. Source Registry muestra la fuente y el fit.
             </div>
           </div>
           <Link
