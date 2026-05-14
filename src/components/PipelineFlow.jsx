@@ -94,30 +94,37 @@ export default function PipelineFlow() {
 
 function StageCard({ stage, activeModule, onEnter, onLeave, isFeedback }) {
   const isActive = activeModule === stage.id
-  const isWorldView = stage.id === 'worldview'
+  const hasRoute = !!stage.route
 
   const cardContent = (
-    <div className={`min-w-[140px] p-3 border-2 text-center ${
+    <div className={`min-w-[140px] p-3 border-2 text-center transition-colors ${
       isActive
         ? isFeedback
           ? 'border-white bg-[#111]'
           : 'border-[#ecd987] bg-[#111]'
-        : 'border-[#333] bg-black hover:border-[#666]'
+        : hasRoute
+          ? 'border-[#333] bg-black hover:border-[#ecd987] hover:bg-[#0a0a0a]'
+          : 'border-[#222] bg-black opacity-60'
     }`}>
       <div className="font-mono text-sm text-[#777] mb-1">{stage.part}</div>
-      <h4 className="text-sm font-bold text-white uppercase tracking-wider">{stage.label}</h4>
+      <h4 className={`text-sm font-bold uppercase tracking-wider ${hasRoute ? 'text-white' : 'text-[#555]'}`}>
+        {stage.label}
+      </h4>
       <p className="text-sm text-[#777] mt-1">{stage.desc}</p>
+      {!hasRoute && !isFeedback && (
+        <p className="text-[10px] text-[#444] uppercase tracking-wider mt-1">próximamente</p>
+      )}
     </div>
   )
 
-  if (isWorldView) {
+  if (hasRoute) {
     return (
       <div
         className="cursor-pointer"
         onMouseEnter={() => onEnter(stage.id)}
         onMouseLeave={onLeave}
       >
-        <Link to="/world-view" className="block">
+        <Link to={stage.route} className="block">
           {cardContent}
         </Link>
       </div>
@@ -126,13 +133,8 @@ function StageCard({ stage, activeModule, onEnter, onLeave, isFeedback }) {
 
   return (
     <div
-      className="cursor-pointer"
       onMouseEnter={() => onEnter(stage.id)}
       onMouseLeave={onLeave}
-      onClick={() => {
-        const el = document.getElementById(`card-${stage.id}`)
-        if (el) el.scrollIntoView({ behavior: 'instant', block: 'center' })
-      }}
     >
       {cardContent}
     </div>
