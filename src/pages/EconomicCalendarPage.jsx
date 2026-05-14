@@ -375,12 +375,13 @@ export default function EconomicCalendarPage() {
                       </div>
 
                       <div className="space-y-1.5">
-                        {cell.events.slice(0, 5).map((event) => {
-                          const saved = savedKeys.has(eventKey(event))
-                          const released = hasActual(event)
-                          const title = eventTitle(event)
-                          return (
-                            <div
+                    {cell.events.slice(0, 5).map((event) => {
+                      const saved = savedKeys.has(eventKey(event))
+                      const released = hasActual(event)
+                      const title = eventTitle(event)
+                      const mapping = classifyCalendarEvent(event)
+                      return (
+                        <div
                               key={eventKey(event)}
                               className={`border px-1.5 py-1 bg-[#050505] ${
                                 released ? 'border-[#4ade80]' : saved ? 'border-[#ecd987]' : 'border-[#222]'
@@ -396,12 +397,15 @@ export default function EconomicCalendarPage() {
                               <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-white truncate">
                                 {eventCurrency(event)} - {title}
                               </div>
-                              <div className="mt-1 text-[10px] font-mono text-[#777] truncate">
-                                A {event.actual || '-'} / F {event.forecast || '-'}
-                              </div>
-                            </div>
-                          )
-                        })}
+                          <div className="mt-1 text-[10px] font-mono text-[#777] truncate">
+                            A {event.actual || '-'} / F {event.forecast || '-'}
+                          </div>
+                          <div className={`mt-1 text-[9px] font-bold uppercase tracking-wider truncate ${mapping.sourceId ? 'text-[#60a5fa]' : 'text-[#555]'}`}>
+                            EQ {mapping.sourceId || 'none'}
+                          </div>
+                        </div>
+                      )
+                    })}
                         {cell.events.length > 5 && (
                           <div className="text-[10px] text-[#777] uppercase tracking-wider">
                             +{cell.events.length - 5} more
@@ -468,9 +472,16 @@ export default function EconomicCalendarPage() {
                         </div>
                       </div>
                       <div className="w-full sm:w-[260px] border border-[#222] bg-[#050505] px-2 py-2">
-                        <div className={`text-[10px] font-bold uppercase tracking-wider ${mapping.matchStatus === 'candidate' ? 'text-[#f59e0b]' : 'text-[#777]'}`}>
-                          {mapping.matchStatus}
+                        <div className={`text-[10px] font-bold uppercase tracking-wider ${
+                          mapping.sourceId ? 'text-[#60a5fa]' : mapping.matchStatus === 'candidate' ? 'text-[#f59e0b]' : 'text-[#777]'
+                        }`}>
+                          {mapping.matchStatus} {mapping.sourceId ? `· ${mapping.sourceId}` : ''}
                         </div>
+                        {mapping.source && (
+                          <div className="text-[10px] text-[#60a5fa] leading-tight mt-1">
+                            {mapping.source.indicator}
+                          </div>
+                        )}
                         <div className="text-[10px] text-[#777] leading-tight mt-1">
                           {mapping.reason}
                         </div>
@@ -493,37 +504,40 @@ export default function EconomicCalendarPage() {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[520px] text-sm table-fixed">
+              <table className="w-full min-w-[620px] text-sm table-fixed">
                 <thead>
                   <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#777]">
                     <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[86px]">Fecha</th>
                     <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest">Evento</th>
                     <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[74px]">Actual</th>
-                    <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[86px]">Match</th>
+                    <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[150px]">Equivalent</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {releases.map((row) => (
-                    <tr key={row.event_hash || `${row.event_date}-${row.event_name}`} className="border-b border-[#222] align-top">
-                      <td className="px-2 py-2 font-mono text-xs text-[#aaa]">{row.event_date || '-'}</td>
-                      <td className="px-2 py-2">
-                        <div className="text-xs font-bold text-white uppercase tracking-wider">
-                          {row.currency || '-'} - {row.event_name}
-                        </div>
-                        <div className="text-[10px] text-[#777] mt-1">
-                          F {row.forecast_value || '-'} / P {row.previous_value || '-'} / {row.impact || 'N/A'}
-                        </div>
-                      </td>
-                      <td className="px-2 py-2 font-mono text-xs text-[#4ade80]">{row.actual_value || '-'}</td>
-                      <td className="px-2 py-2">
-                        <span className={`border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                          row.source_id ? 'border-[#4ade80] text-[#4ade80]' : 'border-[#333] text-[#777]'
-                        }`}>
-                          {row.source_id || row.match_status || 'none'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {releases.map((row) => {
+                    const mapping = classifyCalendarEvent(row.raw_event || row)
+                    return (
+                      <tr key={row.event_hash || `${row.event_date}-${row.event_name}`} className="border-b border-[#222] align-top">
+                        <td className="px-2 py-2 font-mono text-xs text-[#aaa]">{row.event_date || '-'}</td>
+                        <td className="px-2 py-2">
+                          <div className="text-xs font-bold text-white uppercase tracking-wider">
+                            {row.currency || '-'} - {row.event_name}
+                          </div>
+                          <div className="text-[10px] text-[#777] mt-1">
+                            F {row.forecast_value || '-'} / P {row.previous_value || '-'} / {row.impact || 'N/A'}
+                          </div>
+                        </td>
+                        <td className="px-2 py-2 font-mono text-xs text-[#4ade80]">{row.actual_value || '-'}</td>
+                        <td className="px-2 py-2">
+                          <span className={`border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                            mapping.sourceId ? 'border-[#60a5fa] text-[#60a5fa]' : 'border-[#333] text-[#777]'
+                          }`}>
+                            {mapping.sourceId || row.source_id || row.match_status || 'none'}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
                   {!loading && releases.length === 0 && (
                     <tr>
                       <td colSpan={4} className="px-3 py-6 text-sm text-[#777]">
