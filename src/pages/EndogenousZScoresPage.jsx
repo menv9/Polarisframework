@@ -69,6 +69,25 @@ function computeStats(values) {
   return { n, mean, std, last, z }
 }
 
+// ── URLs desde dataSources ────────────────────────────────────────────────────
+function getSourceId(prefix, key) {
+  const suffix = key === 'nfp' && prefix !== 'usa' ? 'empl' : key
+  return `endo_${prefix}_${suffix}`
+}
+
+function loadSourceUrls() {
+  try {
+    const saved = localStorage.getItem('polaris_data_sources')
+    if (!saved) return {}
+    const sources = JSON.parse(saved)
+    const map = {}
+    for (const s of sources) {
+      if (s.scrapeUrl) map[s.id] = s.scrapeUrl
+    }
+    return map
+  } catch { return {} }
+}
+
 // ── localStorage ─────────────────────────────────────────────────────────────
 function loadHistory() {
   try {
@@ -110,6 +129,7 @@ function zBar(z) {
 // ── Componente ────────────────────────────────────────────────────────────────
 export default function EndogenousZScoresPage() {
   const [history, setHistory]       = useState(loadHistory)
+  const [sourceUrls]                = useState(loadSourceUrls)
   const [activeTab, setActiveTab]   = useState('usa')
   const [activeImport, setActiveImport] = useState(null) // 'prefix_key' | null
   const [importText, setImportText] = useState('')
@@ -298,7 +318,23 @@ export default function EndogenousZScoresPage() {
                       {/* Fila principal */}
                       <tr className={`border-b border-[#222] ${isOpen ? 'bg-[#111]' : 'hover:bg-[#0a0a0a]'}`}>
                         <td className="px-2 py-2">
-                          <div className="text-sm font-bold text-[#e5e5e5]">{ind.label}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-bold text-[#e5e5e5]">{ind.label}</span>
+                            {(() => {
+                              const url = sourceUrls[getSourceId(activeTab, ind.key)]
+                              return url ? (
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] font-bold text-[#ecd987] hover:text-white leading-none"
+                                  title={url}
+                                >
+                                  ↗
+                                </a>
+                              ) : null
+                            })()}
+                          </div>
                           <div className="text-[10px] text-[#444] uppercase tracking-wider">{ind.category}</div>
                         </td>
                         <td className="px-2 py-2 font-mono text-xs text-[#777]">
