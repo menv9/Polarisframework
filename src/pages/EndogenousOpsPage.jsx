@@ -39,6 +39,41 @@ const INDICATORS_BY_CATEGORY = INDICATORS.reduce((acc, ind) => {
   return acc
 }, [])
 
+// ── Tooltip ───────────────────────────────────────────────────────────────────
+function Tooltip({ text, align = 'center' }) {
+  const alignClass =
+    align === 'left'  ? 'left-0 -translate-x-0' :
+    align === 'right' ? 'right-0 translate-x-0'  :
+                        'left-1/2 -translate-x-1/2'
+  return (
+    <span className="relative group inline-flex items-center ml-1 cursor-help">
+      <span className="text-[10px] font-bold text-[#444] group-hover:text-[#ecd987] select-none leading-none">ⓘ</span>
+      <span className={`absolute bottom-full mb-2 ${alignClass} w-60 bg-[#0d0d0d] border border-[#333] text-[10px] text-[#aaa] font-mono px-2.5 py-2 leading-relaxed hidden group-hover:block z-50 pointer-events-none whitespace-normal`}>
+        {text}
+      </span>
+    </span>
+  )
+}
+
+// ── Textos de tooltips ────────────────────────────────────────────────────────
+const IND_TIPS = {
+  real_2y:    'Diferencial de tipos reales a 2Y vs media G10. Indicador DOMINANTE (β=0.14). Mayor diferencial → más atractivo carry → divisa más fuerte.',
+  '10y_real': 'Yield real del bono soberano a 10Y (nominal − inflación breakeven). Refleja el retorno real del capital a largo plazo.',
+  ca_gdp:     'Cuenta corriente como % del PIB. Superávit crónico = demanda estructural de la divisa. Déficit = presión vendedora.',
+  tot:        'Variación YoY de los términos de intercambio (precios exportación / importación). Mejora → mayor renta nacional → divisa más fuerte.',
+  core_cpi:   'IPC subyacente YoY (excluye energía y alimentos). Proxy de presión inflacionaria estructural; anticipa movimientos de tipos.',
+  niip:       'Posición de Inversión Internacional Neta como % del PIB. Positivo = acreedor neto (CHE, JPN). Negativo = deudor neto (USA, GBP).',
+  policy:     'Tipo nominal del banco central. Refleja la postura de política monetaria. Se combina con CPI para derivar el tipo real.',
+  cpi:        'IPC general YoY. Incluye componentes volátiles (energía, alimentos). Proxy de inflación total.',
+  nfp:        'Empleo YoY. Para USA = variación NFP. Para el resto = tasa de paro OCDE (signo invertido). Fortaleza del mercado laboral.',
+  cftc:       'Posicionamiento especulativo neto en CFTC (non-commercial). Señal de sentimiento a corto plazo. Contrarian en extremos.',
+  cb_balance: 'Balance del banco central como % del PIB, var. YoY. Signo −1: expansión del balance (QE) es bajista para la divisa.',
+  pmi:        'ISM Manufacturing (USA) o PMI manufacturero equivalente. Indicador líder de actividad económica real.',
+  debt:       'Deuda pública bruta como % del PIB. Signo −1: mayor deuda → menor credibilidad fiscal → presión bajista estructural.',
+  reer:       'Desviación del REER respecto a su media de 10Y. Signo −1: si la divisa está cara en términos reales, tiende a revertir.',
+  umcsi:      'Confianza del consumidor (UMCSI para USA, OCDE para el resto). Anticipa gasto privado y perspectivas económicas.',
+}
+
 function getSourceId(prefix, key) {
   const suffix = key === 'nfp' && prefix !== 'usa' ? 'empl' : key
   return `endo_${prefix}_${suffix}`
@@ -248,7 +283,7 @@ export default function EndogenousOpsPage() {
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-0">
             {/* Regimen */}
             <div className="p-3 border-r border-b border-[#222]">
-              <div className="text-xs text-[#777] uppercase tracking-wider mb-1">Regimen (WV)</div>
+              <div className="text-xs text-[#777] uppercase tracking-wider mb-1">Regimen (WV)<Tooltip text="Determinado por VIX, HY OAS, SP500 vs 200DMA y EMBI. RISK-ON = mercados expansivos · RISK-OFF = aversión al riesgo · MIXTO = entre umbrales. Afecta al multiplicador de régimen de cada divisa." /></div>
               <div className={`text-xl font-mono font-bold ${regimeColor}`}>{regime}</div>
             </div>
             {/* Par selector */}
@@ -280,17 +315,17 @@ export default function EndogenousOpsPage() {
             </div>
             {/* Señal */}
             <div className="p-3 border-r border-b border-[#222]">
-              <div className="text-xs text-[#777] uppercase tracking-wider mb-1">Señal</div>
+              <div className="text-xs text-[#777] uppercase tracking-wider mb-1">Señal<Tooltip text="Diferencial de scores compuestos: score_A − score_B. Positivo = divisa A más fuerte. Rango típico [−1, +1]." /></div>
               <div className={`text-xl font-mono font-bold ${scoreColor(signal)}`}>{fmtScore(signal)}</div>
             </div>
             {/* Conviccion */}
             <div className="p-3 border-r border-b border-[#222]">
-              <div className="text-xs text-[#777] uppercase tracking-wider mb-1">Conviccion</div>
+              <div className="text-xs text-[#777] uppercase tracking-wider mb-1">Conviccion<Tooltip align="right" text="Umbrales de convicción: FULL si |señal| > 0.60 · HALF si |señal| > 0.40 · FLAT si |señal| ≤ 0.40. FLAT = no operar." /></div>
               <div className={`text-xl font-mono font-bold ${convictionColor(conviction)}`}>{conviction}</div>
             </div>
             {/* Posicion */}
             <div className="p-3 border-b border-[#222]">
-              <div className="text-xs text-[#777] uppercase tracking-wider mb-1">Posicion</div>
+              <div className="text-xs text-[#777] uppercase tracking-wider mb-1">Posicion<Tooltip align="right" text="Dirección operativa derivada de la señal. Solo se muestra si convicción ≥ HALF. FLAT = el modelo no tiene señal suficiente para operar." /></div>
               <div className={`text-base font-bold uppercase tracking-wide ${conviction === 'FLAT' ? 'text-[#777]' : 'text-white'}`}>
                 {conviction === 'FLAT' ? '---' : direction}
               </div>
@@ -300,12 +335,12 @@ export default function EndogenousOpsPage() {
           {/* Row 2: horizon breakdown */}
           <div className="grid grid-cols-3 gap-0">
             {[
-              { label: 'CORTO (20%)',  a: scoreA?.short,  b: scoreB?.short  },
-              { label: 'MEDIO (50%)',  a: scoreA?.medium, b: scoreB?.medium },
-              { label: 'LARGO (30%)',  a: scoreA?.long,   b: scoreB?.long   },
+              { label: 'CORTO (20%)',  tip: 'Indicadores con impacto en días-semanas (CFTC). Peso del 20% en el score compuesto.', a: scoreA?.short,  b: scoreB?.short  },
+              { label: 'MEDIO (50%)',  tip: 'Indicadores con impacto en 1-6 meses (tipos, inflación, empleo, PMI). Peso del 50% — es el horizonte dominante.', a: scoreA?.medium, b: scoreB?.medium },
+              { label: 'LARGO (30%)',  tip: 'Indicadores estructurales con impacto en 6+ meses (CA, NIIP, ToT, REER, deuda). Peso del 30%.', a: scoreA?.long,   b: scoreB?.long   },
             ].map((h, i) => (
               <div key={h.label} className={`p-3 ${i < 2 ? 'border-r' : ''} border-[#222]`}>
-                <div className="text-xs text-[#777] uppercase tracking-wider mb-1">{h.label}</div>
+                <div className="text-xs text-[#777] uppercase tracking-wider mb-1">{h.label}<Tooltip text={h.tip} /></div>
                 <div className="flex gap-3">
                   <span className={`text-sm font-mono font-bold ${scoreColor(h.a ?? 0)}`}>
                     {COUNTRIES.find(c => c.prefix === pairA)?.label}: {fmtScore(h.a ?? 0)}
@@ -323,7 +358,10 @@ export default function EndogenousOpsPage() {
         <div className="border-2 border-[#333] mb-4">
           <div className="px-3 py-2 bg-[#111] border-b-2 border-[#333] flex items-center justify-between">
             <span className="text-base font-bold uppercase tracking-widest text-[#e5e5e5]">Ranking de Fortaleza G10</span>
-            <span className="text-[10px] text-[#555] uppercase tracking-wider">Regime: {regime} · Mult pro-ciclico: {getRegimeMultiplier(regime, true).toFixed(2)} / refugio: {getRegimeMultiplier(regime, false).toFixed(2)}</span>
+            <span className="text-[10px] text-[#555] uppercase tracking-wider flex items-center gap-1">
+              Regime: {regime} · Mult pro-ciclico: {getRegimeMultiplier(regime, true).toFixed(2)} / refugio: {getRegimeMultiplier(regime, false).toFixed(2)}
+              <Tooltip align="right" text="Multiplicador de régimen (RM). Pro-cíclicas (EUR,GBP,CAD,AUD,NZD,SEK,NOK): se amplifican en RISK-ON y se atenúan en RISK-OFF. Refugio (USD,JPY,CHF): al revés. MIXTO = 0.75 para todas." />
+            </span>
           </div>
           <div className="grid grid-cols-5 sm:grid-cols-10 gap-0">
             {rankedCountries.map((c, i) => (
@@ -399,10 +437,18 @@ export default function EndogenousOpsPage() {
                 <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#777]">
                   <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[13%]">Cat</th>
                   <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[26%]">Indicador</th>
-                  <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[14%]">Z-Score</th>
-                  <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[9%]">β norm</th>
-                  <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[11%]">Contrib</th>
-                  <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[14%]">Horizonte</th>
+                  <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[14%]">
+                    Z-Score<Tooltip text="Desviaciones estándar del valor actual respecto a la media histórica de 10Y. Rango recortado a [−4, +4]. Se calcula en /endogenous/zscores." />
+                  </th>
+                  <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[9%]">
+                    β norm<Tooltip text="Beta normalizado = β_doc / Σβ_impl (0.76). Peso relativo de este indicador dentro del score. Suma de todos los β_norm = 1.00." />
+                  </th>
+                  <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[11%]">
+                    Contrib<Tooltip align="right" text="Contribución al score = β_norm × z-score × signo × RM. Verde = aporta fortaleza a la divisa. Rojo = aporta debilidad." />
+                  </th>
+                  <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[14%]">
+                    Horizonte<Tooltip align="right" text="Clasificación temporal del indicador. AZUL=SHORT (días) · ÁMBAR=MEDIUM (meses) · GRIS=LONG (estructural). Define el peso en el score compuesto." />
+                  </th>
                   <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[13%]">Data</th>
                 </tr>
               </thead>
@@ -425,7 +471,10 @@ export default function EndogenousOpsPage() {
                             <span className="text-[10px] font-bold uppercase tracking-wider text-[#555]">{category}</span>
                           </td>
                           <td className="px-2 py-1.5">
-                            <div className="text-sm font-bold text-[#e5e5e5]">{ind.label}</div>
+                            <div className="flex items-center gap-0.5">
+                              <span className="text-sm font-bold text-[#e5e5e5]">{ind.label}</span>
+                              {IND_TIPS[ind.key] && <Tooltip align="left" text={IND_TIPS[ind.key]} />}
+                            </div>
                             <div className="text-[10px] text-[#555]">{ind.sign === 1 ? '▲ FX positivo' : '▼ FX negativo'}</div>
                             {(() => {
                               const raw = sourceValues[getSourceId(activeCountry.prefix, ind.key)]
@@ -481,13 +530,13 @@ export default function EndogenousOpsPage() {
             return cs ? (
               <div className="grid grid-cols-4 gap-0 border-t-2 border-[#333]">
                 {[
-                  { label: 'Score CORTO',    value: cs.short,     weight: '20%' },
-                  { label: 'Score MEDIO',    value: cs.medium,    weight: '50%' },
-                  { label: 'Score LARGO',    value: cs.long,      weight: '30%' },
-                  { label: 'COMPUESTO',      value: cs.composite, weight: '—'   },
+                  { label: 'Score CORTO',  tip: 'Suma de contribuciones de indicadores SHORT (CFTC). Pesa 20% en el compuesto.', value: cs.short,     weight: '20%' },
+                  { label: 'Score MEDIO',  tip: 'Suma de contribuciones de indicadores MEDIUM (tipos, inflación, empleo). Pesa 50%.', value: cs.medium,    weight: '50%' },
+                  { label: 'Score LARGO',  tip: 'Suma de contribuciones de indicadores LONG (CA, NIIP, REER, deuda...). Pesa 30%.', value: cs.long,      weight: '30%' },
+                  { label: 'COMPUESTO',    tip: 'Score final = 0.20×CORTO + 0.50×MEDIO + 0.30×LARGO. Base para el ranking y la señal de par.', value: cs.composite, weight: '—'   },
                 ].map((item, i) => (
                   <div key={item.label} className={`p-3 ${i < 3 ? 'border-r' : ''} border-[#222] bg-[#0a0a0a]`}>
-                    <div className="text-xs text-[#777] uppercase tracking-wider mb-1">{item.label} <span className="text-[#444]">({item.weight})</span></div>
+                    <div className="text-xs text-[#777] uppercase tracking-wider mb-1">{item.label} <span className="text-[#444]">({item.weight})</span><Tooltip align={i === 3 ? 'right' : 'left'} text={item.tip} /></div>
                     <div className={`text-lg font-mono font-bold ${scoreColor(item.value)}`}>{fmtScore(item.value)}</div>
                   </div>
                 ))}
