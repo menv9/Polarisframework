@@ -1,5 +1,6 @@
 import { useState, useEffect, Fragment } from 'react'
 import { Link } from 'react-router-dom'
+import { INDICATORS as BASE_INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 
 const STORAGE_KEY_ZSCORES = 'polaris_endogenous_zscores'
 const STORAGE_KEY_WV      = 'polaris_worldview_data'
@@ -18,25 +19,15 @@ const COUNTRIES = [
   { label: 'NOK', prefix: 'nor', cyclical: true  },
 ]
 
-const INDICATORS = [
-  { key: 'real_2y',    label: 'Real Rate 2Y',          beta: 0.14, sign:  1, horizon: 'MEDIUM', category: 'CARRY'       },
-  { key: 'ca_gdp',     label: 'Current Account %GDP',   beta: 0.07, sign:  1, horizon: 'LONG',   category: 'ESTRUCTURAL' },
-  { key: 'reer',       label: 'REER Deviation vs 10Y',  beta: 0.06, sign: -1, horizon: 'LONG',   category: 'VALUATION'   },
-  { key: 'tot',        label: 'Terms of Trade YoY',     beta: 0.06, sign:  1, horizon: 'LONG',   category: 'ESTRUCTURAL' },
-  { key: '10y_real',   label: '10Y Real Yield',         beta: 0.06, sign:  1, horizon: 'MEDIUM', category: 'RATES'       },
-  { key: 'core_cpi',   label: 'Core CPI YoY',           beta: 0.05, sign:  1, horizon: 'MEDIUM', category: 'INFLACION'   },
-  { key: 'niip',       label: 'NIIP % GDP',             beta: 0.05, sign:  1, horizon: 'LONG',   category: 'ESTRUCTURAL' },
-  { key: 'policy',     label: 'Policy Rate',            beta: 0.05, sign:  1, horizon: 'MEDIUM', category: 'RATES'       },
-  { key: 'cpi',        label: 'CPI YoY',                beta: 0.04, sign:  1, horizon: 'MEDIUM', category: 'INFLACION'   },
-  { key: 'nfp',        label: 'Employment YoY',         beta: 0.04, sign:  1, horizon: 'MEDIUM', category: 'EMPLEO'      },
-  { key: 'pmi',        label: 'ISM/PMI',                beta: 0.03, sign:  1, horizon: 'MEDIUM', category: 'CRECIMIENTO' },
-  { key: 'cftc',       label: 'CFTC Positioning',       beta: 0.03, sign:  1, horizon: 'SHORT',  category: 'SENTIMIENTO' },
-  { key: 'cb_balance', label: 'CB Balance/GDP YoY',     beta: 0.03, sign: -1, horizon: 'MEDIUM', category: 'MONETARIO'   },
-  { key: 'debt',       label: 'Govt Debt/GDP',          beta: 0.03, sign: -1, horizon: 'LONG',   category: 'SOBERANO'    },
-  { key: 'umcsi',      label: 'Consumer Sentiment',     beta: 0.02, sign:  1, horizon: 'SHORT',  category: 'CRECIMIENTO' },
-]
+// Mapeo de categorías para la UI (campo no presente en la librería compartida)
+const CATEGORY_MAP = {
+  real_2y: 'CARRY', ca_gdp: 'ESTRUCTURAL', reer: 'VALUATION', tot: 'ESTRUCTURAL',
+  '10y_real': 'RATES', core_cpi: 'INFLACION', niip: 'ESTRUCTURAL', policy: 'RATES',
+  cpi: 'INFLACION', nfp: 'EMPLEO', pmi: 'CRECIMIENTO', cftc: 'SENTIMIENTO',
+  cb_balance: 'MONETARIO', debt: 'SOBERANO', umcsi: 'CRECIMIENTO',
+}
 
-const BETA_TOTAL = INDICATORS.reduce((s, i) => s + i.beta, 0)
+const INDICATORS = BASE_INDICATORS.map(i => ({ ...i, category: CATEGORY_MAP[i.key] ?? i.key.toUpperCase() }))
 
 const INDICATORS_BY_CATEGORY = INDICATORS.reduce((acc, ind) => {
   const last = acc[acc.length - 1]
@@ -111,12 +102,14 @@ function getRegimeMultiplier(regime, cyclical) {
   return 0.75
 }
 
-function computeCountryScore(prefix, cyclical, regime, zScores) {
-  const rm = getRegimeMultiplier(regime, cyclical)
+function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
+  const rm        = getRegimeMultiplier(regime, cyclical)
+  const betaTotal = computeBetaTotal(betas)
   let short = 0, medium = 0, longScore = 0
   for (const ind of INDICATORS) {
-    const z = zScores[`${prefix}_${ind.key}`] ?? 0
-    const contrib = (ind.beta / BETA_TOTAL) * z * ind.sign * rm
+    const beta   = betas[ind.key] ?? ind.betaDoc
+    const z      = zScores[`${prefix}_${ind.key}`] ?? 0
+    const contrib = (beta / betaTotal) * z * ind.sign * rm
     if (ind.horizon === 'SHORT')  short      += contrib
     if (ind.horizon === 'MEDIUM') medium     += contrib
     if (ind.horizon === 'LONG')   longScore  += contrib
@@ -144,6 +137,7 @@ function fmtScore(v) {
 export default function EndogenousOpsPage() {
   const [zScores, setZScores] = useState(loadZScores)
   const [wvData]              = useState(loadWorldViewData)
+  const [betas]               = useState(loadBetas)
   const [pairA, setPairA]     = useState('usa')
   const [pairB, setPairB]     = useState('eur')
   const [activeTab, setActiveTab] = useState('usa')
@@ -173,7 +167,7 @@ export default function EndogenousOpsPage() {
   const regime    = regimeOn ? 'RISK-ON' : regimeOff ? 'RISK-OFF' : 'MIXTO'
   const regimeColor = regime === 'RISK-ON' ? 'text-[#4ade80]' : regime === 'RISK-OFF' ? 'text-[#ef4444]' : 'text-[#e5e5e5]'
 
-  const countryScores = COUNTRIES.map(c => ({ ...c, ...computeCountryScore(c.prefix, c.cyclical, regime, zScores) }))
+  const countryScores = COUNTRIES.map(c => ({ ...c, ...computeCountryScore(c.prefix, c.cyclical, regime, zScores, betas) }))
   const rankedCountries = [...countryScores].sort((a, b) => b.composite - a.composite)
 
   const scoreA    = countryScores.find(c => c.prefix === pairA)
@@ -208,9 +202,15 @@ export default function EndogenousOpsPage() {
             </button>
             <Link
               to="/endogenous/zscores"
+              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#333] text-[#777] hover:text-white hover:border-white"
+            >
+              Z-SCORES →
+            </Link>
+            <Link
+              to="/endogenous/betas"
               className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white"
             >
-              CALCULAR Z-SCORES →
+              BETAS →
             </Link>
             <Link
               to="/data?module=Endogenous"
@@ -398,8 +398,10 @@ export default function EndogenousOpsPage() {
                       </td>
                     </tr>
                     {items.map(ind => {
-                      const z = zScores[`${activeCountry.prefix}_${ind.key}`] ?? 0
-                      const contrib = (ind.beta / BETA_TOTAL) * z * ind.sign * activeRegimeMult
+                      const z           = zScores[`${activeCountry.prefix}_${ind.key}`] ?? 0
+                      const effectiveBeta = betas[ind.key] ?? ind.betaDoc
+                      const betaTotal   = computeBetaTotal(betas)
+                      const contrib     = (effectiveBeta / betaTotal) * z * ind.sign * activeRegimeMult
                       return (
                         <tr key={ind.key} className="border-b border-[#222] hover:bg-[#0a0a0a]">
                           <td className="px-2 py-1.5">
@@ -421,7 +423,7 @@ export default function EndogenousOpsPage() {
                             />
                           </td>
                           <td className="px-2 py-1.5">
-                            <span className="text-xs font-mono text-[#777]">{(ind.beta / BETA_TOTAL).toFixed(3)}</span>
+                            <span className="text-xs font-mono text-[#777]">{(effectiveBeta / betaTotal).toFixed(3)}</span>
                           </td>
                           <td className="px-2 py-1.5">
                             <span className={`text-sm font-mono font-bold ${scoreColor(contrib)}`}>

@@ -7,6 +7,7 @@ import DataPage from './pages/DataPage'
 import DashboardPage from './pages/DashboardPage'
 import EndogenousOpsPage from './pages/EndogenousOpsPage'
 import EndogenousZScoresPage from './pages/EndogenousZScoresPage'
+import EndogenousBetasPage from './pages/EndogenousBetasPage'
 
 export default function AppRoutes() {
   return (
@@ -19,6 +20,7 @@ export default function AppRoutes() {
         <Route path="/world-view/operativa" element={<WorldViewOpsPage />} />
         <Route path="/endogenous" element={<EndogenousOpsPage />} />
         <Route path="/endogenous/zscores" element={<EndogenousZScoresPage />} />
+        <Route path="/endogenous/betas" element={<EndogenousBetasPage />} />
         <Route path="/data" element={<DataPage />} />
       </Routes>
     </div>

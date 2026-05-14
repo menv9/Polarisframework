@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, Fragment } from 'react'
 import { Link } from 'react-router-dom'
+import { INDICATORS as BASE_INDICATORS } from '../lib/endogenousBetas'
 
 const STORAGE_KEY_HISTORY = 'polaris_endogenous_history'
 const STORAGE_KEY_ZSCORES = 'polaris_endogenous_zscores'
@@ -17,23 +18,14 @@ const COUNTRIES = [
   { label: 'NOK', prefix: 'nor' },
 ]
 
-const INDICATORS = [
-  { key: 'real_2y',    label: 'Real Rate 2Y',          beta: 0.14, category: 'CARRY'       },
-  { key: 'ca_gdp',     label: 'Current Account %GDP',   beta: 0.07, category: 'ESTRUCTURAL' },
-  { key: 'reer',       label: 'REER Deviation vs 10Y',  beta: 0.06, category: 'VALUATION'   },
-  { key: 'tot',        label: 'Terms of Trade YoY',     beta: 0.06, category: 'ESTRUCTURAL' },
-  { key: '10y_real',   label: '10Y Real Yield',         beta: 0.06, category: 'RATES'       },
-  { key: 'core_cpi',   label: 'Core CPI YoY',           beta: 0.05, category: 'INFLACION'   },
-  { key: 'niip',       label: 'NIIP % GDP',             beta: 0.05, category: 'ESTRUCTURAL' },
-  { key: 'policy',     label: 'Policy Rate',            beta: 0.05, category: 'RATES'       },
-  { key: 'cpi',        label: 'CPI YoY',                beta: 0.04, category: 'INFLACION'   },
-  { key: 'nfp',        label: 'Employment YoY',         beta: 0.04, category: 'EMPLEO'      },
-  { key: 'pmi',        label: 'ISM/PMI',                beta: 0.03, category: 'CRECIMIENTO' },
-  { key: 'cftc',       label: 'CFTC Positioning',       beta: 0.03, category: 'SENTIMIENTO' },
-  { key: 'cb_balance', label: 'CB Balance/GDP YoY',     beta: 0.03, category: 'MONETARIO'   },
-  { key: 'debt',       label: 'Govt Debt/GDP',          beta: 0.03, category: 'SOBERANO'    },
-  { key: 'umcsi',      label: 'Consumer Sentiment',     beta: 0.02, category: 'CRECIMIENTO' },
-]
+const CATEGORY_MAP = {
+  real_2y: 'CARRY', ca_gdp: 'ESTRUCTURAL', reer: 'VALUATION', tot: 'ESTRUCTURAL',
+  '10y_real': 'RATES', core_cpi: 'INFLACION', niip: 'ESTRUCTURAL', policy: 'RATES',
+  cpi: 'INFLACION', nfp: 'EMPLEO', pmi: 'CRECIMIENTO', cftc: 'SENTIMIENTO',
+  cb_balance: 'MONETARIO', debt: 'SOBERANO', umcsi: 'CRECIMIENTO',
+}
+
+const INDICATORS = BASE_INDICATORS.map(i => ({ ...i, beta: i.betaDoc, category: CATEGORY_MAP[i.key] ?? i.key.toUpperCase() }))
 
 // ── Parsing ──────────────────────────────────────────────────────────────────
 // Acepta:
