@@ -766,10 +766,11 @@ function normalizeHistoryDate(value) {
 
 function normalizeHistorySeries(series) {
   const byDate = new Map()
+  const today = new Date().toISOString().slice(0, 10)
   for (const row of series || []) {
     const value = Number(row.value)
     const date = normalizeHistoryDate(row.date)
-    if (!date || !Number.isFinite(value)) continue
+    if (!date || date > today || !Number.isFinite(value)) continue
     byDate.set(date, { date, value })
   }
   return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date))

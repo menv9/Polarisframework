@@ -37,6 +37,7 @@ function displayHistoryDetail(source) {
 function freshnessOf(source) {
   const endDate = source.history?.end ? new Date(source.history.end) : null
   if (source.history?.status !== 'ok' || !endDate || Number.isNaN(endDate.getTime())) return 'NO DATA'
+  if (endDate > new Date()) return 'FUTURE'
   return endDate >= new Date('2026-01-01T00:00:00Z') ? 'CURRENT' : 'STALE'
 }
 
