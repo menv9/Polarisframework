@@ -653,10 +653,11 @@ async function fetchOecdNiipUsdRows(country, lastN = null) {
 }
 
 async function fetchOecdNiipHistory(country) {
-  const [niipRows, gdpRows] = await Promise.all([
+  const [niipRows, gdpResult] = await Promise.all([
     fetchOecdNiipUsdRows(country),
     fetchWorldBankHistory(country, 'NY.GDP.MKTP.CD'),
   ])
+  const gdpRows = gdpResult.series || []
   const gdpByYear = new Map(gdpRows.map((row) => [String(row.date).slice(0, 4), row.value]))
   const series = niipRows
     .map((row) => {
