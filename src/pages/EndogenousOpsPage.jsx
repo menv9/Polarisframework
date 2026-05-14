@@ -371,10 +371,10 @@ export default function EndogenousOpsPage() {
                 {activeCountry.cyclical ? 'PRO-CICLICA' : 'REFUGIO'} · Mult: {activeRegimeMult.toFixed(2)}
               </span>
               <Link
-                to={`/data/raw?module=Endogenous+%E2%80%94+${activeCountry.label}`}
+                to={`/model-inputs?country=${activeCountry.prefix}`}
                 className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white ml-auto"
               >
-                VER FUENTES →
+                VER HISTORIAL →
               </Link>
             </div>
           )}
@@ -454,9 +454,9 @@ export default function EndogenousOpsPage() {
                           </td>
                           <td className="px-2 py-1.5">
                             <Link
-                              to={`/data/raw?highlight=${getSourceId(activeCountry.prefix, ind.key)}`}
+                              to={`/model-inputs?country=${activeCountry.prefix}&key=${ind.key}`}
                               className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white"
-                            >↗ DATA</Link>
+                            >↗ HIST</Link>
                           </td>
                         </tr>
                       )

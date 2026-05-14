@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, Fragment } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { INDICATORS as BASE_INDICATORS } from '../lib/endogenousBetas'
 import { useModelStore } from '../store/ModelDataContext'
 
@@ -239,9 +239,11 @@ function exportModelInputsCsv({ history, activeTab, activeCountry, activeStats }
 // ── Componente ────────────────────────────────────────────────────────────────
 export default function ModelInputsPage() {
   const { history, setHistory }         = useModelStore()
+  const [searchParams]                  = useSearchParams()
   const [sourceUrls]                    = useState(loadSourceUrls)
   const [customUrls, setCustomUrls]     = useState(loadCustomUrls)
-  const [activeTab, setActiveTab]       = useState('usa')
+  const initCountry = COUNTRIES.find(c => c.prefix === searchParams.get('country'))?.prefix ?? 'usa'
+  const [activeTab, setActiveTab]       = useState(initCountry)
   const [activeImport, setActiveImport] = useState(null)
   const [importText, setImportText]     = useState('')
   const [importError, setImportError]   = useState('')
