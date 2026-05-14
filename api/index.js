@@ -636,6 +636,7 @@ function findIndicator(indicators, searchTerms) {
 const HISTORY_ROOT = path.join(process.cwd(), 'data', 'history')
 const HISTORY_SERIES_DIR = path.join(HISTORY_ROOT, 'series')
 const HISTORY_STATUS_PATH = path.join(HISTORY_ROOT, 'status.json')
+const HISTORY_FRED_LIMIT = 5000
 
 async function ensureHistoryDirs() {
   await fs.mkdir(HISTORY_SERIES_DIR, { recursive: true })
@@ -1003,23 +1004,27 @@ async function fetchWorldBankHistory(country, indicator) {
 
 async function fetchHistoryForSource(source) {
   if (source.fredSeriesId) {
-    return fetchFredHistorySeries(source.fredSeriesId, source.fredYoY ? 'yoy' : null)
+    return fetchFredHistorySeries(source.fredSeriesId, source.fredYoY ? 'yoy' : null, HISTORY_FRED_LIMIT)
   }
   const endpoint = source.apiPath
   if (!endpoint) throw new Error('No automatic history endpoint configured')
   const url = new URL(endpoint, 'http://localhost')
 
   if (url.pathname === '/api/fred/spread') {
-    return fetchFredSpreadHistory(url.searchParams.get('left'), url.searchParams.get('right'), Number(url.searchParams.get('limit') || 5000))
+    return fetchFredSpreadHistory(
+      url.searchParams.get('left'),
+      url.searchParams.get('right'),
+      Math.max(Number(url.searchParams.get('limit') || 0), HISTORY_FRED_LIMIT)
+    )
   }
   if (url.pathname === '/api/fred/real-rate') {
     return fetchFredRealRateHistory(url.searchParams.get('policy'), url.searchParams.get('cpi'), url.searchParams.get('cpiraw') === 'true')
   }
   if (url.pathname.startsWith('/api/fred/percentile/')) {
-    return fetchFredHistorySeries(url.pathname.split('/').at(-1), 'raw_for_percentile')
+    return fetchFredHistorySeries(url.pathname.split('/').at(-1), 'raw_for_percentile', HISTORY_FRED_LIMIT)
   }
   if (url.pathname.startsWith('/api/fred/above-ma/')) {
-    return fetchFredHistorySeries(url.pathname.split('/').at(-1), `raw_for_${url.searchParams.get('window') || 200}dma`)
+    return fetchFredHistorySeries(url.pathname.split('/').at(-1), `raw_for_${url.searchParams.get('window') || 200}dma`, HISTORY_FRED_LIMIT)
   }
   if (url.pathname === '/api/source/yahoo/latest') {
     return { provider: 'yahoo', series: await fetchYahooHistory(url.searchParams.get('symbol'), '10y', '1d') }

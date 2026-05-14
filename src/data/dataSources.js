@@ -111,7 +111,7 @@ const rawDataSources = [
   },
   {
     id: 'wv_embi',
-    indicator: 'EM Corporate OAS Percentile',
+    indicator: 'EMBI Proxy — EM Corporate OAS Percentile',
     category: 'REGIMEN',
     module: 'World View — Regimen',
     scraper: 'api',
@@ -119,7 +119,7 @@ const rawDataSources = [
     frequency: 'Diaria',
     frequencyDays: 1,
     lastUpdate: '2026-05-12',
-    notes: 'FRED BAMLEMCBPIOAS. Proxy gratuito EM credit spread. ON: < P40 | OFF: > P70',
+    notes: 'FRED BAMLEMCBPIOAS. Proxy gratuito de JPM EMBI Global Spread. ON: < P40 | OFF: > P70',
   },
   {
     id: 'wv_move',
@@ -2326,7 +2326,7 @@ const SOURCE_OVERRIDES = {
   wv_vix: { apiPath: '/api/fred/percentile/VIXCLS?limit=1300' },
   wv_hy_oas: { apiPath: '/api/fred/percentile/BAMLH0A0HYM2?limit=1300' },
   wv_sp500: { apiPath: '/api/fred/above-ma/SP500?window=200&limit=320' },
-  wv_embi: { apiPath: '/api/fred/percentile/BAMLEMCBPIOAS?limit=756' },
+  wv_embi: { apiPath: '/api/fred/percentile/BAMLEMCBPIOAS?limit=1300' },
   wv_cpi_usa: { scraper: 'fred', fredSeriesId: 'CPIAUCSL', fredYoY: true },
   wv_cpi_eur: { apiPath: '/api/source/eurostat/latest/prc_hicp_manr?geo=EA20&coicop=CP00&unit=RCH_A' },
   wv_breakevens: { scraper: 'fred', fredSeriesId: 'T5YIFR' },
