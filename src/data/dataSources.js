@@ -2349,7 +2349,7 @@ const SOURCE_OVERRIDES = {
   endo_aus_umcsi: { scraper: 'fred', fredSeriesId: 'CSCICP03AUM665S' },
   endo_nzl_umcsi: { scraper: 'fred', fredSeriesId: 'CSCICP03NZM665S' },
   endo_swe_umcsi: { scraper: 'fred', fredSeriesId: 'CSCICP03SEM665S' },
-  endo_nor_umcsi: { scraper: 'fred', fredSeriesId: 'CSCICP03NOM665S' },
+  endo_nor_umcsi: { scraper: 'fred', fredSeriesId: 'BSCICP02NOQ460S' },
   endo_usa_cb_balance: { scraper: 'fred', fredSeriesId: 'WALCL' },
   endo_eur_cb_balance: { scraper: 'fred', fredSeriesId: 'ECBASSETSW' },
   endo_jpn_cb_balance: { scraper: 'fred', fredSeriesId: 'JPNASSETS' },
@@ -2531,6 +2531,11 @@ const DATA_QUALITY_OVERRIDES = {
     dataFit: 'proxy',
     dataMeasure: 'USD Index CFTC invertido',
     dataCheck: 'NOK no tiene contrato CFTC propio; proxy inverso USD.',
+  },
+  endo_nor_umcsi: {
+    dataFit: 'proxy',
+    dataMeasure: 'OECD business confidence Norway proxy',
+    dataCheck: 'FRED no publica CSCICP03 para Noruega; se usa confianza empresarial trimestral como proxy de sentimiento.',
   },
   exo_embi: {
     dataFit: 'proxy',
