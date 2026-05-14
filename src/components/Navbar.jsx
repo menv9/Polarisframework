@@ -1,10 +1,19 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '../stores/appStore'
+import { supabase } from '../lib/supabase'
 
 export default function Navbar() {
   const scrolled = useAppStore((s) => s.scrolled)
+  const user = useAppStore((s) => s.user)
   const location = useLocation()
+  const navigate = useNavigate()
   const isHome = location.pathname === '/'
+  const isAdmin = user?.app_metadata?.role === 'admin'
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 border-b-2 border-[#333] bg-black ${scrolled ? 'border-white' : ''}`}>
@@ -49,13 +58,26 @@ export default function Navbar() {
               </Link>
             </>
           )}
+
+          {isAdmin && (
+            <Link to="/admin" className="text-sm font-medium text-[#ecd987] hover:text-white uppercase tracking-wider">
+              Admin
+            </Link>
+          )}
+
+          {user && (
+            <div className="flex items-center gap-3 border-l border-[#333] pl-4 ml-1">
+              <span className="text-xs text-[#555] max-w-[140px] truncate">{user.email}</span>
+              <button
+                onClick={handleLogout}
+                className="text-xs text-[#555] hover:text-red-400 uppercase tracking-wider transition-colors"
+              >
+                Salir
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </nav>
   )
 }
-
-
-
-
-

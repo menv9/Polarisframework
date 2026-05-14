@@ -2087,6 +2087,57 @@ function extractIndicators($) {
   return indicators
 }
 
+// ─── Auth helpers ────────────────────────────────────────────────────────────
+
+async function requireAdmin(req, res) {
+  const token = req.headers.authorization?.replace('Bearer ', '')
+  if (!token) { res.status(401).json({ error: 'No autorizado' }); return null }
+  if (!supabaseAdmin) { res.status(500).json({ error: 'Supabase admin no configurado' }); return null }
+
+  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
+  if (error || !user) { res.status(401).json({ error: 'Token inválido' }); return null }
+  if (user.app_metadata?.role !== 'admin') { res.status(403).json({ error: 'Acceso denegado' }); return null }
+  return user
+}
+
+// POST /api/auth/invite — admin invita a un nuevo usuario por email
+app.post('/api/auth/invite', async (req, res) => {
+  const admin = await requireAdmin(req, res)
+  if (!admin) return
+
+  const { email } = req.body
+  if (!email) return res.status(400).json({ error: 'Email requerido' })
+
+  const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email)
+  if (error) return res.status(400).json({ error: error.message })
+  res.json({ user: data.user })
+})
+
+// GET /api/auth/users — admin lista todos los usuarios
+app.get('/api/auth/users', async (req, res) => {
+  const admin = await requireAdmin(req, res)
+  if (!admin) return
+
+  const { data, error } = await supabaseAdmin.auth.admin.listUsers()
+  if (error) return res.status(400).json({ error: error.message })
+  res.json({ users: data.users })
+})
+
+// DELETE /api/auth/users/:userId — admin elimina un usuario
+app.delete('/api/auth/users/:userId', async (req, res) => {
+  const admin = await requireAdmin(req, res)
+  if (!admin) return
+
+  const { userId } = req.params
+  if (userId === admin.id) return res.status(400).json({ error: 'No podés eliminarte a vos mismo' })
+
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
+  if (error) return res.status(400).json({ error: error.message })
+  res.json({ success: true })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Solo iniciar servidor si se ejecuta directamente (desarrollo local)
 if (require.main === module) {
   app.listen(PORT, () => {

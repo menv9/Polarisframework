@@ -1,5 +1,8 @@
 import { Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar'
+import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute'
+import LoginPage from './pages/LoginPage'
+import AdminPage from './pages/AdminPage'
 import HomePage from './pages/HomePage'
 import WorldViewTheoryPage from './pages/WorldViewTheoryPage'
 import WorldViewOpsPage from './pages/WorldViewOpsPage'
@@ -13,30 +16,58 @@ import EndogenousOpsPage from './pages/EndogenousOpsPage'
 import ModelInputsPage from './pages/ModelInputsPage'
 import EndogenousBetasPage from './pages/EndogenousBetasPage'
 
-export default function AppRoutes() {
+function Layout({ children }) {
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary antialiased">
       <Navbar />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/world-view" element={<WorldViewTheoryPage />} />
-        <Route path="/world-view/operativa" element={<WorldViewOpsPage />} />
-        <Route path="/endogenous" element={<EndogenousOpsPage />} />
-        <Route path="/model-inputs" element={<ModelInputsPage />} />
-        <Route path="/endogenous/zscores" element={<ModelInputsPage />} />
-        <Route path="/endogenous/betas" element={<EndogenousBetasPage />} />
-        <Route path="/data" element={<DataHubPage />} />
-        <Route path="/data/raw" element={<DataPage />} />
-        <Route path="/data/coverage-matrix" element={<CoverageMatrixPage />} />
-        <Route path="/data/history" element={<HistoryPage />} />
-        <Route path="/data/history/:sourceId" element={<HistorySeriesPage />} />
-      </Routes>
+      {children}
     </div>
   )
 }
 
+export default function AppRoutes() {
+  return (
+    <Routes>
+      {/* Ruta pública */}
+      <Route path="/login" element={<LoginPage />} />
 
+      {/* Ruta solo admin */}
+      <Route
+        path="/admin"
+        element={
+          <AdminRoute>
+            <Layout>
+              <AdminPage />
+            </Layout>
+          </AdminRoute>
+        }
+      />
 
-
-
+      {/* Rutas protegidas */}
+      <Route
+        path="/*"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/world-view" element={<WorldViewTheoryPage />} />
+                <Route path="/world-view/operativa" element={<WorldViewOpsPage />} />
+                <Route path="/endogenous" element={<EndogenousOpsPage />} />
+                <Route path="/model-inputs" element={<ModelInputsPage />} />
+                <Route path="/endogenous/zscores" element={<ModelInputsPage />} />
+                <Route path="/endogenous/betas" element={<EndogenousBetasPage />} />
+                <Route path="/data" element={<DataHubPage />} />
+                <Route path="/data/raw" element={<DataPage />} />
+                <Route path="/data/coverage-matrix" element={<CoverageMatrixPage />} />
+                <Route path="/data/history" element={<HistoryPage />} />
+                <Route path="/data/history/:sourceId" element={<HistorySeriesPage />} />
+              </Routes>
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
+  )
+}
