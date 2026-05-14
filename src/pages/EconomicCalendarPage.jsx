@@ -134,6 +134,7 @@ export default function EconomicCalendarPage() {
   const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState(null)
   const [lastSync, setLastSync] = useState(null)
+  const [syncResult, setSyncResult] = useState(null)
   const [activeView, setActiveView] = useState('month')
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const today = new Date()
@@ -157,6 +158,9 @@ export default function EconomicCalendarPage() {
     const body = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(body.message || body.error || 'Calendar fetch failed')
     setEvents(Array.isArray(body.events) ? body.events : [])
+    if (Array.isArray(body.warnings) && body.warnings.length) {
+      setSyncResult((prev) => ({ ...(prev || {}), warnings: body.warnings }))
+    }
   }, [])
 
   const loadReleases = useCallback(async () => {
@@ -174,6 +178,14 @@ export default function EconomicCalendarPage() {
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body.message || body.error || 'Calendar sync failed')
       setReleases(Array.isArray(body.releases) ? body.releases : [])
+      setSyncResult({
+        scanned: body.scanned || 0,
+        released: body.released || 0,
+        saved: body.saved || 0,
+        total: body.total || 0,
+        storage: body.storage || 'unknown',
+        warnings: Array.isArray(body.warnings) ? body.warnings : [],
+      })
       setLastSync(new Date().toLocaleTimeString('en-US', { hour12: false }))
       await loadCalendar()
     } catch (err) {
@@ -279,6 +291,24 @@ export default function EconomicCalendarPage() {
         {error && (
           <div className="mb-4 border-2 border-[#ef4444] bg-[#1a0505] px-3 py-2 text-sm text-[#ef4444] font-mono">
             {error}
+          </div>
+        )}
+
+        {syncResult && !error && (
+          <div className="mb-4 border-2 border-[#333] bg-[#080808] px-3 py-2">
+            <div className="text-xs font-mono uppercase tracking-wider text-[#aaa]">
+              SYNC OK · EVENTS {syncResult.scanned} · RELEASED {syncResult.released} · SAVED {syncResult.saved} · STORAGE {syncResult.storage}
+            </div>
+            {syncResult.released === 0 && (
+              <div className="mt-1 text-[10px] text-[#777] uppercase tracking-wider">
+                No hay valores actual nuevos para guardar; el calendario de eventos si fue refrescado.
+              </div>
+            )}
+            {syncResult.warnings?.length > 0 && (
+              <div className="mt-1 text-[10px] text-[#f59e0b] uppercase tracking-wider">
+                {syncResult.warnings.join(' / ')}
+              </div>
+            )}
           </div>
         )}
 

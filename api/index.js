@@ -58,6 +58,17 @@ function describeHttpError(err) {
   return status ? `${message} (${status}${statusText ? ` ${statusText}` : ''})` : message
 }
 
+function isMissingCalendarTableError(error) {
+  const text = `${error?.message || ''} ${error?.details || ''} ${error?.code || ''}`.toLowerCase()
+  return text.includes('calendar_releases') && (
+    text.includes('could not find the table') ||
+    text.includes('schema cache') ||
+    text.includes('does not exist') ||
+    text.includes('42p01') ||
+    text.includes('pgrst205')
+  )
+}
+
 async function getWithRetry(url, config = {}, attempts = 3, label = 'GET') {
   let lastError = null
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -1123,6 +1134,13 @@ async function readCalendarReleases() {
       .order('event_date', { ascending: false })
       .order('saved_at', { ascending: false })
       .limit(500)
+    if (isMissingCalendarTableError(error)) {
+      return {
+        storage: 'missing-table',
+        releases: [],
+        warnings: ['calendar_releases table is missing; run Documentation/05_Implementacion/calendar_releases.sql'],
+      }
+    }
     if (error) throw new Error(`Supabase calendar_releases read failed: ${error.message}`)
     return { storage: 'supabase', releases: data || [] }
   }
@@ -1145,6 +1163,15 @@ async function upsertCalendarReleases(rows) {
     const { error } = await supabaseAdmin
       .from('calendar_releases')
       .upsert(rows, { onConflict: 'event_hash' })
+    if (isMissingCalendarTableError(error)) {
+      return {
+        storage: 'missing-table',
+        releases: [],
+        inserted: 0,
+        total: 0,
+        warnings: ['calendar_releases table is missing; sync refreshed events but could not persist releases'],
+      }
+    }
     if (error) throw new Error(`Supabase calendar_releases upsert failed: ${error.message}`)
     const current = await readCalendarReleases()
     return { ...current, inserted: rows.length, total: current.releases.length }
@@ -1847,7 +1874,7 @@ app.post('/api/calendar/sync', async (_req, res) => {
       released: releases.length,
       saved: result.inserted,
       total: result.total,
-      warnings: calendar.warnings || [],
+      warnings: [...(calendar.warnings || []), ...(result.warnings || [])],
       releases: result.releases,
     })
   } catch (err) {
