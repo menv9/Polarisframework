@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { coverageCountries, getCoverageRows, getCoverageSummary } from '../data/coverageMatrix'
+import { coverageCountries, getCoverageRows, getCoverageSummary, getPrioritySummary } from '../data/coverageMatrix'
 
 const fitConfig = {
   exact: { label: 'OK', color: 'border-[#4ade80] text-[#4ade80] bg-[#06140b]' },
@@ -16,9 +16,16 @@ const comparableConfig = {
   'within-country': { label: 'SOLO HISTORIA PROPIA', color: 'text-[#60a5fa]' },
 }
 
+const priorityConfig = {
+  MVP: { label: 'MVP', color: 'border-[#4ade80] text-[#4ade80]' },
+  RECOMMENDED: { label: 'REC', color: 'border-[#60a5fa] text-[#60a5fa]' },
+  FULL: { label: 'FULL', color: 'border-[#777] text-[#aaa]' },
+}
+
 export default function CoverageMatrixPage() {
   const rows = getCoverageRows()
   const summary = getCoverageSummary(rows)
+  const prioritySummary = getPrioritySummary(rows)
 
   return (
     <div className="pt-12 min-h-screen">
@@ -27,7 +34,7 @@ export default function CoverageMatrixPage() {
           <div>
             <h1 className="text-2xl font-bold uppercase tracking-widest">Coverage Matrix</h1>
             <div className="text-xs text-[#777] uppercase tracking-wider mt-1">
-              Variables canonicas por pais. Fuente: Centro de Datos.
+              24 indicadores Endogenous G10 segun docs 15.2/15.4. Data sigue siendo el aparcamiento.
             </div>
           </div>
           <Link
@@ -47,6 +54,12 @@ export default function CoverageMatrixPage() {
           <Metric label="Revisar/Falta" value={(summary.pending || 0) + (summary.missing || 0)} color="text-[#ef4444]" />
         </div>
 
+        <div className="grid grid-cols-3 gap-0 border-2 border-[#333] mb-4">
+          <PriorityMetric label="MVP modelo" value={prioritySummary.MVP || 0} config={priorityConfig.MVP} />
+          <PriorityMetric label="Recomendado" value={prioritySummary.RECOMMENDED || 0} config={priorityConfig.RECOMMENDED} />
+          <PriorityMetric label="Completo/backlog" value={prioritySummary.FULL || 0} config={priorityConfig.FULL} />
+        </div>
+
         <div className="mb-4 border-2 border-[#333]">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-0 text-xs">
             <Legend fit="exact" text="Serie directa: entra al modelo con confianza alta." />
@@ -61,9 +74,9 @@ export default function CoverageMatrixPage() {
           <table className="w-full min-w-[1180px] text-sm table-fixed">
             <thead>
               <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#777]">
-                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[210px]">Variable Canonica</th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[250px]">Variable Canonica</th>
                 <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[115px]">Comparacion</th>
-                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[105px]">Transform</th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[120px]">Transform</th>
                 {coverageCountries.map((country) => (
                   <th key={country.code} className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[86px] text-center">
                     {country.label}
@@ -75,9 +88,16 @@ export default function CoverageMatrixPage() {
               {rows.map((row) => (
                 <tr key={row.key} className="border-b border-[#222] align-top">
                   <td className="px-2 py-2">
-                    <div className="text-sm font-bold text-white uppercase tracking-wider">{row.label}</div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="text-sm font-bold text-white uppercase tracking-wider">{row.label}</div>
+                      <span className={`shrink-0 border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${priorityConfig[row.priority]?.color || 'border-[#555] text-[#777]'}`}>
+                        {priorityConfig[row.priority]?.label || row.priority}
+                      </span>
+                    </div>
                     <div className="text-[10px] text-[#777] mt-1 leading-tight">{row.description}</div>
-                    <div className="text-[10px] text-[#555] mt-1 uppercase tracking-wider">{row.category}</div>
+                    <div className="text-[10px] text-[#555] mt-1 uppercase tracking-wider">
+                      #{row.docNo} / beta {row.beta.toFixed(2)} / {row.horizon} / {row.category}
+                    </div>
                   </td>
                   <td className="px-2 py-2">
                     <div className={`text-[10px] font-bold uppercase tracking-wider ${comparableConfig[row.comparable]?.color || 'text-[#777]'}`}>
@@ -107,6 +127,20 @@ function Metric({ label, value, color }) {
     <div className="p-3 border-r border-b md:border-b-0 border-[#222]">
       <div className="text-[10px] text-[#777] uppercase tracking-widest mb-1">{label}</div>
       <div className={`text-xl font-mono font-bold ${color}`}>{value}</div>
+    </div>
+  )
+}
+
+function PriorityMetric({ label, value, config }) {
+  return (
+    <div className="p-3 border-r border-[#222]">
+      <div className="text-[10px] text-[#777] uppercase tracking-widest mb-1">{label}</div>
+      <div className="flex items-center gap-2">
+        <span className={`inline-block border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${config.color}`}>
+          {config.label}
+        </span>
+        <span className="text-lg font-mono font-bold text-white">{value}</span>
+      </div>
     </div>
   )
 }
