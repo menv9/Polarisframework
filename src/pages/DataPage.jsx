@@ -397,7 +397,7 @@ export default function DataPage() {
       <div className="max-w-6xl mx-auto px-4 py-4">
         {/* ===== HEADER ===== */}
         <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-[#333]">
-          <h1 className="text-2xl font-bold uppercase tracking-widest">CENTRO DE CONTROL — DATOS</h1>
+          <h1 className="text-2xl font-bold uppercase tracking-widest">RAW DATA</h1>
           <div className="flex items-center gap-3">
             {lastGlobalRefresh && (
               <span className="text-xs text-[#777] uppercase tracking-wider">
@@ -417,6 +417,12 @@ export default function DataPage() {
             >
               EXPORT CSV
             </button>
+            <Link
+              to="/data"
+              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#333] text-[#aaa] hover:text-white hover:border-white"
+            >
+              DATA CENTER
+            </Link>
             <Link
               to="/data/coverage-matrix"
               className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#60a5fa] text-[#60a5fa] hover:text-white hover:border-white"

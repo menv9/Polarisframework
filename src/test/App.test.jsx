@@ -59,16 +59,27 @@ describe('App', () => {
     expect(screen.getByText('WorldView State Vector')).toBeInTheDocument()
   })
 
-  it('renders data control center page', () => {
+  it('renders data center hub page', () => {
     render(
       <MemoryRouter initialEntries={['/data']}>
         <AppRoutes />
       </MemoryRouter>
     )
-    expect(screen.getByText('CENTRO DE CONTROL — DATOS')).toBeInTheDocument()
+    expect(screen.getByText('Data Center')).toBeInTheDocument()
+    expect(screen.getByText('Raw Data')).toBeInTheDocument()
+    expect(screen.getByText('Coverage Matrix')).toBeInTheDocument()
+    expect(screen.getByText('History Pipeline')).toBeInTheDocument()
+    expect(screen.getByText('Model Inputs')).toBeInTheDocument()
+  })
+
+  it('renders raw data page', () => {
+    render(
+      <MemoryRouter initialEntries={['/data/raw']}>
+        <AppRoutes />
+      </MemoryRouter>
+    )
+    expect(screen.getByText('RAW DATA')).toBeInTheDocument()
     expect(screen.getByText('REFRESH TODO')).toBeInTheDocument()
-    expect(screen.getByText('Actualizados')).toBeInTheDocument()
-    expect(screen.getByText('Desactualizados')).toBeInTheDocument()
   })
 })
 

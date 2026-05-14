@@ -298,7 +298,7 @@ export default function EndogenousOpsPage() {
               BETAS →
             </Link>
             <Link
-              to="/data?module=Endogenous"
+              to="/data/raw?module=Endogenous"
               className="text-xs font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]"
             >
               → /DATA
@@ -455,7 +455,7 @@ export default function EndogenousOpsPage() {
                 {activeCountry.cyclical ? 'PRO-CICLICA' : 'REFUGIO'} · Mult: {activeRegimeMult.toFixed(2)}
               </span>
               <Link
-                to={`/data?module=Endogenous+%E2%80%94+${activeCountry.label}`}
+                to={`/data/raw?module=Endogenous+%E2%80%94+${activeCountry.label}`}
                 className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white ml-auto"
               >
                 VER FUENTES →
@@ -544,7 +544,7 @@ export default function EndogenousOpsPage() {
                           </td>
                           <td className="px-2 py-1.5">
                             <Link
-                              to={`/data?highlight=${getSourceId(activeCountry.prefix, ind.key)}`}
+                              to={`/data/raw?highlight=${getSourceId(activeCountry.prefix, ind.key)}`}
                               className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white"
                             >↗ DATA</Link>
                           </td>
@@ -582,3 +582,4 @@ export default function EndogenousOpsPage() {
     </div>
   )
 }
+

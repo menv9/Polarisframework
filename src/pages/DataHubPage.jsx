@@ -1,0 +1,85 @@
+import { Link } from 'react-router-dom'
+
+const cards = [
+  {
+    title: 'Raw Data',
+    path: '/data/raw',
+    tone: 'text-[#4ade80] border-[#4ade80]',
+    desc: 'Catalogo de fuentes: endpoints, latest values, refresh, estado, fit y metadata.',
+    meta: 'Fuente externa',
+  },
+  {
+    title: 'Coverage Matrix',
+    path: '/data/coverage-matrix',
+    tone: 'text-[#60a5fa] border-[#60a5fa]',
+    desc: 'Mapa maestro de datos necesarios por modulo y cobertura real frente a la documentacion.',
+    meta: 'Necesidad vs cobertura',
+  },
+  {
+    title: 'History Pipeline',
+    path: '/data/history',
+    tone: 'text-[#ecd987] border-[#ecd987]',
+    desc: 'Ingesta de historicos, estado OK/error, observaciones, start/end y vista por indicador.',
+    meta: 'Historico raw',
+  },
+  {
+    title: 'Model Inputs',
+    path: '/model-inputs',
+    tone: 'text-[#f59e0b] border-[#f59e0b]',
+    desc: 'Transformaciones, z-scores y features internas calculadas desde los historicos.',
+    meta: 'Features del modelo',
+  },
+]
+
+export default function DataHubPage() {
+  return (
+    <div className="pt-12 min-h-screen">
+      <div className="max-w-6xl mx-auto px-4 py-4">
+        <div className="mb-4 pb-2 border-b-2 border-[#333]">
+          <h1 className="text-2xl font-bold uppercase tracking-widest">Data Center</h1>
+          <div className="text-xs text-[#777] uppercase tracking-wider mt-1">
+            Centro de gestion de datos: fuentes, cobertura, historicos y features.
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {cards.map((card) => (
+            <Link
+              key={card.path}
+              to={card.path}
+              className={`block border-2 ${card.tone} p-4 bg-[#080808] hover:bg-[#111] hover:border-white hover:text-white transition-colors min-h-[150px]`}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-xl font-bold uppercase tracking-widest">{card.title}</div>
+                  <div className="text-[10px] text-[#777] uppercase tracking-wider mt-1">{card.meta}</div>
+                </div>
+                <div className="text-2xl font-bold">→</div>
+              </div>
+              <p className="mt-5 text-sm text-[#aaa] leading-relaxed">{card.desc}</p>
+            </Link>
+          ))}
+        </div>
+
+        <div className="mt-5 border-2 border-[#333] bg-[#0a0a0a] p-4">
+          <div className="text-sm font-bold uppercase tracking-widest text-white mb-2">Flujo recomendado</div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-0 border border-[#222]">
+            <Step label="1. Raw Data" text="Conectar y validar fuentes externas." />
+            <Step label="2. Coverage" text="Ver que datos exige el framework." />
+            <Step label="3. History" text="Guardar historicos persistentes." />
+            <Step label="4. Model Inputs" text="Crear features y z-scores." />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Step({ label, text }) {
+  return (
+    <div className="p-3 border-r border-b md:border-b-0 border-[#222]">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-[#ecd987]">{label}</div>
+      <div className="text-xs text-[#888] mt-2 leading-tight">{text}</div>
+    </div>
+  )
+}

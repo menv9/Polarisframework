@@ -68,14 +68,14 @@ export default function CoverageMatrixPage() {
           <div>
             <h1 className="text-2xl font-bold uppercase tracking-widest">Coverage Matrix</h1>
             <div className="text-xs text-[#777] uppercase tracking-wider mt-1">
-              24 indicadores Endogenous G10 segun docs 15.2/15.4. Data sigue siendo el aparcamiento.
+              24 indicadores Endogenous G10 segun docs 15.2/15.4. Raw Data sigue siendo el aparcamiento.
             </div>
           </div>
           <Link
             to="/data"
             className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white"
           >
-            DATA
+            DATA CENTER
           </Link>
         </div>
 
@@ -280,7 +280,7 @@ function ExternalCoverageSections({ groups }) {
                         item.source ? (
                           <Link
                             key={item.sourceId}
-                            to={`/data?highlight=${item.source.id}`}
+                            to={`/data/raw?highlight=${item.source.id}`}
                             title={item.source.dataCheck}
                             className={`border px-1.5 py-1 text-[10px] font-bold uppercase tracking-wider hover:border-white ${fitConfig[item.source.dataFit]?.color || fitConfig.pending.color}`}
                           >
@@ -356,7 +356,7 @@ function CoverageCell({ cell }) {
 
   return (
     <Link
-      to={`/data?module=Endogenous&highlight=${cell.source.id}`}
+      to={`/data/raw?module=Endogenous&highlight=${cell.source.id}`}
       title={`${cell.source.indicator}: ${cell.source.dataCheck}`}
       className={`block min-h-[72px] border px-1.5 py-1.5 hover:border-white ${cfg.color}`}
     >
@@ -369,3 +369,4 @@ function CoverageCell({ cell }) {
     </Link>
   )
 }
+

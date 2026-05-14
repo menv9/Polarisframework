@@ -184,7 +184,7 @@ export default function HistoryPage() {
                 return (
                   <tr key={source.id} className="border-b border-[#222] align-top">
                     <td className="px-2 py-2">
-                      <Link to={`/data?highlight=${source.id}`} className="text-sm font-bold text-white hover:text-[#ecd987]">
+                      <Link to={`/data/raw?highlight=${source.id}`} className="text-sm font-bold text-white hover:text-[#ecd987]">
                         {source.id}
                       </Link>
                       <div className="text-[10px] text-[#777] mt-1 leading-tight">{source.indicator}</div>
@@ -247,3 +247,4 @@ function Metric({ label, value, color }) {
     </div>
   )
 }
+

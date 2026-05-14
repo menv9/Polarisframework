@@ -3,6 +3,7 @@ import Navbar from './components/Navbar'
 import HomePage from './pages/HomePage'
 import WorldViewTheoryPage from './pages/WorldViewTheoryPage'
 import WorldViewOpsPage from './pages/WorldViewOpsPage'
+import DataHubPage from './pages/DataHubPage'
 import DataPage from './pages/DataPage'
 import CoverageMatrixPage from './pages/CoverageMatrixPage'
 import HistoryPage from './pages/HistoryPage'
@@ -25,7 +26,8 @@ export default function AppRoutes() {
         <Route path="/model-inputs" element={<ModelInputsPage />} />
         <Route path="/endogenous/zscores" element={<ModelInputsPage />} />
         <Route path="/endogenous/betas" element={<EndogenousBetasPage />} />
-        <Route path="/data" element={<DataPage />} />
+        <Route path="/data" element={<DataHubPage />} />
+        <Route path="/data/raw" element={<DataPage />} />
         <Route path="/data/coverage-matrix" element={<CoverageMatrixPage />} />
         <Route path="/data/history" element={<HistoryPage />} />
         <Route path="/data/history/:sourceId" element={<HistorySeriesPage />} />

@@ -118,7 +118,7 @@ export default function WorldViewOpsPage() {
             <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-[#333]">
               <h1 className="text-2xl font-bold uppercase tracking-widest">OPERATIVA — WORLD VIEW</h1>
               <Link
-                to="/data?module=World+View"
+                to="/data/raw?module=World+View"
                 className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white"
               >
                 ACTUALIZAR DATOS →
@@ -167,7 +167,7 @@ export default function WorldViewOpsPage() {
             <div className="border-2 border-[#333] overflow-hidden">
               <div className="px-3 py-2 bg-[#1a1a0d] border-b-2 border-[#ecd987] flex items-center justify-between">
                 <span className="text-base font-bold uppercase tracking-widest text-[#ecd987]">Parametros de Entrada</span>
-                <Link to="/data?module=World+View" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">
+                <Link to="/data/raw?module=World+View" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">
                   VER FUENTES EN /DATA →
                 </Link>
               </div>
@@ -203,7 +203,7 @@ export default function WorldViewOpsPage() {
                           className="w-28 bg-[#111] border-b-2 border-[#ecd987] text-sm font-mono font-bold text-white px-2 py-0.5 text-right outline-none focus:border-white" />
                       </td>
                       <td className="px-2 py-1.5">
-                        <Link to={`/data?highlight=${row.dataId}`} className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">↗</Link>
+                        <Link to={`/data/raw?highlight=${row.dataId}`} className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">↗</Link>
                       </td>
                     </tr>
                   ))}
@@ -240,7 +240,7 @@ export default function WorldViewOpsPage() {
                         )}
                       </td>
                       <td className="px-2 py-1.5">
-                        <Link to={`/data?highlight=${row.dataId}`} className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">↗</Link>
+                        <Link to={`/data/raw?highlight=${row.dataId}`} className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">↗</Link>
                       </td>
                     </tr>
                   ))}
@@ -266,8 +266,8 @@ export default function WorldViewOpsPage() {
                       </td>
                       <td className="px-2 py-1.5">
                         {row.dataId
-                          ? <Link to={`/data?highlight=${row.dataId}`} className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">↗</Link>
-                          : <Link to="/data?module=World+View" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">↗</Link>
+                          ? <Link to={`/data/raw?highlight=${row.dataId}`} className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">↗</Link>
+                          : <Link to="/data/raw?module=World+View" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">↗</Link>
                         }
                       </td>
                     </tr>
@@ -304,7 +304,7 @@ export default function WorldViewOpsPage() {
                         )}
                       </td>
                       <td className="px-2 py-1.5">
-                        <Link to={`/data?highlight=${row.dataId}`} className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">↗</Link>
+                        <Link to={`/data/raw?highlight=${row.dataId}`} className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">↗</Link>
                       </td>
                     </tr>
                   ))}
@@ -329,7 +329,7 @@ export default function WorldViewOpsPage() {
                           className="w-28 bg-[#111] border-b-2 border-[#ecd987] text-sm font-mono font-bold text-white px-2 py-0.5 text-right outline-none focus:border-white" />
                       </td>
                       <td className="px-2 py-1.5">
-                        <Link to={`/data?highlight=${row.dataId}`} className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">↗</Link>
+                        <Link to={`/data/raw?highlight=${row.dataId}`} className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">↗</Link>
                       </td>
                     </tr>
                   ))}
@@ -342,3 +342,4 @@ export default function WorldViewOpsPage() {
     </div>
   )
 }
+
