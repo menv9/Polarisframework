@@ -82,6 +82,22 @@ function loadWorldViewData() {
   return DEFAULT_WV_DATA
 }
 
+function loadSourceValues() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_SOURCES)
+    if (!saved) return {}
+    const sources = JSON.parse(saved)
+    const map = {}
+    for (const s of sources) {
+      if (s.id && s._value != null && s._value !== '') {
+        const num = Number(s._value)
+        if (!isNaN(num)) map[s.id] = num
+      }
+    }
+    return map
+  } catch { return {} }
+}
+
 function loadZScores() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY_ZSCORES)
@@ -135,9 +151,10 @@ function fmtScore(v) {
 }
 
 export default function EndogenousOpsPage() {
-  const [zScores, setZScores] = useState(loadZScores)
-  const [wvData]              = useState(loadWorldViewData)
-  const [betas]               = useState(loadBetas)
+  const [zScores, setZScores]   = useState(loadZScores)
+  const [wvData]                = useState(loadWorldViewData)
+  const [betas]                 = useState(loadBetas)
+  const [sourceValues]          = useState(loadSourceValues)
   const [pairA, setPairA]     = useState('usa')
   const [pairB, setPairB]     = useState('eur')
   const [activeTab, setActiveTab] = useState('usa')
@@ -410,6 +427,12 @@ export default function EndogenousOpsPage() {
                           <td className="px-2 py-1.5">
                             <div className="text-sm font-bold text-[#e5e5e5]">{ind.label}</div>
                             <div className="text-[10px] text-[#555]">{ind.sign === 1 ? '▲ FX positivo' : '▼ FX negativo'}</div>
+                            {(() => {
+                              const raw = sourceValues[getSourceId(activeCountry.prefix, ind.key)]
+                              return raw != null
+                                ? <div className="text-[10px] font-mono text-[#f59e0b]">val: {raw.toFixed(2)}</div>
+                                : null
+                            })()}
                           </td>
                           <td className="px-2 py-1.5">
                             <input
