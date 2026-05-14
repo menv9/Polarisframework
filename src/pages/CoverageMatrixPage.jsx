@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   coverageCountries,
@@ -149,6 +149,14 @@ export default function CoverageMatrixPage() {
   const prioritySummary = getPrioritySummary(rows)
   const externalGroups = getExternalCoverageGroups()
   const externalSummary = getExternalCoverageSummary(externalGroups)
+  const [historyStatus, setHistoryStatus] = useState({})
+
+  useEffect(() => {
+    fetch('/api/history/status')
+      .then((r) => r.json())
+      .then((data) => setHistoryStatus(data || {}))
+      .catch(() => {})
+  }, [])
 
   const requestSort = (key) => {
     setSort((current) => ({
@@ -268,7 +276,7 @@ export default function CoverageMatrixPage() {
                   </td>
                   {row.cells.map((cell) => (
                     <td key={`${row.key}-${cell.country.code}`} className="px-1.5 py-2">
-                      <CoverageCell cell={cell} />
+                      <CoverageCell cell={cell} history={historyStatus[cell.sourceId] || null} />
                     </td>
                   ))}
                 </tr>
@@ -277,7 +285,7 @@ export default function CoverageMatrixPage() {
           </table>
         </div>
 
-        <ExternalCoverageSections groups={externalGroups} />
+        <ExternalCoverageSections groups={externalGroups} historyStatus={historyStatus} />
       </div>
     </div>
   )
@@ -341,7 +349,7 @@ function SortHeader({ label, sortKey, sort, onSort, align = 'left' }) {
   )
 }
 
-function ExternalCoverageSections({ groups }) {
+function ExternalCoverageSections({ groups, historyStatus }) {
   return (
     <div className="mt-5 space-y-5">
       {groups.map((group) => (
@@ -390,15 +398,22 @@ function ExternalCoverageSections({ groups }) {
                   <td className="px-2 py-2 text-[10px] text-[#777] uppercase tracking-wider">{row.docRef}</td>
                   <td className="px-2 py-2">
                     <div className="flex flex-wrap gap-1.5">
-                      {row.sources.map((item) =>
-                        item.source ? (
+                      {row.sources.map((item) => {
+                        const hist = historyStatus[item.sourceId] || null
+                        const hasData = hist && hist.status !== 'error' && (hist.count ?? 0) > 0
+                        return item.source ? (
                           <Link
                             key={item.sourceId}
                             to={`/data/raw?highlight=${item.source.id}`}
                             title={item.source.dataCheck}
-                            className={`border px-1.5 py-1 text-[10px] font-bold uppercase tracking-wider hover:border-white ${fitConfig[item.source.dataFit]?.color || fitConfig.pending.color}`}
+                            className={`relative border px-1.5 py-1 text-[10px] font-bold uppercase tracking-wider hover:border-white ${fitConfig[item.source.dataFit]?.color || fitConfig.pending.color}`}
                           >
                             {item.source.id}
+                            {hasData && (
+                              <span className="ml-1 text-[8px] text-[#4ade80] font-mono normal-case">
+                                {hist.count}
+                              </span>
+                            )}
                           </Link>
                         ) : (
                           <span
@@ -406,9 +421,14 @@ function ExternalCoverageSections({ groups }) {
                             className={`border px-1.5 py-1 text-[10px] font-bold uppercase tracking-wider ${fitConfig.missing.color}`}
                           >
                             {item.sourceId}
+                            {hasData && (
+                              <span className="ml-1 text-[8px] text-[#4ade80] font-mono normal-case">
+                                {hist.count}
+                              </span>
+                            )}
                           </span>
                         )
-                      )}
+                      })}
                     </div>
                   </td>
                 </tr>
@@ -456,7 +476,23 @@ function Legend({ fit, text }) {
   )
 }
 
-function CoverageCell({ cell }) {
+function HistoryBadge({ history }) {
+  if (!history) {
+    return <div className="text-[9px] text-[#444] mt-1.5 uppercase tracking-wider">sin datos</div>
+  }
+  if (history.status === 'error') {
+    return <div className="text-[9px] text-[#ef4444] mt-1.5 uppercase tracking-wider">error</div>
+  }
+  const count = history.count ?? 0
+  const end = history.end ? history.end.slice(0, 7) : null
+  return (
+    <div className="text-[9px] text-[#4ade80] mt-1.5 uppercase tracking-wider font-mono">
+      {count} obs{end ? ` · ${end}` : ''}
+    </div>
+  )
+}
+
+function CoverageCell({ cell, history }) {
   const cfg = fitConfig[cell.fit] || fitConfig.missing
 
   if (!cell.source) {
@@ -464,6 +500,7 @@ function CoverageCell({ cell }) {
       <div className={`min-h-[72px] border px-1.5 py-1.5 ${cfg.color}`}>
         <div className="text-[10px] font-bold uppercase tracking-wider">{cfg.label}</div>
         <div className="text-[10px] text-[#555] mt-1">Sin fila en Data</div>
+        <HistoryBadge history={history} />
       </div>
     )
   }
@@ -480,6 +517,7 @@ function CoverageCell({ cell }) {
       </div>
       <div className="text-[10px] text-white mt-1 leading-tight line-clamp-2">{cell.source.indicator}</div>
       <div className="text-[9px] text-[#888] mt-1 leading-tight line-clamp-2">{cell.source.dataMeasure}</div>
+      <HistoryBadge history={history} />
     </Link>
   )
 }
