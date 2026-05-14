@@ -6,6 +6,7 @@ import WorldViewOpsPage from './pages/WorldViewOpsPage'
 import DataPage from './pages/DataPage'
 import CoverageMatrixPage from './pages/CoverageMatrixPage'
 import HistoryPage from './pages/HistoryPage'
+import HistorySeriesPage from './pages/HistorySeriesPage'
 import DashboardPage from './pages/DashboardPage'
 import EndogenousOpsPage from './pages/EndogenousOpsPage'
 import ModelInputsPage from './pages/ModelInputsPage'
@@ -27,6 +28,7 @@ export default function AppRoutes() {
         <Route path="/data" element={<DataPage />} />
         <Route path="/data/coverage-matrix" element={<CoverageMatrixPage />} />
         <Route path="/data/history" element={<HistoryPage />} />
+        <Route path="/data/history/:sourceId" element={<HistorySeriesPage />} />
       </Routes>
     </div>
   )

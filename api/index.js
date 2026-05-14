@@ -829,6 +829,58 @@ async function saveHistoryFailure(source, statusName, message) {
   return status[source.id]
 }
 
+async function readHistorySeries(sourceId, { limit = 500, offset = 0, order = 'asc' } = {}) {
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 500, 5000))
+  const safeOffset = Math.max(0, Number(offset) || 0)
+  const ascending = order !== 'desc'
+
+  if (supabaseAdmin) {
+    const [{ count, error: countError }, { data, error }] = await Promise.all([
+      supabaseAdmin
+        .from('history_observations')
+        .select('*', { count: 'exact', head: true })
+        .eq('source_id', sourceId),
+      supabaseAdmin
+        .from('history_observations')
+        .select('source_id,date,value,raw,fetched_at')
+        .eq('source_id', sourceId)
+        .order('date', { ascending })
+        .range(safeOffset, safeOffset + safeLimit - 1),
+    ])
+    if (countError) throw new Error(`Supabase history count failed: ${countError.message}`)
+    if (error) throw new Error(`Supabase history read failed: ${error.message}`)
+    return {
+      sourceId,
+      storage: 'supabase',
+      total: count || 0,
+      limit: safeLimit,
+      offset: safeOffset,
+      order: ascending ? 'asc' : 'desc',
+      observations: data || [],
+    }
+  }
+
+  const filePath = path.join(HISTORY_SERIES_DIR, `${safeFileName(sourceId)}.json`)
+  const raw = await fs.readFile(filePath, 'utf8')
+  const payload = JSON.parse(raw)
+  const series = order === 'desc' ? payload.series.slice().reverse() : payload.series
+  return {
+    sourceId,
+    storage: 'filesystem',
+    total: payload.series.length,
+    limit: safeLimit,
+    offset: safeOffset,
+    order: ascending ? 'asc' : 'desc',
+    observations: series.slice(safeOffset, safeOffset + safeLimit).map((row) => ({
+      source_id: sourceId,
+      date: row.date,
+      value: row.value,
+      raw: row.raw || null,
+      fetched_at: payload.fetchedAt,
+    })),
+  }
+}
+
 async function fetchFredHistorySeries(seriesId, transform = null, limit = 5000) {
   const series = normalizeHistorySeries(await fetchFredNumericObservations(seriesId, limit).then((rows) => rows.reverse()))
   return {
@@ -1068,6 +1120,18 @@ app.get('/api/history/status', async (_req, res) => {
     res.json(await readHistoryStatus())
   } catch (err) {
     res.status(502).json({ error: 'History status failed', message: err.message })
+  }
+})
+
+app.get('/api/history/series/:sourceId', async (req, res) => {
+  try {
+    res.json(await readHistorySeries(req.params.sourceId, {
+      limit: req.query.limit,
+      offset: req.query.offset,
+      order: req.query.order,
+    }))
+  } catch (err) {
+    res.status(502).json({ error: 'History series failed', message: err.message })
   }
 })
 

@@ -174,7 +174,7 @@ export default function HistoryPage() {
                 <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[110px]">Start</th>
                 <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[110px]">End</th>
                 <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest">Endpoint / error</th>
-                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[125px]">Accion</th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[170px]">Accion</th>
               </tr>
             </thead>
             <tbody>
@@ -204,17 +204,29 @@ export default function HistoryPage() {
                       </div>
                     </td>
                     <td className="px-2 py-2">
-                      <button
-                        onClick={() => ingestOne(source)}
-                        disabled={loadingId === source.id || !source.automatable}
-                        className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider border ${
-                          loadingId === source.id || !source.automatable
-                            ? 'border-[#333] text-[#555] cursor-not-allowed'
-                            : 'border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white'
-                        }`}
-                      >
-                        {loadingId === source.id ? '...' : source.automatable ? 'INGEST' : 'NO AUTO'}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => ingestOne(source)}
+                          disabled={loadingId === source.id || !source.automatable}
+                          className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider border ${
+                            loadingId === source.id || !source.automatable
+                              ? 'border-[#333] text-[#555] cursor-not-allowed'
+                              : 'border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white'
+                          }`}
+                        >
+                          {loadingId === source.id ? '...' : source.automatable ? 'INGEST' : 'NO AUTO'}
+                        </button>
+                        <Link
+                          to={`/data/history/${source.id}`}
+                          className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider border ${
+                            source.history?.status === 'ok'
+                              ? 'border-[#60a5fa] text-[#60a5fa] hover:text-white hover:border-white'
+                              : 'border-[#333] text-[#555]'
+                          }`}
+                        >
+                          VIEW
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 )
