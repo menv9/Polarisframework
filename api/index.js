@@ -924,6 +924,7 @@ const BIS_CBTA_BULK_URL = 'https://data.bis.org/static/bulk/WS_CBTA_csv_flat.zip
 let bisCbtaCache = { timestamp: 0, rowsByRefArea: null }
 let forexFactoryCalendarCache = { timestamp: 0, data: null, warnings: [] }
 const FOREX_FACTORY_CACHE_TTL_MS = 60 * 60 * 1000
+const FXMACRODATA_CALENDAR_CURRENCIES = ['usd', 'eur', 'gbp', 'jpy', 'aud', 'cad', 'chf', 'nzd']
 
 async function ensureHistoryDirs() {
   await fs.mkdir(HISTORY_SERIES_DIR, { recursive: true })
@@ -1005,6 +1006,78 @@ function toCalendarRelease(event) {
   }
 }
 
+function toFxMacroCalendarEvent(row, currency) {
+  const date = row.announcement_datetime_local
+    ? new Date(row.announcement_datetime_local)
+    : new Date(Number(row.announcement_datetime) * 1000)
+  if (Number.isNaN(date.getTime())) return null
+  return {
+    title: row.name || row.title || row.release || 'Macro release',
+    country: String(currency || '').toUpperCase(),
+    currency: String(currency || '').toUpperCase(),
+    impact: 'Scheduled',
+    date: date.toISOString(),
+    actual: '',
+    forecast: '',
+    previous: '',
+    source: 'fxmacrodata',
+    release: row.release || null,
+    provider: row.source || 'FXMacroData',
+    raw: row,
+  }
+}
+
+async function fetchFxMacroDataCalendar() {
+  const settled = await Promise.allSettled(
+    FXMACRODATA_CALENDAR_CURRENCIES.map(async (currency) => {
+      const { data } = await getWithRetry(
+        `https://fxmacrodata.com/api/v1/calendar/${currency}`,
+        { timeout: 20000 },
+        2,
+        `[FXMACRODATA] ${currency}`
+      )
+      return (Array.isArray(data?.data) ? data.data : [])
+        .map((row) => toFxMacroCalendarEvent(row, currency))
+        .filter(Boolean)
+    })
+  )
+
+  const warnings = []
+  const events = []
+  settled.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      events.push(...result.value)
+    } else {
+      warnings.push(`fxmacrodata ${FXMACRODATA_CALENDAR_CURRENCIES[index]} unavailable: ${result.reason?.message || 'fetch failed'}`)
+    }
+  })
+  return { events, warnings }
+}
+
+function mergeCalendarEvents(events) {
+  const today = new Date()
+  const minDate = new Date(today.getFullYear(), today.getMonth(), 1)
+  const byKey = new Map()
+  events.forEach((event) => {
+    const eventTime = new Date(calendarEventDateTime(event) || 0)
+    if (Number.isNaN(eventTime.getTime()) || eventTime < minDate) return
+    const key = [
+      calendarEventDateTime(event) || '',
+      calendarEventCurrency(event),
+      calendarEventName(event).toLowerCase(),
+    ].join('|')
+    const existing = byKey.get(key)
+    if (!existing || existing.source !== 'forexfactory') {
+      byKey.set(key, event)
+    }
+  })
+  return Array.from(byKey.values()).sort((a, b) => {
+    const aTime = new Date(calendarEventDateTime(a) || 0).getTime()
+    const bTime = new Date(calendarEventDateTime(b) || 0).getTime()
+    return aTime - bTime
+  })
+}
+
 async function fetchForexFactoryCalendar() {
   if (
     forexFactoryCalendarCache.data &&
@@ -1018,19 +1091,26 @@ async function fetchForexFactoryCalendar() {
     getWithRetry('https://nfs.faireconomy.media/ff_calendar_nextweek.json', { timeout: 20000 }, 3, '[FF] nextweek'),
   ])
 
-  if (thisWeekResult.status === 'rejected') throw thisWeekResult.reason
-
   const warnings = []
-  const thisWeek = thisWeekResult.value
+  const thisWeek = thisWeekResult.status === 'fulfilled' ? thisWeekResult.value : null
   const nextWeek = nextWeekResult.status === 'fulfilled' ? nextWeekResult.value : null
+  if (thisWeekResult.status === 'rejected') {
+    warnings.push(`thisweek unavailable: ${thisWeekResult.reason?.message || 'fetch failed'}`)
+  }
   if (nextWeekResult.status === 'rejected') {
     warnings.push(`nextweek unavailable: ${nextWeekResult.reason?.message || 'fetch failed'}`)
   }
 
-  const data = [
-    ...(Array.isArray(thisWeek.data) ? thisWeek.data : []),
+  const forexFactoryEvents = [
+    ...(Array.isArray(thisWeek?.data) ? thisWeek.data : []),
     ...(Array.isArray(nextWeek?.data) ? nextWeek.data : []),
   ]
+  const fxMacro = await fetchFxMacroDataCalendar()
+  warnings.push(...fxMacro.warnings)
+  const data = mergeCalendarEvents([...forexFactoryEvents, ...fxMacro.events])
+  if (!data.length) {
+    throw new Error(warnings.join('; ') || 'No calendar sources returned events')
+  }
   forexFactoryCalendarCache = { timestamp: Date.now(), data, warnings }
   return forexFactoryCalendarCache
 }
