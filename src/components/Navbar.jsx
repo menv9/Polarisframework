@@ -1,13 +1,95 @@
+import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '../stores/appStore'
 import { supabase } from '../lib/supabase'
+
+const GROUPS = [
+  {
+    label: 'Análisis',
+    items: [
+      { to: '/dashboard',           label: 'Hub',  desc: 'Dashboard' },
+      { to: '/world-view/operativa',label: 'WV',   desc: 'World View' },
+      { to: '/endogenous',          label: 'Endo', desc: 'Endogenous' },
+      { to: '/exogenous/operativa', label: 'Exo',  desc: 'Exogenous' },
+    ],
+  },
+  {
+    label: 'Ejecución',
+    items: [
+      { to: '/timing/operativa',    label: 'Timing',    desc: 'Timing' },
+      { to: '/risk/operativa',      label: 'Risk',      desc: 'Risk Mgmt' },
+      { to: '/execution/operativa', label: 'Exec',      desc: 'Execution' },
+    ],
+  },
+  {
+    label: 'Aprendizaje',
+    items: [
+      { to: '/journal',     label: 'Journal', desc: 'Trade Journal' },
+      { to: '/performance', label: 'Perf',    desc: 'Performance' },
+      { to: '/data',        label: 'Data',    desc: 'Data Hub' },
+    ],
+  },
+]
+
+function NavDropdown({ group, location }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  const isGroupActive = group.items.some(
+    item => location.pathname.startsWith(item.to) && item.to !== '/'
+  )
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors ${
+          isGroupActive ? 'text-[#ecd987]' : 'text-[#666] hover:text-[#ecd987]'
+        }`}
+      >
+        {group.label}
+        <span className={`text-[8px] transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-2 bg-black border border-[#333] min-w-[140px] z-50">
+          {group.items.map(item => {
+            const active = location.pathname.startsWith(item.to) && item.to !== '/'
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                onClick={() => setOpen(false)}
+                className={`flex items-center justify-between px-3 py-2 text-xs font-bold uppercase tracking-wider border-b border-[#1a1a1a] last:border-0 transition-colors ${
+                  active
+                    ? 'text-[#ecd987] bg-[#111]'
+                    : 'text-[#666] hover:text-[#ecd987] hover:bg-[#0a0a0a]'
+                }`}
+              >
+                <span>{item.label}</span>
+                <span className="text-[10px] text-[#333] font-normal normal-case tracking-normal ml-3">{item.desc}</span>
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function Navbar() {
   const scrolled = useAppStore((s) => s.scrolled)
   const user = useAppStore((s) => s.user)
   const location = useLocation()
   const navigate = useNavigate()
-  const isHome = location.pathname === '/'
   const isAdmin = user?.app_metadata?.role === 'admin'
 
   async function handleLogout() {
@@ -23,80 +105,23 @@ export default function Navbar() {
           <span className="text-sm text-[#777] border-l-2 border-[#333] pl-3 uppercase tracking-wider">Framework</span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-4">
-          {/* Análisis */}
-          {[
-            { to: '/dashboard',           label: 'Dashboard'  },
-            { to: '/world-view/operativa',label: 'World View' },
-            { to: '/endogenous',          label: 'Endogenous' },
-            { to: '/exogenous/operativa', label: 'Exogenous'  },
-          ].map(({ to, label }) => (
-            <Link
-              key={to}
-              to={to}
-              className={`text-sm font-medium uppercase tracking-wider transition-colors ${
-                location.pathname.startsWith(to) && to !== '/'
-                  ? 'text-[#ecd987]'
-                  : 'text-[#888] hover:text-[#ecd987]'
-              }`}
-            >
-              {label}
-            </Link>
-          ))}
-
-          {/* Separador */}
-          <span className="text-[#222]">|</span>
-
-          {/* Ejecución */}
-          {[
-            { to: '/timing/operativa',    label: 'Timing'    },
-            { to: '/risk/operativa',      label: 'Risk'      },
-            { to: '/execution/operativa', label: 'Execution' },
-          ].map(({ to, label }) => (
-            <Link
-              key={to}
-              to={to}
-              className={`text-sm font-medium uppercase tracking-wider transition-colors ${
-                location.pathname.startsWith(to)
-                  ? 'text-[#ecd987]'
-                  : 'text-[#888] hover:text-[#ecd987]'
-              }`}
-            >
-              {label}
-            </Link>
-          ))}
-
-          {/* Separador */}
-          <span className="text-[#222]">|</span>
-
-          {/* Aprendizaje */}
-          {[
-            { to: '/journal',     label: 'Journal'     },
-            { to: '/performance', label: 'Performance' },
-            { to: '/data',        label: 'Data'        },
-          ].map(({ to, label }) => (
-            <Link
-              key={to}
-              to={to}
-              className={`text-sm font-medium uppercase tracking-wider transition-colors ${
-                location.pathname.startsWith(to) && to !== '/'
-                  ? 'text-[#ecd987]'
-                  : 'text-[#888] hover:text-[#ecd987]'
-              }`}
-            >
-              {label}
-            </Link>
+        <div className="hidden md:flex items-center gap-5">
+          {GROUPS.map(group => (
+            <NavDropdown key={group.label} group={group} location={location} />
           ))}
 
           {isAdmin && (
-            <Link
-              to="/admin"
-              className={`text-sm font-medium uppercase tracking-wider transition-colors ${
-                location.pathname === '/admin' ? 'text-white' : 'text-[#ecd987] hover:text-white'
-              }`}
-            >
-              Admin
-            </Link>
+            <>
+              <span className="text-[#222]">|</span>
+              <Link
+                to="/admin"
+                className={`text-xs font-bold uppercase tracking-wider transition-colors ${
+                  location.pathname === '/admin' ? 'text-white' : 'text-[#ecd987] hover:text-white'
+                }`}
+              >
+                Admin
+              </Link>
+            </>
           )}
 
           {user && (
