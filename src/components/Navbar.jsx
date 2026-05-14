@@ -24,43 +24,33 @@ export default function Navbar() {
         </Link>
 
         <div className="hidden md:flex items-center gap-6">
-          {isHome ? (
-            <>
-              <a href="#pipeline" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
-                Pipeline
-              </a>
-              <a href="#modules" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
-                Modulos
-              </a>
-              <a href="#architecture" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
-                Arquitectura
-              </a>
-              <Link to="/dashboard" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
-                Dashboard
-              </Link>
-              <Link to="/data" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
-                Data
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link to="/" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
-                Inicio
-              </Link>
-              <Link to="/dashboard" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
-                Dashboard
-              </Link>
-              <Link to="/endogenous" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
-                Endogenous
-              </Link>
-              <Link to="/data" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
-                Data
-              </Link>
-            </>
-          )}
+          {[
+            { to: '/dashboard',           label: 'Dashboard'  },
+            { to: '/world-view/operativa',label: 'World View' },
+            { to: '/endogenous',          label: 'Endogenous' },
+            { to: '/exogenous/operativa', label: 'Exogenous'  },
+            { to: '/data',                label: 'Data'       },
+          ].map(({ to, label }) => (
+            <Link
+              key={to}
+              to={to}
+              className={`text-sm font-medium uppercase tracking-wider transition-colors ${
+                location.pathname.startsWith(to) && to !== '/'
+                  ? 'text-[#ecd987]'
+                  : 'text-[#888] hover:text-[#ecd987]'
+              }`}
+            >
+              {label}
+            </Link>
+          ))}
 
           {isAdmin && (
-            <Link to="/admin" className="text-sm font-medium text-[#ecd987] hover:text-white uppercase tracking-wider">
+            <Link
+              to="/admin"
+              className={`text-sm font-medium uppercase tracking-wider transition-colors ${
+                location.pathname === '/admin' ? 'text-white' : 'text-[#ecd987] hover:text-white'
+              }`}
+            >
               Admin
             </Link>
           )}
