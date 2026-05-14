@@ -730,7 +730,7 @@ async function fetchWorldBankLatest(country, indicator) {
 
 async function fetchBankOfCanadaPolicyRate() {
   const url = 'https://www.bankofcanada.ca/valet/observations/V39079/json'
-  const { data } = await axios.get(url, { timeout: 15000 })
+  const { data } = await getWithRetry(url, { timeout: 15000 }, 3, '[BOC] V39079 latest')
   const latest = data?.observations?.at(-1)
   const value = Number.parseFloat(latest?.V39079?.v)
   if (!latest || !Number.isFinite(value)) throw new Error('No Bank of Canada policy rate')
@@ -742,6 +742,15 @@ async function fetchBankOfCanadaPolicyRate() {
     raw: latest.V39079.v,
     meta: { bank: 'boc' },
   })
+}
+
+async function fetchBankOfCanadaPolicyRateHistory() {
+  const url = 'https://www.bankofcanada.ca/valet/observations/V39079/json'
+  const { data } = await getWithRetry(url, { timeout: 30000 }, 3, '[BOC] V39079 history')
+  const series = (data?.observations || [])
+    .map((row) => ({ date: row.d, value: Number.parseFloat(row.V39079?.v), raw: row.V39079?.v }))
+    .filter((row) => row.date && Number.isFinite(row.value))
+  return { provider: 'bank-of-canada', series }
 }
 
 async function fetchOfficialCountryIndicators(countrySlug) {
@@ -1366,6 +1375,9 @@ async function fetchHistoryForSource(source) {
   }
   if (url.pathname === '/api/source/bis/reer/latest') {
     return fetchBisReerHistory(url.searchParams.get('currency'))
+  }
+  if (url.pathname === '/api/source/central-bank/boc/policy-rate/latest') {
+    return fetchBankOfCanadaPolicyRateHistory()
   }
   if (url.pathname === '/api/source/cftc/latest') {
     return fetchCftcHistory(url.searchParams.get('market'), url.searchParams.get('invert') === 'true')
