@@ -50,6 +50,25 @@ function setCached(key, data) {
   cache.set(key, { data, timestamp: Date.now() })
 }
 
+async function getWithRetry(url, config = {}, attempts = 3, label = 'GET') {
+  let lastError = null
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await axios.get(url, config)
+    } catch (err) {
+      lastError = err
+      const status = err.response?.status
+      if (status && status < 500) throw err
+      if (attempt < attempts) {
+        const delayMs = 400 * attempt
+        console.warn(`${label} failed attempt ${attempt}/${attempts}: ${err.message}`)
+        await new Promise((resolve) => setTimeout(resolve, delayMs))
+      }
+    }
+  }
+  throw lastError
+}
+
 // ScrapingAnt config
 const SCRAPINGANT_API_KEY = process.env.SCRAPINGANT_API_KEY || ''
 const SCRAPINGANT_BASE = 'https://api.scrapingant.com/v2/general'
@@ -121,7 +140,7 @@ async function fetchFredObservations(seriesId, limit = 1) {
   })
   const url = `${FRED_BASE}?${params.toString()}`
   console.log(`[FRED] Fetching series ${seriesId}, limit ${limit}`)
-  const { data } = await axios.get(url, { timeout: 15000 })
+  const { data } = await getWithRetry(url, { timeout: 15000 }, 3, `[FRED] ${seriesId}`)
   if (!data || !data.observations) {
     throw new Error('Invalid FRED response')
   }
@@ -344,7 +363,7 @@ async function fetchYahooRatio(leftSymbol, rightSymbol) {
 
 async function fetchEcbLatest(seriesKey) {
   const url = `${ECB_BASE}/${seriesKey}?format=csvdata&detail=dataonly&lastNObservations=1`
-  const { data } = await axios.get(url, { timeout: 20000 })
+  const { data } = await getWithRetry(url, { timeout: 20000 }, 3, `[ECB] ${seriesKey}`)
   const rows = parseCsv(data)
   const row = rows.find((r) => r.OBS_VALUE || r.TIME_PERIOD) || rows[0]
   if (!row) throw new Error(`No ECB data for ${seriesKey}`)
@@ -358,21 +377,45 @@ async function fetchEcbLatest(seriesKey) {
   })
 }
 
-function latestJsonStatValue(data) {
+function jsonStatTimeLabels(data) {
   const timeDimId = data.id?.find((id) => id === 'time' || id === 'TIME_PERIOD')
   const timeDim = timeDimId ? data.dimension?.[timeDimId] : null
   const index = timeDim?.category?.index || {}
   const labels = timeDim?.category?.label || {}
-  const valueMap = data.value || {}
-  const latest = Object.entries(valueMap)
-    .map(([flatIndex, rawValue]) => ({ flatIndex: Number(flatIndex), rawValue: Number(rawValue) }))
-    .filter((item) => Number.isFinite(item.rawValue))
-    .sort((a, b) => a.flatIndex - b.flatIndex)
-    .at(-1)
+  return Object.entries(index)
+    .sort((a, b) => a[1] - b[1])
+    .map(([id]) => labels[id] || id)
+}
+
+function jsonStatRows(data) {
+  const ids = data.id || []
+  const sizes = data.size || []
+  const timeDimIndex = ids.findIndex((id) => id === 'time' || id === 'TIME_PERIOD')
+  const times = jsonStatTimeLabels(data)
+  if (timeDimIndex < 0 || !times.length) return []
+
+  const strideFor = (dimensionIndex) => sizes
+    .slice(dimensionIndex + 1)
+    .reduce((product, size) => product * size, 1)
+
+  return Object.entries(data.value || {})
+    .map(([flatIndex, rawValue]) => {
+      const value = Number(rawValue)
+      if (!Number.isFinite(value)) return null
+      const index = Number(flatIndex)
+      const stride = strideFor(timeDimIndex)
+      const timeIndex = Math.floor(index / stride) % sizes[timeDimIndex]
+      const date = times[timeIndex]
+      return date ? { date, value, flatIndex: index } : null
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.flatIndex - b.flatIndex)
+}
+
+function latestJsonStatValue(data) {
+  const latest = jsonStatRows(data).at(-1)
   if (!latest) throw new Error('No numeric Eurostat values')
-  const timeEntries = Object.entries(index).sort((a, b) => a[1] - b[1])
-  const guessedTime = timeEntries.at(-1)?.[0]
-  return { value: latest.rawValue, date: labels[guessedTime] || guessedTime || null, flatIndex: latest.flatIndex }
+  return latest
 }
 
 async function fetchEurostatLatest(dataset, filters = {}) {
@@ -381,7 +424,7 @@ async function fetchEurostatLatest(dataset, filters = {}) {
     if (value !== undefined && value !== null && value !== '') params.set(key, value)
   })
   const url = `${EUROSTAT_BASE}/${dataset}?${params.toString()}`
-  const { data } = await axios.get(url, { timeout: 20000 })
+  const { data } = await getWithRetry(url, { timeout: 20000 }, 3, `[EUROSTAT] ${dataset}`)
   const latest = latestJsonStatValue(data)
   return normalizeLatest({
     provider: 'eurostat',
@@ -1164,16 +1207,8 @@ async function fetchEurostatHistory(dataset, filters = {}) {
   Object.entries(filters).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') params.set(key, value)
   })
-  const { data } = await axios.get(`${EUROSTAT_BASE}/${dataset}?${params.toString()}`, { timeout: 30000 })
-  const timeDimId = data.id?.find((id) => id === 'time' || id === 'TIME_PERIOD')
-  const timeDim = timeDimId ? data.dimension?.[timeDimId] : null
-  const timeIndex = timeDim?.category?.index || {}
-  const times = Object.entries(timeIndex).sort((a, b) => a[1] - b[1]).map(([id]) => id)
-  const values = Object.entries(data.value || {})
-    .map(([flatIndex, value]) => ({ flatIndex: Number(flatIndex), value: Number(value) }))
-    .filter((row) => Number.isFinite(row.value))
-    .sort((a, b) => a.flatIndex - b.flatIndex)
-  const series = values.map((row, index) => ({ date: times[index % times.length], value: row.value })).filter((row) => row.date)
+  const { data } = await getWithRetry(`${EUROSTAT_BASE}/${dataset}?${params.toString()}`, { timeout: 30000 }, 3, `[EUROSTAT] ${dataset}`)
+  const series = jsonStatRows(data)
   return { provider: 'eurostat', series }
 }
 
@@ -1252,7 +1287,7 @@ async function fetchImfDataMapperHistory(indicator, country) {
 
 async function fetchWorldBankHistory(country, indicator) {
   const url = `https://api.worldbank.org/v2/country/${encodeURIComponent(country)}/indicator/${encodeURIComponent(indicator)}?format=json&per_page=200&date=1960:2026`
-  const { data } = await axios.get(url, { timeout: 20000 })
+  const { data } = await getWithRetry(url, { timeout: 20000 }, 3, `[WORLDBANK] ${country}/${indicator}`)
   const observations = Array.isArray(data) ? data[1] : null
   if (!Array.isArray(observations)) throw new Error(`No World Bank data for ${country}/${indicator}`)
   const series = observations.map((row) => ({ date: row.date, value: Number(row.value) }))
