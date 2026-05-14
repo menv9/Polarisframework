@@ -23,6 +23,13 @@ const cards = [
     meta: 'Historico raw',
   },
   {
+    title: 'Economic Calendar',
+    path: '/data/economic-calendar',
+    tone: 'text-[#ef4444] border-[#ef4444]',
+    desc: 'Calendario macro con auto-sync, releases guardados y barrera dura frente al modelo.',
+    meta: 'Releases macro',
+  },
+  {
     title: 'Model Features',
     path: '/model-inputs',
     tone: 'text-[#f59e0b] border-[#f59e0b]',
@@ -63,11 +70,12 @@ export default function DataHubPage() {
 
         <div className="mt-5 border-2 border-[#333] bg-[#0a0a0a] p-4">
           <div className="text-sm font-bold uppercase tracking-widest text-white mb-2">Flujo recomendado</div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-0 border border-[#222]">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-0 border border-[#222]">
             <Step label="1. Source Registry" text="Conectar y validar fuentes externas." />
             <Step label="2. Coverage" text="Ver que datos exige el framework." />
             <Step label="3. History" text="Guardar historicos persistentes." />
-            <Step label="4. Model Features" text="Crear features y z-scores." />
+            <Step label="4. Calendar" text="Archivar releases macro sin tocar el modelo." />
+            <Step label="5. Model Features" text="Crear features y z-scores." />
           </div>
         </div>
 
@@ -78,7 +86,7 @@ export default function DataHubPage() {
               El framework consume Model Features. Las otras capas conectan, auditan y persisten.
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-0">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-0">
             <ContractStep
               label="Source Registry"
               output="Fuente + fit"
@@ -93,6 +101,11 @@ export default function DataHubPage() {
               label="History Pipeline"
               output="Historico canonico"
               text="Series persistidas por source_id, sin features finales."
+            />
+            <ContractStep
+              label="Economic Calendar"
+              output="Release log"
+              text="Eventos macro guardados aparte; no alimentan fuentes ni features."
             />
             <ContractStep
               label="Model Features"

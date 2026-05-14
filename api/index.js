@@ -7,6 +7,7 @@ const AdmZip = require('adm-zip')
 const XLSX = require('xlsx')
 const fs = require('fs/promises')
 const path = require('path')
+const crypto = require('crypto')
 const { createClient } = require('@supabase/supabase-js')
 
 const app = express()
@@ -48,6 +49,13 @@ function getCached(key) {
 
 function setCached(key, data) {
   cache.set(key, { data, timestamp: Date.now() })
+}
+
+function describeHttpError(err) {
+  const status = err?.response?.status
+  const statusText = err?.response?.statusText
+  const message = err?.message || statusText || 'Request failed'
+  return status ? `${message} (${status}${statusText ? ` ${statusText}` : ''})` : message
 }
 
 async function getWithRetry(url, config = {}, attempts = 3, label = 'GET') {
@@ -909,16 +917,169 @@ function findIndicator(indicators, searchTerms) {
 const HISTORY_ROOT = path.join(process.cwd(), 'data', 'history')
 const HISTORY_SERIES_DIR = path.join(HISTORY_ROOT, 'series')
 const HISTORY_STATUS_PATH = path.join(HISTORY_ROOT, 'status.json')
+const CALENDAR_ROOT = path.join(process.cwd(), 'data', 'calendar')
+const CALENDAR_RELEASES_PATH = path.join(CALENDAR_ROOT, 'releases.json')
 const HISTORY_FRED_LIMIT = 5000
 const BIS_CBTA_BULK_URL = 'https://data.bis.org/static/bulk/WS_CBTA_csv_flat.zip'
 let bisCbtaCache = { timestamp: 0, rowsByRefArea: null }
+let forexFactoryCalendarCache = { timestamp: 0, data: null, warnings: [] }
+const FOREX_FACTORY_CACHE_TTL_MS = 60 * 60 * 1000
 
 async function ensureHistoryDirs() {
   await fs.mkdir(HISTORY_SERIES_DIR, { recursive: true })
 }
 
+async function ensureCalendarDirs() {
+  await fs.mkdir(CALENDAR_ROOT, { recursive: true })
+}
+
 function safeFileName(id) {
   return String(id).replace(/[^a-zA-Z0-9._-]/g, '_')
+}
+
+function calendarEventName(event) {
+  return String(event?.title || event?.event || event?.name || '').trim()
+}
+
+function calendarEventCurrency(event) {
+  return String(event?.country || event?.currency || '').trim()
+}
+
+function calendarEventImpact(event) {
+  return String(event?.impact || '').trim()
+}
+
+function calendarEventDateTime(event) {
+  const rawDate = event?.date || event?.datetime || event?.timestamp || event?.time
+  if (!rawDate) return null
+  if (typeof rawDate === 'number') {
+    const date = new Date(rawDate * (rawDate < 10_000_000_000 ? 1000 : 1))
+    return Number.isNaN(date.getTime()) ? null : date.toISOString()
+  }
+  const date = new Date(String(rawDate))
+  return Number.isNaN(date.getTime()) ? String(rawDate) : date.toISOString()
+}
+
+function calendarEventDate(event) {
+  const dateTime = calendarEventDateTime(event)
+  if (!dateTime) return null
+  const parsed = new Date(dateTime)
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10)
+  const match = String(dateTime).match(/\d{4}-\d{2}-\d{2}/)
+  return match ? match[0] : null
+}
+
+function hasReleasedActual(event) {
+  const actual = event?.actual
+  if (actual === null || actual === undefined) return false
+  const text = String(actual).trim()
+  return Boolean(text && text !== '-' && text.toLowerCase() !== 'null')
+}
+
+function calendarEventHash(event) {
+  const key = [
+    calendarEventDateTime(event) || '',
+    calendarEventCurrency(event),
+    calendarEventName(event),
+  ].join('|')
+  return crypto.createHash('sha256').update(key).digest('hex')
+}
+
+function toCalendarRelease(event) {
+  const eventName = calendarEventName(event)
+  const eventDate = calendarEventDate(event)
+  const eventHash = calendarEventHash(event)
+  return {
+    event_hash: eventHash,
+    event_date: eventDate,
+    event_name: eventName,
+    currency: calendarEventCurrency(event) || null,
+    impact: calendarEventImpact(event) || null,
+    actual_value: event.actual === undefined || event.actual === null ? null : String(event.actual),
+    forecast_value: event.forecast === undefined || event.forecast === null ? null : String(event.forecast),
+    previous_value: event.previous === undefined || event.previous === null ? null : String(event.previous),
+    source_id: null,
+    match_status: 'none',
+    raw_event: event,
+    saved_at: new Date().toISOString(),
+  }
+}
+
+async function fetchForexFactoryCalendar() {
+  if (
+    forexFactoryCalendarCache.data &&
+    Date.now() - forexFactoryCalendarCache.timestamp < FOREX_FACTORY_CACHE_TTL_MS
+  ) {
+    return forexFactoryCalendarCache
+  }
+
+  const [thisWeekResult, nextWeekResult] = await Promise.allSettled([
+    getWithRetry('https://nfs.faireconomy.media/ff_calendar_thisweek.json', { timeout: 20000 }, 3, '[FF] thisweek'),
+    getWithRetry('https://nfs.faireconomy.media/ff_calendar_nextweek.json', { timeout: 20000 }, 3, '[FF] nextweek'),
+  ])
+
+  if (thisWeekResult.status === 'rejected') throw thisWeekResult.reason
+
+  const warnings = []
+  const thisWeek = thisWeekResult.value
+  const nextWeek = nextWeekResult.status === 'fulfilled' ? nextWeekResult.value : null
+  if (nextWeekResult.status === 'rejected') {
+    warnings.push(`nextweek unavailable: ${nextWeekResult.reason?.message || 'fetch failed'}`)
+  }
+
+  const data = [
+    ...(Array.isArray(thisWeek.data) ? thisWeek.data : []),
+    ...(Array.isArray(nextWeek?.data) ? nextWeek.data : []),
+  ]
+  forexFactoryCalendarCache = { timestamp: Date.now(), data, warnings }
+  return forexFactoryCalendarCache
+}
+
+async function readCalendarReleases() {
+  if (supabaseAdmin) {
+    const { data, error } = await supabaseAdmin
+      .from('calendar_releases')
+      .select('*')
+      .order('event_date', { ascending: false })
+      .order('saved_at', { ascending: false })
+      .limit(500)
+    if (error) throw new Error(`Supabase calendar_releases read failed: ${error.message}`)
+    return { storage: 'supabase', releases: data || [] }
+  }
+
+  try {
+    const raw = await fs.readFile(CALENDAR_RELEASES_PATH, 'utf8')
+    return { storage: 'filesystem', releases: JSON.parse(raw) }
+  } catch {
+    return { storage: 'filesystem', releases: [] }
+  }
+}
+
+async function upsertCalendarReleases(rows) {
+  if (!rows.length) {
+    const current = await readCalendarReleases()
+    return { ...current, inserted: 0, total: current.releases.length }
+  }
+
+  if (supabaseAdmin) {
+    const { error } = await supabaseAdmin
+      .from('calendar_releases')
+      .upsert(rows, { onConflict: 'event_hash' })
+    if (error) throw new Error(`Supabase calendar_releases upsert failed: ${error.message}`)
+    const current = await readCalendarReleases()
+    return { ...current, inserted: rows.length, total: current.releases.length }
+  }
+
+  await ensureCalendarDirs()
+  const current = await readCalendarReleases()
+  const byHash = new Map(current.releases.map((row) => [row.event_hash, row]))
+  rows.forEach((row) => byHash.set(row.event_hash, { ...byHash.get(row.event_hash), ...row }))
+  const releases = Array.from(byHash.values()).sort((a, b) => {
+    const dateCmp = String(b.event_date || '').localeCompare(String(a.event_date || ''))
+    return dateCmp || String(b.saved_at || '').localeCompare(String(a.saved_at || ''))
+  })
+  await fs.writeFile(CALENDAR_RELEASES_PATH, JSON.stringify(releases, null, 2))
+  return { storage: 'filesystem', releases, inserted: rows.length, total: releases.length }
 }
 
 async function readHistoryStatus() {
@@ -1568,6 +1729,50 @@ async function fetchHistoryForSource(source) {
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
+app.get('/api/calendar', async (_req, res) => {
+  try {
+    const calendar = await fetchForexFactoryCalendar()
+    res.json({
+      events: calendar.data,
+      cachedAt: new Date(forexFactoryCalendarCache.timestamp).toISOString(),
+      source: 'forexfactory',
+      warnings: calendar.warnings || [],
+    })
+  } catch (err) {
+    res.status(502).json({ error: 'Calendar fetch failed', message: describeHttpError(err) })
+  }
+})
+
+app.get('/api/calendar/releases', async (_req, res) => {
+  try {
+    res.json(await readCalendarReleases())
+  } catch (err) {
+    res.status(502).json({ error: 'Calendar releases read failed', message: describeHttpError(err) })
+  }
+})
+
+app.post('/api/calendar/sync', async (_req, res) => {
+  try {
+    const calendar = await fetchForexFactoryCalendar()
+    const events = calendar.data
+    const releases = events
+      .filter((event) => calendarEventName(event) && calendarEventDate(event) && hasReleasedActual(event))
+      .map(toCalendarRelease)
+    const result = await upsertCalendarReleases(releases)
+    res.json({
+      storage: result.storage,
+      scanned: events.length,
+      released: releases.length,
+      saved: result.inserted,
+      total: result.total,
+      warnings: calendar.warnings || [],
+      releases: result.releases,
+    })
+  } catch (err) {
+    res.status(502).json({ error: 'Calendar sync failed', message: describeHttpError(err) })
+  }
 })
 
 app.get('/api/history/status', async (_req, res) => {
@@ -2326,6 +2531,8 @@ if (require.main === module) {
     console.log(`   GET http://localhost:${PORT}/api/source/bis/reer/latest?currency=USD`)
     console.log(`   GET http://localhost:${PORT}/api/source/cftc/latest?market=EURO%20FX`)
     console.log(`   GET http://localhost:${PORT}/api/source/imf/latest?dataset=...&seriesKey=...`)
+    console.log(`   GET http://localhost:${PORT}/api/calendar`)
+    console.log(`   POST http://localhost:${PORT}/api/calendar/sync`)
     console.log(`   GET http://localhost:${PORT}/api/indicators/:country`)
     console.log(`   GET http://localhost:${PORT}/api/polaris/worldview`)
     console.log(`   POST http://localhost:${PORT}/api/scrape`)
