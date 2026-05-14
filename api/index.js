@@ -728,6 +728,29 @@ async function fetchWorldBankLatest(country, indicator) {
   })
 }
 
+async function fetchWorldBankTotHistory(country) {
+  const result = await fetchWorldBankHistory(country, 'TT.PRI.MRCH.XD.WD')
+  return {
+    provider: 'worldbank',
+    transform: 'terms_of_trade_yoy',
+    series: annualPercentChange(result.series, 1),
+  }
+}
+
+async function fetchWorldBankTotLatest(country) {
+  const result = await fetchWorldBankTotHistory(country)
+  const latest = result.series.at(-1)
+  if (!latest) throw new Error(`No World Bank Terms of Trade observations for ${country}`)
+  return normalizeLatest({
+    provider: result.provider,
+    seriesId: `TT.PRI.MRCH.XD.WD/${country}`,
+    date: latest.date,
+    value: latest.value,
+    raw: latest.value,
+    meta: { country, indicator: 'TT.PRI.MRCH.XD.WD', transform: result.transform },
+  })
+}
+
 async function fetchBankOfCanadaPolicyRate() {
   const url = 'https://www.bankofcanada.ca/valet/observations/V39079/json'
   const { data } = await getWithRetry(url, { timeout: 15000 }, 3, '[BOC] V39079 latest')
@@ -1391,6 +1414,9 @@ async function fetchHistoryForSource(source) {
   if (url.pathname === '/api/source/worldbank/latest') {
     return fetchWorldBankHistory(url.searchParams.get('country'), url.searchParams.get('indicator'))
   }
+  if (url.pathname === '/api/source/worldbank/tot/latest') {
+    return fetchWorldBankTotHistory(url.searchParams.get('country'))
+  }
   throw new Error(`No history fetcher for ${url.pathname}`)
 }
 
@@ -1739,6 +1765,15 @@ app.get('/api/source/worldbank/latest', async (req, res) => {
     res.json(await fetchWorldBankLatest(String(req.query.country), String(req.query.indicator)))
   } catch (err) {
     res.status(502).json({ error: 'World Bank fetch failed', message: err.message })
+  }
+})
+
+app.get('/api/source/worldbank/tot/latest', async (req, res) => {
+  try {
+    if (!req.query.country) return res.status(400).json({ error: 'country required' })
+    res.json(await fetchWorldBankTotLatest(String(req.query.country)))
+  } catch (err) {
+    res.status(502).json({ error: 'World Bank ToT fetch failed', message: err.message })
   }
 })
 
