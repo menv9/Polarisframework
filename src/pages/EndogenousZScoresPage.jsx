@@ -27,6 +27,48 @@ const CATEGORY_MAP = {
 
 const INDICATORS = BASE_INDICATORS.map(i => ({ ...i, beta: i.betaDoc, category: CATEGORY_MAP[i.key] ?? i.key.toUpperCase() }))
 
+// Labels por indicador y país — alineados con lo que está realmente en dataSources.js
+const CFTC_OWN = new Set(['eur', 'jpn', 'gbr', 'che', 'can', 'aus', 'nzl'])
+const CB_BAL_WIRED = new Set(['usa', 'eur', 'jpn'])
+
+function getIndLabel(key, prefix) {
+  switch (key) {
+    case 'nfp':
+      // USA: PAYEMS YoY | Resto: LRHUTTTXXXM156S (tasa de paro OECD)
+      return prefix === 'usa' ? 'NFP YoY (PAYEMS)' : 'Unemployment Rate (OECD)'
+    case 'umcsi':
+      // USA: UMCSENT | Resto: CSCICP03XXM665S (OECD consumer confidence)
+      return prefix === 'usa' ? 'UMCSI (Univ. Michigan)' : 'Consumer Confidence (OECD)'
+    case '10y_real':
+      // USA: DFII10 (TIPS — yield real real) | Resto: IRLTLT01XXM156N (yield NOMINAL OECD)
+      return prefix === 'usa' ? '10Y Real Yield (TIPS)' : '10Y Nominal Yield (OECD)'
+    case 'pmi':
+      return prefix === 'usa' ? 'ISM Manufacturing' : 'PMI Manufacturing (manual)'
+    case 'policy':
+      if (prefix === 'usa') return 'Fed Funds Rate (DFF)'
+      if (prefix === 'eur') return 'ECB Deposit Facility Rate'
+      if (prefix === 'can') return 'BoC Overnight Rate'
+      return 'Policy Rate (OECD IRSTCI01)'
+    case 'cb_balance':
+      if (prefix === 'usa') return 'Fed Balance/GDP (WALCL)'
+      if (prefix === 'eur') return 'ECB Balance/GDP (ECBASSETSW)'
+      if (prefix === 'jpn') return 'BoJ Balance/GDP (JPNASSETS)'
+      return 'CB Balance/GDP (manual)'
+    case 'real_2y':
+      // USA: DGS2 − T5YIFR | Resto: IRSTCI01XXM156N − CPI (policy rate proxy)
+      return prefix === 'usa' ? 'Real Rate 2Y (2Y − TIPS brkevn)' : 'Real Rate 2Y (policy − CPI)'
+    case 'cftc':
+      if (prefix === 'usa') return 'CFTC USD Index'
+      if (prefix === 'swe' || prefix === 'nor') return 'CFTC USD Index (inv. proxy)'
+      return `CFTC ${prefix === 'eur' ? 'Euro FX' : prefix === 'jpn' ? 'Japanese Yen' : prefix === 'gbr' ? 'British Pound' : prefix === 'che' ? 'Swiss Franc' : prefix === 'can' ? 'Canadian Dollar' : prefix === 'aus' ? 'Australian Dollar' : 'NZ Dollar'}`
+    case 'tot':
+      // Sin scraper config en ningún país — entrada manual
+      return 'Terms of Trade YoY (manual)'
+    default:
+      return INDICATORS.find(i => i.key === key)?.label ?? key
+  }
+}
+
 // ── Date helpers ──────────────────────────────────────────────────────────────
 function normalizeDate(str) {
   if (!str || typeof str !== 'string') return null
@@ -384,7 +426,7 @@ export default function EndogenousZScoresPage() {
                       <tr className={`border-b border-[#222] ${isOpen ? 'bg-[#111]' : 'hover:bg-[#0a0a0a]'}`}>
                         <td className="px-2 py-2">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-bold text-[#e5e5e5]">{ind.label}</span>
+                            <span className="text-sm font-bold text-[#e5e5e5]">{getIndLabel(ind.key, activeTab)}</span>
                             {(() => {
                               const url = sourceUrls[getSourceId(activeTab, ind.key)]
                               return url ? (

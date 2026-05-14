@@ -29,6 +29,39 @@ const CATEGORY_MAP = {
 
 const INDICATORS = BASE_INDICATORS.map(i => ({ ...i, category: CATEGORY_MAP[i.key] ?? i.key.toUpperCase() }))
 
+function getIndLabel(key, prefix) {
+  switch (key) {
+    case 'nfp':
+      return prefix === 'usa' ? 'NFP YoY (PAYEMS)' : 'Unemployment Rate (OECD)'
+    case 'umcsi':
+      return prefix === 'usa' ? 'UMCSI (Univ. Michigan)' : 'Consumer Confidence (OECD)'
+    case '10y_real':
+      return prefix === 'usa' ? '10Y Real Yield (TIPS)' : '10Y Nominal Yield (OECD)'
+    case 'pmi':
+      return prefix === 'usa' ? 'ISM Manufacturing' : 'PMI Manufacturing (manual)'
+    case 'policy':
+      if (prefix === 'usa') return 'Fed Funds Rate (DFF)'
+      if (prefix === 'eur') return 'ECB Deposit Facility Rate'
+      if (prefix === 'can') return 'BoC Overnight Rate'
+      return 'Policy Rate (OECD IRSTCI01)'
+    case 'cb_balance':
+      if (prefix === 'usa') return 'Fed Balance/GDP (WALCL)'
+      if (prefix === 'eur') return 'ECB Balance/GDP (ECBASSETSW)'
+      if (prefix === 'jpn') return 'BoJ Balance/GDP (JPNASSETS)'
+      return 'CB Balance/GDP (manual)'
+    case 'real_2y':
+      return prefix === 'usa' ? 'Real Rate 2Y (2Y − TIPS brkevn)' : 'Real Rate 2Y (policy − CPI)'
+    case 'cftc':
+      if (prefix === 'usa') return 'CFTC USD Index'
+      if (prefix === 'swe' || prefix === 'nor') return 'CFTC USD Index (inv. proxy)'
+      return `CFTC ${prefix === 'eur' ? 'Euro FX' : prefix === 'jpn' ? 'Japanese Yen' : prefix === 'gbr' ? 'British Pound' : prefix === 'che' ? 'Swiss Franc' : prefix === 'can' ? 'Canadian Dollar' : prefix === 'aus' ? 'Australian Dollar' : 'NZ Dollar'}`
+    case 'tot':
+      return 'Terms of Trade YoY (manual)'
+    default:
+      return INDICATORS.find(i => i.key === key)?.label ?? key
+  }
+}
+
 const INDICATORS_BY_CATEGORY = INDICATORS.reduce((acc, ind) => {
   const last = acc[acc.length - 1]
   if (last && last.category === ind.category) {
@@ -57,18 +90,18 @@ function Tooltip({ text, align = 'center' }) {
 
 // ── Textos de tooltips ────────────────────────────────────────────────────────
 const IND_TIPS = {
-  real_2y:    'Diferencial de tipos reales a 2Y vs media G10. Indicador DOMINANTE (β=0.14). Mayor diferencial → más atractivo carry → divisa más fuerte.',
-  '10y_real': 'Yield real del bono soberano a 10Y (nominal − inflación breakeven). Refleja el retorno real del capital a largo plazo.',
+  real_2y:    'Indicador DOMINANTE (b=0.14). USA: 2Y nominal (DGS2) menos TIPS breakeven (T5YIFR). Resto: policy rate (IRSTCI01) menos CPI YoY. Mayor valor = carry mas atractivo = divisa mas fuerte.',
+  '10y_real': 'USA: DFII10 (TIPS 10Y - yield real real). Resto paises: IRLTLT01XXM156N (yield NOMINAL 10Y OECD). Atencion: para no-USA es yield nominal usado como proxy del yield real.',
   ca_gdp:     'Cuenta corriente como % del PIB. Superávit crónico = demanda estructural de la divisa. Déficit = presión vendedora.',
-  tot:        'Variación YoY de los términos de intercambio (precios exportación / importación). Mejora → mayor renta nacional → divisa más fuerte.',
+  tot:        'Variación YoY de los términos de intercambio (px exportación / px importación). Fuente varía: EUR=Eurostat · AUS=ABS · CAN=StatCan · NOR=SSB · NZL=Stats NZ · resto=OECD MEI. Proxy si no disponible: Export PI / Import PI − 1.',
   core_cpi:   'IPC subyacente YoY (excluye energía y alimentos). Proxy de presión inflacionaria estructural; anticipa movimientos de tipos.',
   niip:       'Posición de Inversión Internacional Neta como % del PIB. Positivo = acreedor neto (CHE, JPN). Negativo = deudor neto (USA, GBP).',
   policy:     'Tipo nominal del banco central. Refleja la postura de política monetaria. Se combina con CPI para derivar el tipo real.',
   cpi:        'IPC general YoY. Incluye componentes volátiles (energía, alimentos). Proxy de inflación total.',
-  nfp:        'Empleo YoY. Para USA = variación NFP. Para el resto = tasa de paro OCDE (signo invertido). Fortaleza del mercado laboral.',
-  cftc:       'Posicionamiento especulativo neto en CFTC (non-commercial). Señal de sentimiento a corto plazo. Contrarian en extremos.',
-  cb_balance: 'Balance del banco central como % del PIB, var. YoY. Signo −1: expansión del balance (QE) es bajista para la divisa.',
-  pmi:        'ISM Manufacturing (USA) o PMI manufacturero equivalente. Indicador líder de actividad económica real.',
+  nfp:        'USA: PAYEMS YoY (NFP). Resto: LRHUTTTTXXM156S (tasa de paro OECD). Atencion: tasa de paro es inversa al empleo — z-score alto = paro alto = mercado laboral debil.',
+  cftc:       'Posicionamiento neto especulativo CFTC. EUR/JPY/GBP/CHF/CAD/AUD/NZD: contrato propio. SEK y NOK: no tienen contrato CFTC propio, se usa USD Index con signo invertido como proxy.',
+  cb_balance: 'USA: WALCL (Fed). EUR: ECBASSETSW. JPN: JPNASSETS. Resto: sin fuente automatizada (manual). Signo -1: expansion de balance (QE) es bajista para la divisa.',
+  pmi:        'USA: ISM Manufacturing (FRED). Resto: PMI Manufacturing nacional — sin fuente automatizada, entrada manual requerida.',
   debt:       'Deuda pública bruta como % del PIB. Signo −1: mayor deuda → menor credibilidad fiscal → presión bajista estructural.',
   reer:       'Desviación del REER respecto a su media de 10Y. Signo −1: si la divisa está cara en términos reales, tiende a revertir.',
   umcsi:      'Confianza del consumidor (UMCSI para USA, OCDE para el resto). Anticipa gasto privado y perspectivas económicas.',
@@ -472,7 +505,7 @@ export default function EndogenousOpsPage() {
                           </td>
                           <td className="px-2 py-1.5">
                             <div className="flex items-center gap-0.5">
-                              <span className="text-sm font-bold text-[#e5e5e5]">{ind.label}</span>
+                              <span className="text-sm font-bold text-[#e5e5e5]">{getIndLabel(ind.key, activeCountry.prefix)}</span>
                               {IND_TIPS[ind.key] && <Tooltip align="left" text={IND_TIPS[ind.key]} />}
                             </div>
                             <div className="text-[10px] text-[#555]">{ind.sign === 1 ? '▲ FX positivo' : '▼ FX negativo'}</div>
