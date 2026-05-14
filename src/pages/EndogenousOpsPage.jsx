@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react'
+import { useState, Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import { INDICATORS as BASE_INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 import { useModelStore } from '../store/ModelDataContext'
@@ -16,99 +16,72 @@ const COUNTRIES = [
   { label: 'NOK', prefix: 'nor', cyclical: true  },
 ]
 
-// Mapeo de categorías para la UI (campo no presente en la librería compartida)
 const CATEGORY_MAP = {
   real_2y: 'CARRY', ca_gdp: 'ESTRUCTURAL', reer: 'VALUATION', tot: 'ESTRUCTURAL',
-  '10y_real': 'RATES', core_cpi: 'INFLACION', niip: 'ESTRUCTURAL', policy: 'RATES',
-  cpi: 'INFLACION', nfp: 'EMPLEO', pmi: 'CRECIMIENTO', cftc: 'SENTIMIENTO',
+  '10y_real': 'RATES', core_cpi: 'INFLACIÓN', niip: 'ESTRUCTURAL', policy: 'RATES',
+  cpi: 'INFLACIÓN', nfp: 'EMPLEO', pmi: 'CRECIMIENTO', cftc: 'SENTIMIENTO',
   cb_balance: 'MONETARIO', debt: 'SOBERANO', umcsi: 'CRECIMIENTO',
+}
+
+const CATEGORY_COLOR = {
+  CARRY: 'text-[#ecd987]', RATES: 'text-[#60a5fa]', INFLACIÓN: 'text-[#f97316]',
+  EMPLEO: 'text-[#a78bfa]', CRECIMIENTO: 'text-[#4ade80]', SENTIMIENTO: 'text-[#f43f5e]',
+  MONETARIO: 'text-[#38bdf8]', SOBERANO: 'text-[#fb923c]', ESTRUCTURAL: 'text-[#a3a3a3]',
+  VALUATION: 'text-[#e879f9]',
 }
 
 const INDICATORS = BASE_INDICATORS.map(i => ({ ...i, category: CATEGORY_MAP[i.key] ?? i.key.toUpperCase() }))
 
-function getIndLabel(key, prefix) {
-  switch (key) {
-    case 'nfp':
-      return prefix === 'usa' ? 'NFP YoY (PAYEMS)' : 'Unemployment Rate (OECD)'
-    case 'umcsi':
-      return prefix === 'usa' ? 'UMCSI (Univ. Michigan)' : 'Consumer Confidence (OECD)'
-    case '10y_real':
-      return prefix === 'usa' ? '10Y Real Yield (TIPS)' : '10Y Nominal Yield (OECD)'
-    case 'pmi':
-      return prefix === 'usa' ? 'ISM Manufacturing' : 'PMI Manufacturing (manual)'
-    case 'policy':
-      if (prefix === 'usa') return 'Fed Funds Rate (DFF)'
-      if (prefix === 'eur') return 'ECB Deposit Facility Rate'
-      if (prefix === 'can') return 'BoC Overnight Rate'
-      return 'Policy Rate (OECD IRSTCI01)'
-    case 'cb_balance':
-      if (prefix === 'usa') return 'Fed Balance/GDP (WALCL)'
-      if (prefix === 'eur') return 'ECB Balance/GDP (ECBASSETSW)'
-      if (prefix === 'jpn') return 'BoJ Balance/GDP (JPNASSETS)'
-      return 'CB Balance/GDP (manual)'
-    case 'real_2y':
-      return prefix === 'usa' ? 'Real Rate 2Y (2Y − TIPS brkevn)' : 'Real Rate 2Y (policy − CPI)'
-    case 'cftc':
-      if (prefix === 'usa') return 'CFTC USD Index'
-      if (prefix === 'swe' || prefix === 'nor') return 'CFTC USD Index (inv. proxy)'
-      return `CFTC ${prefix === 'eur' ? 'Euro FX' : prefix === 'jpn' ? 'Japanese Yen' : prefix === 'gbr' ? 'British Pound' : prefix === 'che' ? 'Swiss Franc' : prefix === 'can' ? 'Canadian Dollar' : prefix === 'aus' ? 'Australian Dollar' : 'NZ Dollar'}`
-    case 'tot':
-      return 'Terms of Trade YoY (manual)'
-    default:
-      return INDICATORS.find(i => i.key === key)?.label ?? key
-  }
-}
-
 const INDICATORS_BY_CATEGORY = INDICATORS.reduce((acc, ind) => {
   const last = acc[acc.length - 1]
-  if (last && last.category === ind.category) {
-    last.items.push(ind)
-  } else {
-    acc.push({ category: ind.category, items: [ind] })
-  }
+  if (last && last.category === ind.category) last.items.push(ind)
+  else acc.push({ category: ind.category, items: [ind] })
   return acc
 }, [])
 
-// ── Tooltip ───────────────────────────────────────────────────────────────────
-function Tooltip({ text, align = 'center' }) {
-  const alignClass =
-    align === 'left'  ? 'left-0 -translate-x-0' :
-    align === 'right' ? 'right-0 translate-x-0'  :
-                        'left-1/2 -translate-x-1/2'
-  return (
-    <span className="relative group inline-flex items-center ml-1 cursor-help">
-      <span className="text-[10px] font-bold text-[#444] group-hover:text-[#ecd987] select-none leading-none">ⓘ</span>
-      <span className={`absolute bottom-full mb-2 ${alignClass} w-60 bg-[#0d0d0d] border border-[#333] text-[10px] text-[#aaa] font-mono px-2.5 py-2 leading-relaxed hidden group-hover:block z-50 pointer-events-none whitespace-normal`}>
-        {text}
-      </span>
-    </span>
-  )
+function getIndLabel(key, prefix) {
+  switch (key) {
+    case 'nfp':       return prefix === 'usa' ? 'NFP YoY' : 'Unemployment Rate'
+    case 'umcsi':     return prefix === 'usa' ? 'UMCSI Consumer Sentiment' : 'Consumer Confidence'
+    case '10y_real':  return prefix === 'usa' ? '10Y Real Yield (TIPS)' : '10Y Nominal Yield'
+    case 'pmi':       return prefix === 'usa' ? 'ISM Manufacturing' : 'PMI Manufacturing'
+    case 'policy':
+      if (prefix === 'usa') return 'Fed Funds Rate'
+      if (prefix === 'eur') return 'ECB Deposit Rate'
+      if (prefix === 'can') return 'BoC Rate'
+      return 'Policy Rate'
+    case 'cb_balance':
+      if (prefix === 'usa') return 'Fed Balance/GDP'
+      if (prefix === 'eur') return 'ECB Balance/GDP'
+      if (prefix === 'jpn') return 'BoJ Balance/GDP'
+      return 'CB Balance/GDP'
+    case 'real_2y':   return prefix === 'usa' ? 'Real Rate 2Y (2Y−TIPS)' : 'Real Rate 2Y'
+    case 'cftc':
+      if (prefix === 'usa') return 'CFTC USD Index'
+      if (prefix === 'swe' || prefix === 'nor') return 'CFTC USD (inv. proxy)'
+      return `CFTC ${prefix === 'eur' ? 'Euro FX' : prefix === 'jpn' ? 'JPY' : prefix === 'gbr' ? 'GBP' : prefix === 'che' ? 'CHF' : prefix === 'can' ? 'CAD' : prefix === 'aus' ? 'AUD' : 'NZD'}`
+    case 'tot':       return 'Terms of Trade YoY'
+    default:          return INDICATORS.find(i => i.key === key)?.label ?? key
+  }
 }
 
-// ── Textos de tooltips ────────────────────────────────────────────────────────
 const IND_TIPS = {
-  real_2y:    'Indicador DOMINANTE (b=0.14). USA: 2Y nominal (DGS2) menos TIPS breakeven (T5YIFR). Resto: policy rate (IRSTCI01) menos CPI YoY. Mayor valor = carry mas atractivo = divisa mas fuerte.',
-  '10y_real': 'USA: DFII10 (TIPS 10Y - yield real real). Resto paises: IRLTLT01XXM156N (yield NOMINAL 10Y OECD). Atencion: para no-USA es yield nominal usado como proxy del yield real.',
-  ca_gdp:     'Cuenta corriente como % del PIB. Superávit crónico = demanda estructural de la divisa. Déficit = presión vendedora.',
-  tot:        'Variación YoY de los términos de intercambio (px exportación / px importación). Fuente varía: EUR=Eurostat · AUS=ABS · CAN=StatCan · NOR=SSB · NZL=Stats NZ · resto=OECD MEI. Proxy si no disponible: Export PI / Import PI − 1.',
-  core_cpi:   'IPC subyacente YoY (excluye energía y alimentos). Proxy de presión inflacionaria estructural; anticipa movimientos de tipos.',
-  niip:       'Posición de Inversión Internacional Neta como % del PIB. Positivo = acreedor neto (CHE, JPN). Negativo = deudor neto (USA, GBP).',
-  policy:     'Tipo nominal del banco central. Refleja la postura de política monetaria. Se combina con CPI para derivar el tipo real.',
-  cpi:        'IPC general YoY. Incluye componentes volátiles (energía, alimentos). Proxy de inflación total.',
-  nfp:        'USA: PAYEMS YoY (NFP). Resto: LRHUTTTTXXM156S (tasa de paro OECD). Atencion: tasa de paro es inversa al empleo — z-score alto = paro alto = mercado laboral debil.',
-  cftc:       'Posicionamiento neto especulativo CFTC. EUR/JPY/GBP/CHF/CAD/AUD/NZD: contrato propio. SEK y NOK: no tienen contrato CFTC propio, se usa USD Index con signo invertido como proxy.',
-  cb_balance: 'USA: WALCL (Fed). EUR: ECBASSETSW. JPN: JPNASSETS. Resto: sin fuente automatizada (manual). Signo -1: expansion de balance (QE) es bajista para la divisa.',
-  pmi:        'USA: ISM Manufacturing (FRED). Resto: PMI Manufacturing nacional — sin fuente automatizada, entrada manual requerida.',
-  debt:       'Deuda pública bruta como % del PIB. Signo −1: mayor deuda → menor credibilidad fiscal → presión bajista estructural.',
-  reer:       'Desviación del REER respecto a su media de 10Y. Signo −1: si la divisa está cara en términos reales, tiende a revertir.',
-  umcsi:      'Confianza del consumidor (UMCSI para USA, OCDE para el resto). Anticipa gasto privado y perspectivas económicas.',
+  real_2y:    'DOMINANTE (β=0.14). USA: 2Y − TIPS breakeven. Resto: policy rate − CPI. Mayor real rate = carry más atractivo = divisa más fuerte.',
+  '10y_real': 'USA: TIPS 10Y real yield. Resto: 10Y nominal yield (proxy). Precaución: no-USA es nominal.',
+  ca_gdp:     'Cuenta corriente / PIB. Superávit = demanda estructural de la divisa. Déficit = presión vendedora.',
+  tot:        'Términos de intercambio YoY. Fuente varía por país. Proxy de ingresos de exportación.',
+  core_cpi:   'IPC subyacente YoY. Proxy de inflación estructural; anticipa movimientos de tipos.',
+  niip:       'Posición de Inversión Internacional Neta / PIB. Positivo = acreedor neto (CHF, JPY).',
+  policy:     'Tipo nominal del banco central. Se combina con CPI para derivar el tipo real.',
+  cpi:        'IPC general YoY. Incluye volátiles (energía, alimentos).',
+  nfp:        'USA: PAYEMS YoY. Resto: tasa de paro (inversa — z alto = paro alto = laboral débil).',
+  cftc:       'Posicionamiento neto especulativo CFTC. SEK/NOK usan USD Index invertido como proxy.',
+  cb_balance: 'Activos banco central / PIB. Signo −1: expansión (QE) = bajista para la divisa.',
+  pmi:        'USA: ISM Manufacturing. Resto: PMI nacional (entrada manual).',
+  debt:       'Deuda pública / PIB. Signo −1: más deuda = menor credibilidad fiscal.',
+  reer:       'Desviación REER vs media 10Y. Signo −1: si está cara en términos reales, tiende a revertir.',
+  umcsi:      'UMCSI (USA) / OCDE (resto). Anticipa gasto privado y perspectivas económicas.',
 }
-
-function getSourceId(prefix, key) {
-  const suffix = key === 'nfp' && prefix !== 'usa' ? 'empl' : key
-  return `endo_${prefix}_${suffix}`
-}
-
 
 function loadSourceValues() {
   try {
@@ -126,6 +99,11 @@ function loadSourceValues() {
   } catch { return {} }
 }
 
+function getSourceId(prefix, key) {
+  const suffix = key === 'nfp' && prefix !== 'usa' ? 'empl' : key
+  return `endo_${prefix}_${suffix}`
+}
+
 function getRegimeMultiplier(regime, cyclical) {
   if (regime === 'RISK-ON')  return cyclical ? 1.0 : 0.5
   if (regime === 'RISK-OFF') return cyclical ? 0.5 : 1.0
@@ -133,16 +111,16 @@ function getRegimeMultiplier(regime, cyclical) {
 }
 
 function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
-  const rm        = getRegimeMultiplier(regime, cyclical)
+  const rm = getRegimeMultiplier(regime, cyclical)
   const betaTotal = computeBetaTotal(betas)
   let short = 0, medium = 0, longScore = 0
   for (const ind of INDICATORS) {
-    const beta   = betas[ind.key] ?? ind.betaDoc
-    const z      = zScores[`${prefix}_${ind.key}`] ?? 0
+    const beta    = betas[ind.key] ?? ind.betaDoc
+    const z       = zScores[`${prefix}_${ind.key}`] ?? 0
     const contrib = (beta / betaTotal) * z * ind.sign * rm
-    if (ind.horizon === 'SHORT')  short      += contrib
-    if (ind.horizon === 'MEDIUM') medium     += contrib
-    if (ind.horizon === 'LONG')   longScore  += contrib
+    if (ind.horizon === 'SHORT')  short     += contrib
+    if (ind.horizon === 'MEDIUM') medium    += contrib
+    if (ind.horizon === 'LONG')   longScore += contrib
   }
   return { composite: 0.20 * short + 0.50 * medium + 0.30 * longScore, short, medium, long: longScore }
 }
@@ -152,150 +130,206 @@ function getConviction(signal) {
   return a > 0.6 ? 'FULL' : a > 0.4 ? 'HALF' : 'FLAT'
 }
 
-function convictionColor(conviction) {
-  return conviction === 'FULL' ? 'text-[#4ade80]' : conviction === 'HALF' ? 'text-[#f59e0b]' : 'text-[#777]'
-}
-
 function scoreColor(v) {
-  return v > 0 ? 'text-[#4ade80]' : v < 0 ? 'text-[#ef4444]' : 'text-[#e5e5e5]'
+  return v > 0.001 ? 'text-[#4ade80]' : v < -0.001 ? 'text-[#ef4444]' : 'text-[#555]'
 }
 
 function fmtScore(v) {
   return (v >= 0 ? '+' : '') + v.toFixed(3)
 }
 
+// Mini bar para z-score (rango -4 a +4)
+function ZBar({ z }) {
+  const clamped = Math.max(-4, Math.min(4, z))
+  const pct = Math.abs(clamped) / 4 * 100
+  const positive = clamped >= 0
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className={`text-sm font-mono font-bold w-14 text-right ${z === 0 ? 'text-[#333]' : z > 0 ? 'text-[#4ade80]' : 'text-[#ef4444]'}`}>
+        {z >= 0 ? '+' : ''}{z.toFixed(2)}
+      </span>
+      <div className="w-16 h-1.5 bg-[#1a1a1a] relative flex-shrink-0">
+        {positive
+          ? <div className="absolute left-1/2 top-0 h-full bg-[#4ade80]" style={{ width: `${pct / 2}%` }} />
+          : <div className="absolute right-1/2 top-0 h-full bg-[#ef4444]" style={{ width: `${pct / 2}%` }} />
+        }
+        <div className="absolute left-1/2 top-0 w-px h-full bg-[#333]" />
+      </div>
+    </div>
+  )
+}
+
+// Mini bar para contribución
+function ContribBar({ contrib, maxContrib }) {
+  const pct = maxContrib > 0 ? Math.abs(contrib) / maxContrib * 100 : 0
+  const positive = contrib >= 0
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className={`text-sm font-mono font-bold w-14 text-right ${scoreColor(contrib)}`}>
+        {fmtScore(contrib)}
+      </span>
+      <div className="w-20 h-2 bg-[#1a1a1a] flex-shrink-0 rounded-sm overflow-hidden">
+        <div
+          className={`h-full rounded-sm ${positive ? 'bg-[#4ade80]' : 'bg-[#ef4444]'}`}
+          style={{ width: `${pct}%`, opacity: 0.7 }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function Tooltip({ text, align = 'center' }) {
+  const alignClass =
+    align === 'left'  ? 'left-0' :
+    align === 'right' ? 'right-0' :
+                        'left-1/2 -translate-x-1/2'
+  return (
+    <span className="relative group inline-flex items-center ml-1 cursor-help">
+      <span className="text-[9px] font-bold text-[#333] group-hover:text-[#666] select-none">ⓘ</span>
+      <span className={`absolute bottom-full mb-2 ${alignClass} w-56 bg-[#0d0d0d] border border-[#333] text-[10px] text-[#aaa] px-2.5 py-2 leading-relaxed hidden group-hover:block z-50 pointer-events-none whitespace-normal`}>
+        {text}
+      </span>
+    </span>
+  )
+}
+
 export default function EndogenousOpsPage() {
   const { zscores: zScores, worldview: wvData } = useModelStore()
-  const [betas]                 = useState(loadBetas)
-  const [sourceValues]          = useState(loadSourceValues)
-  const [pairA, setPairA]     = useState('usa')
-  const [pairB, setPairB]     = useState('eur')
+  const [betas]        = useState(loadBetas)
+  const [sourceValues] = useState(loadSourceValues)
+  const [pairA, setPairA]   = useState('usa')
+  const [pairB, setPairB]   = useState('eur')
   const [activeTab, setActiveTab] = useState('usa')
 
   const regimeOn  = wvData.vix < 30 && wvData.hyOas < 30 && wvData.sp200dma === 1 && wvData.embi < 40
   const regimeOff = wvData.vix > 70 || wvData.hyOas > 70 || wvData.sp200dma === 0 || wvData.embi > 70
   const regime    = regimeOn ? 'RISK-ON' : regimeOff ? 'RISK-OFF' : 'MIXTO'
-  const regimeColor = regime === 'RISK-ON' ? 'text-[#4ade80]' : regime === 'RISK-OFF' ? 'text-[#ef4444]' : 'text-[#e5e5e5]'
 
-  const countryScores = COUNTRIES.map(c => ({ ...c, ...computeCountryScore(c.prefix, c.cyclical, regime, zScores, betas) }))
+  const countryScores  = COUNTRIES.map(c => ({ ...c, ...computeCountryScore(c.prefix, c.cyclical, regime, zScores, betas) }))
   const rankedCountries = [...countryScores].sort((a, b) => b.composite - a.composite)
+  const maxAbsScore    = Math.max(...countryScores.map(c => Math.abs(c.composite)), 0.001)
 
-  const scoreA    = countryScores.find(c => c.prefix === pairA)
-  const scoreB    = countryScores.find(c => c.prefix === pairB)
-  const signal    = scoreA && scoreB ? scoreA.composite - scoreB.composite : 0
+  const scoreA     = countryScores.find(c => c.prefix === pairA)
+  const scoreB     = countryScores.find(c => c.prefix === pairB)
+  const signal     = scoreA && scoreB ? scoreA.composite - scoreB.composite : 0
   const conviction = getConviction(signal)
   const direction  = signal > 0
     ? `LONG ${pairA.toUpperCase()}/${pairB.toUpperCase()}`
     : signal < 0
     ? `LONG ${pairB.toUpperCase()}/${pairA.toUpperCase()}`
-    : 'FLAT — SIN SEÑAL'
+    : 'FLAT'
 
-  const activeCountry = COUNTRIES.find(c => c.prefix === activeTab)
-  const activeRegimeMult = getRegimeMultiplier(regime, activeCountry?.cyclical ?? true)
+  const activeCountry     = COUNTRIES.find(c => c.prefix === activeTab)
+  const activeScore       = countryScores.find(c => c.prefix === activeTab)
+  const activeRegimeMult  = getRegimeMultiplier(regime, activeCountry?.cyclical ?? true)
+
+  // Max contribution for bar scaling
+  const betaTotal = computeBetaTotal(betas)
+  const allContribs = activeCountry
+    ? INDICATORS.map(ind => {
+        const z = zScores[`${activeCountry.prefix}_${ind.key}`] ?? 0
+        return Math.abs((betas[ind.key] ?? ind.betaDoc) / betaTotal * z * ind.sign * activeRegimeMult)
+      })
+    : []
+  const maxContrib = Math.max(...allContribs, 0.001)
+
+  const convColor = conviction === 'FULL' ? 'text-[#4ade80]' : conviction === 'HALF' ? 'text-[#f59e0b]' : 'text-[#555]'
+  const regimeColor = regime === 'RISK-ON' ? 'text-[#4ade80]' : regime === 'RISK-OFF' ? 'text-[#ef4444]' : 'text-[#e5e5e5]'
 
   return (
     <div className="pt-12 min-h-screen">
       <div className="max-w-5xl mx-auto px-4 py-4">
 
-        {/* ===== HEADER ===== */}
+        {/* ── HEADER ── */}
         <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-[#333]">
-          <h1 className="text-2xl font-bold uppercase tracking-widest">OPERATIVA — ENDOGENOUS</h1>
-          <div className="flex items-center gap-3">
-            <Link
-              to="/model-inputs"
-              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#333] text-[#777] hover:text-white hover:border-white"
-            >
-              MODEL INPUTS →
+          <div>
+            <h1 className="text-2xl font-bold uppercase tracking-widest">ENDOGENOUS</h1>
+            <p className="text-xs text-[#555] mt-0.5 uppercase tracking-wider">Módulo II — Scoring macroeconómico G10</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link to="/model-inputs" className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-[#333] text-[#555] hover:text-white hover:border-white transition-colors">
+              Z-Scores
             </Link>
-            <Link
-              to="/endogenous/betas"
-              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white"
-            >
-              BETAS →
-            </Link>
-            <Link
-              to="/data/raw?module=Endogenous"
-              className="text-xs font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]"
-            >
-              → /DATA
+            <Link to="/endogenous/betas" className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white transition-colors">
+              Betas
             </Link>
           </div>
         </div>
 
-        {/* ===== STATE VECTOR ===== */}
-        <div className="border-2 border-[#333] mb-4">
-          <div className="px-3 py-2 bg-[#1a1a0d] border-b-2 border-[#ecd987]">
-            <span className="text-base font-bold uppercase tracking-widest text-[#ecd987]">Endogenous State Vector</span>
+        {/* ── SEÑAL DEL PAR ── */}
+        <div className="border-2 border-[#333] mb-3">
+          <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333]">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Señal de Par</span>
           </div>
-
-          {/* Row 1: 5 cells */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-0">
-            {/* Regimen */}
-            <div className="p-3 border-r border-b border-[#222]">
-              <div className="text-xs text-[#777] uppercase tracking-wider mb-1">Regimen (WV)<Tooltip text="Determinado por VIX, HY OAS, SP500 vs 200DMA y EMBI. RISK-ON = mercados expansivos · RISK-OFF = aversión al riesgo · MIXTO = entre umbrales. Afecta al multiplicador de régimen de cada divisa." /></div>
-              <div className={`text-xl font-mono font-bold ${regimeColor}`}>{regime}</div>
-            </div>
+
             {/* Par selector */}
-            <div className="p-3 border-r border-b border-[#222] sm:col-span-1">
-              <div className="text-xs text-[#777] uppercase tracking-wider mb-1">Par</div>
+            <div className="p-3 border-r border-[#222]">
+              <div className="text-[10px] text-[#555] uppercase tracking-wider mb-2">Par</div>
               <div className="flex items-center gap-1">
-                <div className="relative inline-block">
-                  <select
-                    value={pairA}
-                    onChange={e => setPairA(e.target.value)}
-                    className="appearance-none bg-[#111] border-b-2 border-[#ecd987] text-sm font-bold text-white px-2 py-0.5 pr-5 outline-none focus:border-white w-16"
-                  >
-                    {COUNTRIES.map(c => <option key={c.prefix} value={c.prefix}>{c.label}</option>)}
-                  </select>
-                  <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[#ecd987] text-xs pointer-events-none">v</span>
-                </div>
-                <span className="text-[#555] font-bold text-sm">/</span>
-                <div className="relative inline-block">
-                  <select
-                    value={pairB}
-                    onChange={e => setPairB(e.target.value)}
-                    className="appearance-none bg-[#111] border-b-2 border-[#ecd987] text-sm font-bold text-white px-2 py-0.5 pr-5 outline-none focus:border-white w-16"
-                  >
-                    {COUNTRIES.map(c => <option key={c.prefix} value={c.prefix}>{c.label}</option>)}
-                  </select>
-                  <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[#ecd987] text-xs pointer-events-none">v</span>
-                </div>
+                <select value={pairA} onChange={e => setPairA(e.target.value)}
+                  className="bg-[#111] border-b-2 border-[#ecd987] text-sm font-bold text-white px-1 py-0.5 outline-none w-14">
+                  {COUNTRIES.map(c => <option key={c.prefix} value={c.prefix}>{c.label}</option>)}
+                </select>
+                <span className="text-[#444]">/</span>
+                <select value={pairB} onChange={e => setPairB(e.target.value)}
+                  className="bg-[#111] border-b-2 border-[#ecd987] text-sm font-bold text-white px-1 py-0.5 outline-none w-14">
+                  {COUNTRIES.map(c => <option key={c.prefix} value={c.prefix}>{c.label}</option>)}
+                </select>
               </div>
             </div>
+
             {/* Señal */}
-            <div className="p-3 border-r border-b border-[#222]">
-              <div className="text-xs text-[#777] uppercase tracking-wider mb-1">Señal<Tooltip text="Diferencial de scores compuestos: score_A − score_B. Positivo = divisa A más fuerte. Rango típico [−1, +1]." /></div>
-              <div className={`text-xl font-mono font-bold ${scoreColor(signal)}`}>{fmtScore(signal)}</div>
+            <div className="p-3 border-r border-[#222]">
+              <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">
+                Señal
+                <Tooltip text="Diferencial score_A − score_B. Positivo = divisa A más fuerte. Rango típico [−1, +1]." />
+              </div>
+              <div className={`text-2xl font-mono font-bold ${scoreColor(signal)}`}>{fmtScore(signal)}</div>
             </div>
-            {/* Conviccion */}
-            <div className="p-3 border-r border-b border-[#222]">
-              <div className="text-xs text-[#777] uppercase tracking-wider mb-1">Conviccion<Tooltip align="right" text="Umbrales de convicción: FULL si |señal| > 0.60 · HALF si |señal| > 0.40 · FLAT si |señal| ≤ 0.40. FLAT = no operar." /></div>
-              <div className={`text-xl font-mono font-bold ${convictionColor(conviction)}`}>{conviction}</div>
+
+            {/* Convicción */}
+            <div className="p-3 border-r border-[#222]">
+              <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">
+                Convicción
+                <Tooltip text="FULL si |señal|>0.60 · HALF si |señal|>0.40 · FLAT si ≤0.40 → no operar." />
+              </div>
+              <div className={`text-2xl font-mono font-bold ${convColor}`}>{conviction}</div>
             </div>
-            {/* Posicion */}
-            <div className="p-3 border-b border-[#222]">
-              <div className="text-xs text-[#777] uppercase tracking-wider mb-1">Posicion<Tooltip align="right" text="Dirección operativa derivada de la señal. Solo se muestra si convicción ≥ HALF. FLAT = el modelo no tiene señal suficiente para operar." /></div>
-              <div className={`text-base font-bold uppercase tracking-wide ${conviction === 'FLAT' ? 'text-[#777]' : 'text-white'}`}>
-                {conviction === 'FLAT' ? '---' : direction}
+
+            {/* Dirección */}
+            <div className="p-3 border-r border-[#222]">
+              <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Dirección</div>
+              <div className={`text-base font-bold uppercase tracking-wide ${conviction === 'FLAT' ? 'text-[#444]' : signal > 0 ? 'text-[#4ade80]' : 'text-[#ef4444]'}`}>
+                {conviction === 'FLAT' ? '— sin señal —' : direction}
+              </div>
+            </div>
+
+            {/* Régimen */}
+            <div className="p-3">
+              <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Régimen (WV)</div>
+              <div className={`text-base font-bold uppercase ${regimeColor}`}>{regime}</div>
+              <div className="text-[10px] text-[#444] mt-0.5">
+                Mult: ciclicas ×{getRegimeMultiplier(regime, true).toFixed(2)} · refugio ×{getRegimeMultiplier(regime, false).toFixed(2)}
               </div>
             </div>
           </div>
 
-          {/* Row 2: horizon breakdown */}
-          <div className="grid grid-cols-3 gap-0">
+          {/* Horizonte breakdown */}
+          <div className="grid grid-cols-3 border-t border-[#222]">
             {[
-              { label: 'CORTO (20%)',  tip: 'Indicadores con impacto en días-semanas (CFTC). Peso del 20% en el score compuesto.', a: scoreA?.short,  b: scoreB?.short  },
-              { label: 'MEDIO (50%)',  tip: 'Indicadores con impacto en 1-6 meses (tipos, inflación, empleo, PMI). Peso del 50% — es el horizonte dominante.', a: scoreA?.medium, b: scoreB?.medium },
-              { label: 'LARGO (30%)',  tip: 'Indicadores estructurales con impacto en 6+ meses (CA, NIIP, ToT, REER, deuda). Peso del 30%.', a: scoreA?.long,   b: scoreB?.long   },
+              { label: 'CORTO 20%', tip: 'Indicadores de días-semanas (CFTC). Peso 20%.', a: scoreA?.short,  b: scoreB?.short  },
+              { label: 'MEDIO 50%', tip: 'Indicadores 1-6 meses (tipos, inflación, empleo, PMI). Peso 50% — dominante.', a: scoreA?.medium, b: scoreB?.medium },
+              { label: 'LARGO 30%', tip: 'Indicadores estructurales 6+ meses (CA, NIIP, ToT, REER, deuda). Peso 30%.', a: scoreA?.long,   b: scoreB?.long   },
             ].map((h, i) => (
-              <div key={h.label} className={`p-3 ${i < 2 ? 'border-r' : ''} border-[#222]`}>
-                <div className="text-xs text-[#777] uppercase tracking-wider mb-1">{h.label}<Tooltip text={h.tip} /></div>
-                <div className="flex gap-3">
-                  <span className={`text-sm font-mono font-bold ${scoreColor(h.a ?? 0)}`}>
-                    {COUNTRIES.find(c => c.prefix === pairA)?.label}: {fmtScore(h.a ?? 0)}
+              <div key={h.label} className={`px-3 py-2 ${i < 2 ? 'border-r' : ''} border-[#222]`}>
+                <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">{h.label}<Tooltip text={h.tip} /></div>
+                <div className="flex gap-4">
+                  <span className={`text-xs font-mono font-bold ${scoreColor(h.a ?? 0)}`}>
+                    {COUNTRIES.find(c => c.prefix === pairA)?.label} {fmtScore(h.a ?? 0)}
                   </span>
-                  <span className={`text-sm font-mono font-bold ${scoreColor(h.b ?? 0)}`}>
-                    {COUNTRIES.find(c => c.prefix === pairB)?.label}: {fmtScore(h.b ?? 0)}
+                  <span className={`text-xs font-mono font-bold ${scoreColor(h.b ?? 0)}`}>
+                    {COUNTRIES.find(c => c.prefix === pairB)?.label} {fmtScore(h.b ?? 0)}
                   </span>
                 </div>
               </div>
@@ -303,58 +337,87 @@ export default function EndogenousOpsPage() {
           </div>
         </div>
 
-        {/* ===== RANKING DE FORTALEZA ===== */}
-        <div className="border-2 border-[#333] mb-4">
-          <div className="px-3 py-2 bg-[#111] border-b-2 border-[#333] flex items-center justify-between">
-            <span className="text-base font-bold uppercase tracking-widest text-[#e5e5e5]">Ranking de Fortaleza G10</span>
-            <span className="text-[10px] text-[#555] uppercase tracking-wider flex items-center gap-1">
-              Regime: {regime} · Mult pro-ciclico: {getRegimeMultiplier(regime, true).toFixed(2)} / refugio: {getRegimeMultiplier(regime, false).toFixed(2)}
-              <Tooltip align="right" text="Multiplicador de régimen (RM). Pro-cíclicas (EUR,GBP,CAD,AUD,NZD,SEK,NOK): se amplifican en RISK-ON y se atenúan en RISK-OFF. Refugio (USD,JPY,CHF): al revés. MIXTO = 0.75 para todas." />
-            </span>
+        {/* ── RANKING G10 ── */}
+        <div className="border-2 border-[#333] mb-3">
+          <div className="px-3 py-1.5 bg-[#111] border-b border-[#333]">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#a3a3a3]">Ranking de Fortaleza G10 — haz click para detallar</span>
           </div>
-          <div className="grid grid-cols-5 sm:grid-cols-10 gap-0">
-            {rankedCountries.map((c, i) => (
-              <button
-                key={c.prefix}
-                onClick={() => setActiveTab(c.prefix)}
-                className={`p-3 border-r border-b border-[#222] text-center transition-colors hover:bg-[#111] ${activeTab === c.prefix ? 'bg-[#111]' : ''}`}
-              >
-                <div className="text-[10px] text-[#777] uppercase tracking-widest mb-0.5">{c.label}</div>
-                <div className={`text-lg font-mono font-bold ${scoreColor(c.composite)}`}>
-                  {fmtScore(c.composite)}
-                </div>
-                <div className="text-[10px] text-[#555] uppercase tracking-wider mt-0.5">#{i + 1}</div>
-              </button>
-            ))}
+          <div className="grid grid-cols-5 sm:grid-cols-10">
+            {rankedCountries.map((c, i) => {
+              const barPct = Math.abs(c.composite) / maxAbsScore * 100
+              const isActive = activeTab === c.prefix
+              return (
+                <button key={c.prefix} onClick={() => setActiveTab(c.prefix)}
+                  className={`p-3 border-r border-b border-[#1a1a1a] text-center transition-colors ${isActive ? 'bg-[#111] border-b-2 border-b-[#ecd987]' : 'hover:bg-[#0a0a0a]'}`}>
+                  <div className="text-[9px] text-[#444] uppercase mb-0.5">#{i + 1}</div>
+                  <div className={`text-xs font-bold uppercase mb-1 ${isActive ? 'text-[#ecd987]' : 'text-[#a3a3a3]'}`}>{c.label}</div>
+                  <div className={`text-base font-mono font-bold ${scoreColor(c.composite)}`}>{fmtScore(c.composite)}</div>
+                  <div className="mt-1.5 h-1 bg-[#1a1a1a] overflow-hidden">
+                    <div className={`h-full ${c.composite > 0 ? 'bg-[#4ade80]' : c.composite < 0 ? 'bg-[#ef4444]' : 'bg-[#333]'}`}
+                      style={{ width: `${barPct}%` }} />
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </div>
 
-        {/* ===== COUNTRY INPUTS ===== */}
+        {/* ── DETALLE DE PAÍS ── */}
         <div className="border-2 border-[#333]">
-          <div className="px-3 py-2 bg-[#1a1a0d] border-b-2 border-[#ecd987] flex items-center justify-between">
-            <span className="text-base font-bold uppercase tracking-widest text-[#ecd987]">Z-Scores por Pais</span>
-            <Link to="/world-view/operativa" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">
-              EDITAR REGIMEN EN WORLD VIEW →
-            </Link>
-          </div>
+          {/* Country header */}
+          {activeCountry && activeScore && (
+            <div className="px-4 py-3 bg-[#0f0f0f] border-b border-[#222] flex items-center justify-between">
+              <div className="flex items-center gap-6">
+                <div>
+                  <div className="text-[10px] text-[#555] uppercase tracking-wider mb-0.5">{activeCountry.cyclical ? 'Pro-Cíclica' : 'Refugio'} · RM ×{activeRegimeMult.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-[#ecd987] uppercase">{activeCountry.label}</div>
+                </div>
+                <div className={`text-3xl font-mono font-bold ${scoreColor(activeScore.composite)}`}>
+                  {fmtScore(activeScore.composite)}
+                </div>
+                <div className="flex flex-col gap-1 text-[10px]">
+                  {[
+                    { label: 'CORTO 20%', value: activeScore.short  },
+                    { label: 'MEDIO 50%', value: activeScore.medium },
+                    { label: 'LARGO 30%', value: activeScore.long   },
+                  ].map(h => (
+                    <div key={h.label} className="flex items-center gap-2">
+                      <span className="text-[#444] w-20 uppercase">{h.label}</span>
+                      <div className="w-24 h-1 bg-[#1a1a1a] relative">
+                        {h.value >= 0
+                          ? <div className="absolute left-1/2 top-0 h-full bg-[#4ade80]"
+                              style={{ width: `${Math.min(Math.abs(h.value) / 0.5 * 50, 50)}%` }} />
+                          : <div className="absolute right-1/2 top-0 h-full bg-[#ef4444]"
+                              style={{ width: `${Math.min(Math.abs(h.value) / 0.5 * 50, 50)}%` }} />
+                        }
+                        <div className="absolute left-1/2 top-0 w-px h-full bg-[#333]" />
+                      </div>
+                      <span className={`font-mono w-14 ${scoreColor(h.value)}`}>{fmtScore(h.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <Link to={`/model-inputs?country=${activeCountry.prefix}`}
+                className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">
+                → Datos
+              </Link>
+            </div>
+          )}
 
           {/* Tab bar */}
-          <div className="flex border-b-2 border-[#333] overflow-x-auto">
+          <div className="flex border-b border-[#222] overflow-x-auto bg-[#0a0a0a]">
             {COUNTRIES.map(c => {
               const cs = countryScores.find(x => x.prefix === c.prefix)
               return (
-                <button
-                  key={c.prefix}
-                  onClick={() => setActiveTab(c.prefix)}
-                  className={`px-3 py-2 text-sm font-bold uppercase tracking-wider border-r border-[#222] whitespace-nowrap flex-shrink-0 ${
+                <button key={c.prefix} onClick={() => setActiveTab(c.prefix)}
+                  className={`px-3 py-2 text-xs font-bold uppercase tracking-wider border-r border-[#1a1a1a] whitespace-nowrap flex-shrink-0 transition-colors ${
                     activeTab === c.prefix
-                      ? 'bg-[#111] text-[#ecd987] border-b-2 border-[#ecd987] -mb-[2px]'
-                      : 'text-[#777] hover:text-white'
-                  }`}
-                >
+                      ? 'text-[#ecd987] bg-[#111]'
+                      : 'text-[#444] hover:text-[#a3a3a3]'
+                  }`}>
                   {c.label}
                   {cs && (
-                    <span className={`ml-1.5 text-xs font-mono ${scoreColor(cs.composite)}`}>
+                    <span className={`ml-1.5 text-[10px] font-mono ${scoreColor(cs.composite)}`}>
                       {fmtScore(cs.composite)}
                     </span>
                   )}
@@ -363,133 +426,100 @@ export default function EndogenousOpsPage() {
             })}
           </div>
 
-          {/* Active country info bar */}
+          {/* Indicator table */}
           {activeCountry && (
-            <div className="px-3 py-2 bg-[#0a0a0a] border-b border-[#222] flex items-center gap-6">
-              <span className="text-sm font-bold text-white uppercase tracking-wider">{activeCountry.label}</span>
-              <span className="text-xs text-[#555] uppercase tracking-wider">
-                {activeCountry.cyclical ? 'PRO-CICLICA' : 'REFUGIO'} · Mult: {activeRegimeMult.toFixed(2)}
-              </span>
-              <Link
-                to={`/model-inputs?country=${activeCountry.prefix}`}
-                className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white ml-auto"
-              >
-                VER HISTORIAL →
-              </Link>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[580px]">
+                <thead>
+                  <tr className="bg-[#0a0a0a] border-b border-[#222] text-[#444] text-left">
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest w-[36%]">Indicador</th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest w-[28%]">
+                      Z-Score
+                      <Tooltip text="Desviaciones estándar del valor actual respecto a la media histórica. Rango [−4, +4]." />
+                    </th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest w-[28%]">
+                      Contribución
+                      <Tooltip align="right" text="β_norm × z × signo × RM. La barra muestra la magnitud relativa. Verde = aporta fortaleza." />
+                    </th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest w-[8%]">TF</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {INDICATORS_BY_CATEGORY.map(({ category, items }) => (
+                    <Fragment key={category}>
+                      {/* Category row */}
+                      <tr className="bg-[#0f0f0f] border-y border-[#1a1a1a]">
+                        <td colSpan={4} className="px-3 py-1.5">
+                          <span className={`text-[10px] font-bold uppercase tracking-widest ${CATEGORY_COLOR[category] ?? 'text-[#555]'}`}>
+                            {category}
+                          </span>
+                        </td>
+                      </tr>
+
+                      {items.map(ind => {
+                        const z        = zScores[`${activeCountry.prefix}_${ind.key}`] ?? 0
+                        const beta     = betas[ind.key] ?? ind.betaDoc
+                        const contrib  = (beta / betaTotal) * z * ind.sign * activeRegimeMult
+                        const rawVal   = sourceValues[getSourceId(activeCountry.prefix, ind.key)]
+                        const hasData  = z !== 0 || rawVal != null
+
+                        return (
+                          <tr key={ind.key} className={`border-b border-[#111] hover:bg-[#0a0a0a] transition-colors ${!hasData ? 'opacity-40' : ''}`}>
+                            {/* Indicator name */}
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs font-bold text-[#e5e5e5]">
+                                  {getIndLabel(ind.key, activeCountry.prefix)}
+                                </span>
+                                {IND_TIPS[ind.key] && <Tooltip text={IND_TIPS[ind.key]} />}
+                                {ind.key === 'real_2y' && (
+                                  <span className="text-[9px] font-bold text-[#ecd987] ml-1">★</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className={`text-[9px] uppercase tracking-wider ${ind.sign === 1 ? 'text-[#4ade80]' : 'text-[#ef4444]'}`}>
+                                  {ind.sign === 1 ? '▲ bull' : '▼ bear'}
+                                </span>
+                                {rawVal != null && (
+                                  <span className="text-[9px] font-mono text-[#f59e0b]">{rawVal.toFixed(2)}</span>
+                                )}
+                                {!hasData && (
+                                  <span className="text-[9px] text-[#444] uppercase">sin datos</span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Z-Score with bar */}
+                            <td className="px-3 py-2">
+                              <ZBar z={z} />
+                            </td>
+
+                            {/* Contribution with bar */}
+                            <td className="px-3 py-2">
+                              <ContribBar contrib={contrib} maxContrib={maxContrib} />
+                            </td>
+
+                            {/* Horizon */}
+                            <td className="px-3 py-2">
+                              <span className={`text-[9px] font-bold uppercase tracking-wider ${
+                                ind.horizon === 'SHORT'  ? 'text-[#60a5fa]' :
+                                ind.horizon === 'MEDIUM' ? 'text-[#f59e0b]' : 'text-[#666]'
+                              }`}>
+                                {ind.horizon === 'SHORT' ? 'S' : ind.horizon === 'MEDIUM' ? 'M' : 'L'}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-
-          {/* Indicator table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm table-fixed min-w-[640px]">
-              <thead>
-                <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#777]">
-                  <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[13%]">Cat</th>
-                  <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[26%]">Indicador</th>
-                  <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[14%]">
-                    Z-Score<Tooltip text="Desviaciones estándar del valor actual respecto a la media histórica de 10Y. Rango recortado a [−4, +4]. Se calcula en /model-inputs." />
-                  </th>
-                  <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[9%]">
-                    β norm<Tooltip text="Beta normalizado = β_doc / Σβ_impl (0.76). Peso relativo de este indicador dentro del score. Suma de todos los β_norm = 1.00." />
-                  </th>
-                  <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[11%]">
-                    Contrib<Tooltip align="right" text="Contribución al score = β_norm × z-score × signo × RM. Verde = aporta fortaleza a la divisa. Rojo = aporta debilidad." />
-                  </th>
-                  <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[14%]">
-                    Horizonte<Tooltip align="right" text="Clasificación temporal del indicador. AZUL=SHORT (días) · ÁMBAR=MEDIUM (meses) · GRIS=LONG (estructural). Define el peso en el score compuesto." />
-                  </th>
-                  <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[13%]">Data</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activeCountry && INDICATORS_BY_CATEGORY.map(({ category, items }) => (
-                  <Fragment key={category}>
-                    <tr className="border-y border-[#333] bg-[#161616]">
-                      <td colSpan={7} className="px-2 py-1.5">
-                        <span className="text-sm font-bold uppercase tracking-widest text-[#ecd987]">{category}</span>
-                      </td>
-                    </tr>
-                    {items.map(ind => {
-                      const z           = zScores[`${activeCountry.prefix}_${ind.key}`] ?? 0
-                      const effectiveBeta = betas[ind.key] ?? ind.betaDoc
-                      const betaTotal   = computeBetaTotal(betas)
-                      const contrib     = (effectiveBeta / betaTotal) * z * ind.sign * activeRegimeMult
-                      return (
-                        <tr key={ind.key} className="border-b border-[#222] hover:bg-[#0a0a0a]">
-                          <td className="px-2 py-1.5">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#555]">{category}</span>
-                          </td>
-                          <td className="px-2 py-1.5">
-                            <div className="flex items-center gap-0.5">
-                              <span className="text-sm font-bold text-[#e5e5e5]">{getIndLabel(ind.key, activeCountry.prefix)}</span>
-                              {IND_TIPS[ind.key] && <Tooltip align="left" text={IND_TIPS[ind.key]} />}
-                            </div>
-                            <div className="text-[10px] text-[#555]">{ind.sign === 1 ? '▲ FX positivo' : '▼ FX negativo'}</div>
-                            {(() => {
-                              const raw = sourceValues[getSourceId(activeCountry.prefix, ind.key)]
-                              return raw != null
-                                ? <div className="text-[10px] font-mono text-[#f59e0b]">val: {raw.toFixed(2)}</div>
-                                : null
-                            })()}
-                          </td>
-                          <td className="px-2 py-1.5">
-                            <span className={`text-sm font-mono font-bold ${z === 0 ? 'text-[#555]' : z > 0 ? 'text-[#4ade80]' : 'text-[#ef4444]'}`}>
-                              {z >= 0 ? '+' : ''}{z.toFixed(3)}
-                            </span>
-                          </td>
-                          <td className="px-2 py-1.5">
-                            <span className="text-xs font-mono text-[#777]">{(effectiveBeta / betaTotal).toFixed(3)}</span>
-                          </td>
-                          <td className="px-2 py-1.5">
-                            <span className={`text-sm font-mono font-bold ${scoreColor(contrib)}`}>
-                              {fmtScore(contrib)}
-                            </span>
-                          </td>
-                          <td className="px-2 py-1.5">
-                            <span className={`text-xs font-bold uppercase tracking-wider ${
-                              ind.horizon === 'SHORT'  ? 'text-[#60a5fa]' :
-                              ind.horizon === 'MEDIUM' ? 'text-[#f59e0b]' :
-                                                         'text-[#a3a3a3]'
-                            }`}>{ind.horizon}</span>
-                          </td>
-                          <td className="px-2 py-1.5">
-                            <Link
-                              to={`/model-inputs?country=${activeCountry.prefix}&key=${ind.key}`}
-                              className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white"
-                            >↗ HIST</Link>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Per-country sub-score footer */}
-          {activeCountry && (() => {
-            const cs = countryScores.find(c => c.prefix === activeCountry.prefix)
-            return cs ? (
-              <div className="grid grid-cols-4 gap-0 border-t-2 border-[#333]">
-                {[
-                  { label: 'Score CORTO',  tip: 'Suma de contribuciones de indicadores SHORT (CFTC). Pesa 20% en el compuesto.', value: cs.short,     weight: '20%' },
-                  { label: 'Score MEDIO',  tip: 'Suma de contribuciones de indicadores MEDIUM (tipos, inflación, empleo). Pesa 50%.', value: cs.medium,    weight: '50%' },
-                  { label: 'Score LARGO',  tip: 'Suma de contribuciones de indicadores LONG (CA, NIIP, REER, deuda...). Pesa 30%.', value: cs.long,      weight: '30%' },
-                  { label: 'COMPUESTO',    tip: 'Score final = 0.20×CORTO + 0.50×MEDIO + 0.30×LARGO. Base para el ranking y la señal de par.', value: cs.composite, weight: '—'   },
-                ].map((item, i) => (
-                  <div key={item.label} className={`p-3 ${i < 3 ? 'border-r' : ''} border-[#222] bg-[#0a0a0a]`}>
-                    <div className="text-xs text-[#777] uppercase tracking-wider mb-1">{item.label} <span className="text-[#444]">({item.weight})</span><Tooltip align={i === 3 ? 'right' : 'left'} text={item.tip} /></div>
-                    <div className={`text-lg font-mono font-bold ${scoreColor(item.value)}`}>{fmtScore(item.value)}</div>
-                  </div>
-                ))}
-              </div>
-            ) : null
-          })()}
         </div>
 
       </div>
     </div>
   )
 }
-
