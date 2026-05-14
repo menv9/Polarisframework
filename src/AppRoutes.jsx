@@ -15,6 +15,7 @@ import DashboardPage from './pages/DashboardPage'
 import EndogenousOpsPage from './pages/EndogenousOpsPage'
 import ModelInputsPage from './pages/ModelInputsPage'
 import EndogenousBetasPage from './pages/EndogenousBetasPage'
+import ExogenousOpsPage from './pages/ExogenousOpsPage'
 
 function Layout({ children }) {
   return (
@@ -76,6 +77,7 @@ export default function AppRoutes() {
                 <Route path="/model-inputs" element={<ModelInputsPage />} />
                 <Route path="/endogenous/zscores" element={<ModelInputsPage />} />
                 <Route path="/endogenous/betas" element={<EndogenousBetasPage />} />
+                <Route path="/exogenous/operativa" element={<ExogenousOpsPage />} />
               </Routes>
             </Layout>
           </ProtectedRoute>

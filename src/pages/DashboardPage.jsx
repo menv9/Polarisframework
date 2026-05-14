@@ -253,6 +253,7 @@ export default function DashboardPage() {
               { to: '/world-view/operativa', label: 'World View Ops',   desc: 'Vector de estado + parámetros' },
               { to: '/endogenous',           label: 'Endogenous Ops',   desc: 'Señales + ranking G10' },
               { to: '/model-inputs',         label: 'Model Inputs',     desc: 'Z-scores + historial series' },
+              { to: '/exogenous/operativa',   label: 'Exogenous Ops',    desc: 'Commodities, China, Rates' },
               { to: '/data',                 label: 'Centro de Datos',  desc: 'Fuentes + cobertura' },
             ].map(link => (
               <Link
