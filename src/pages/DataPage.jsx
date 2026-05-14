@@ -2,6 +2,41 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { dataSources, getNextUpdate, getStatus, countByStatus, getAccessSummary } from '../data/dataSources'
 
+function exportCsv(sources) {
+  const headers = [
+    'id', 'modulo', 'pais', 'indicador', 'categoria',
+    'valor', 'ultima_actualizacion', 'proxima_actualizacion', 'estado',
+    'fuente', 'endpoint', 'frecuencia', 'fit', 'medida', 'notas',
+  ]
+
+  const escape = (v) => {
+    if (v === null || v === undefined) return ''
+    const s = String(v).replace(/"/g, '""')
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s}"` : s
+  }
+
+  const rows = sources.map((s) => {
+    const parts = s.module.split(/\s+(?:—|–)\s+/)
+    const endpoint = s.apiPath || (s.fredSeriesId ? `/api/fred/${s.fredYoY ? 'yoy' : 'latest'}/${s.fredSeriesId}` : '')
+    const next = getNextUpdate(s.lastUpdate, s.frequencyDays)
+    const status = getStatus(s)
+    return [
+      s.id, parts[0] || '', parts[1] || '', s.indicator, s.category,
+      s._value || '', s.lastUpdate || '', next, status.label,
+      s.primarySource || '', endpoint, s.frequency || '', s.dataFit || '', s.dataMeasure || '', s.notes || '',
+    ].map(escape).join(',')
+  })
+
+  const csv = [headers.join(','), ...rows].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `polaris_data_${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 const STORAGE_KEY = 'polaris_data_sources'
 const USER_EDITABLE_FIELDS = ['lastUpdate', '_lastScrape', '_scrapedValue', '_value', '_refreshError']
 
@@ -376,6 +411,12 @@ export default function DataPage() {
                 OK {globalRefreshResult.ok} / ERR {globalRefreshResult.errors} / SKIP {globalRefreshResult.skipped}
               </span>
             )}
+            <button
+              onClick={() => exportCsv(sources)}
+              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#4ade80] text-[#4ade80] hover:text-white hover:border-white"
+            >
+              EXPORT CSV
+            </button>
             <button
               onClick={refreshAllSources}
               disabled={loadingAll}
