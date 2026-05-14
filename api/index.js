@@ -744,12 +744,33 @@ async function upsertSupabaseHistoryFailure(row) {
   return { ...row, storage: 'supabase' }
 }
 
+function normalizeHistoryDate(value) {
+  const text = String(value || '').trim()
+  if (!text) return null
+
+  const year = text.match(/^(\d{4})$/)
+  if (year) return `${year[1]}-01-01`
+
+  const month = text.match(/^(\d{4})-(\d{2})$/)
+  if (month) return `${month[1]}-${month[2]}-01`
+
+  const quarter = text.match(/^(\d{4})-?Q([1-4])$/i)
+  if (quarter) {
+    const quarterStartMonth = String((Number(quarter[2]) - 1) * 3 + 1).padStart(2, '0')
+    return `${quarter[1]}-${quarterStartMonth}-01`
+  }
+
+  const date = text.slice(0, 10)
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null
+}
+
 function normalizeHistorySeries(series) {
   const byDate = new Map()
   for (const row of series || []) {
     const value = Number(row.value)
-    if (!row.date || !Number.isFinite(value)) continue
-    byDate.set(String(row.date).slice(0, 10), { date: String(row.date).slice(0, 10), value })
+    const date = normalizeHistoryDate(row.date)
+    if (!date || !Number.isFinite(value)) continue
+    byDate.set(date, { date, value })
   }
   return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date))
 }

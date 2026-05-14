@@ -34,10 +34,16 @@ function displayHistoryDetail(source) {
     || 'No endpoint automatico'
 }
 
+function freshnessOf(source) {
+  const endDate = source.history?.end ? new Date(source.history.end) : null
+  if (source.history?.status !== 'ok' || !endDate || Number.isNaN(endDate.getTime())) return 'NO DATA'
+  return endDate >= new Date('2026-01-01T00:00:00Z') ? 'CURRENT' : 'STALE'
+}
+
 function exportHistoryCsv(rows) {
   const headers = [
     'fuente', 'indicador', 'modulo', 'estado', 'obs',
-    'start', 'end', 'endpoint_error', 'accion',
+    'start', 'end', 'freshness', 'endpoint_error', 'accion',
   ]
 
   const escape = (value) => {
@@ -55,12 +61,13 @@ function exportHistoryCsv(rows) {
       source.history?.count || 0,
       source.history?.start || '-',
       source.history?.end || '-',
+      freshnessOf(source),
       displayHistoryDetail(source),
       source.automatable ? 'INGEST' : 'NO AUTO',
     ].map(escape).join(',')
   })
 
-  const csv = [headers.join(','), ...body].join('\n')
+  const csv = `\uFEFF${[headers.join(','), ...body].join('\n')}`
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
