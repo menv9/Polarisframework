@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { getStatus, countByStatus } from '../data/dataSources'
 import { useModelStore } from '../store/ModelDataContext'
 import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 
@@ -55,8 +54,6 @@ export default function DashboardPage() {
   const { worldview: wv, dataSources: sources, zscores: zScores } = useModelStore()
   const [betas] = useState(loadBetas)
 
-  const counts = useMemo(() => countByStatus(sources), [sources])
-
   // ── World View derivations ────────────────────────────────────────────────
   const scoreGDP  = wv.gdpUsa * 0.25 + wv.gdpEur * 0.18 + wv.gdpChn * 0.18 + wv.gdpJpn * 0.05 + wv.gdpResto * 0.34
   const regimeOn  = wv.vix < 30 && wv.hyOas < 30 && wv.sp200dma === 1 && wv.embi < 40
@@ -105,20 +102,6 @@ export default function DashboardPage() {
     [countryScores]
   )
 
-  // ── Salud por módulo ─────────────────────────────────────────────────────
-  const getCountryStatus = (label) => {
-    const cs = sources.filter(s => s.module === `Endogenous — ${label}`)
-    if (!cs.length) return { ok: 0, total: 0, pct: 0 }
-    const ok = cs.filter(s => getStatus(s).code === 'ok').length
-    return { ok, total: cs.length, pct: Math.round((ok / cs.length) * 100) }
-  }
-
-  const exoSources = sources.filter(s => s.module?.startsWith('Exogenous'))
-  const exoOk      = exoSources.filter(s => getStatus(s).code === 'ok').length
-
-  const wvSources = sources.filter(s => s.module === 'World View')
-  const wvOk      = wvSources.filter(s => getStatus(s).code === 'ok').length
-
   const convColor = (conv) =>
     conv === 'FULL' ? 'text-[#4ade80]' : conv === 'HALF' ? 'text-[#f59e0b]' : 'text-[#555]'
 
@@ -149,7 +132,7 @@ export default function DashboardPage() {
               { label: 'WOC',       value: wocScore.toFixed(2), color: wocScore > 0 ? 'text-[#4ade80]' : wocScore < 0 ? 'text-[#ef4444]' : 'text-[#e5e5e5]' },
               { label: 'USD BIAS',  value: usdBias,             color: usdBias === 'BULLISH' ? 'text-[#4ade80]' : usdBias === 'BEARISH' ? 'text-[#ef4444]' : 'text-[#e5e5e5]' },
               { label: 'INFLACION', value: inflation,           color: inflation === 'INFLACIONARIO' ? 'text-[#f59e0b]' : inflation === 'DESINFLACIONARIO' ? 'text-[#60a5fa]' : 'text-[#e5e5e5]' },
-              { label: 'WV DATA',   value: `${wvOk}/${wvSources.length}`, color: wvOk >= wvSources.length * 0.7 ? 'text-[#4ade80]' : 'text-[#f59e0b]' },
+              { label: 'Z-SCORES',  value: hasZscores ? `${Object.keys(zScores).length}v` : 'SIN DATOS', color: hasZscores ? 'text-[#4ade80]' : 'text-[#ef4444]' },
             ].map(item => (
               <div key={item.label} className="p-3 border-r border-b border-[#222]">
                 <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">{item.label}</div>
@@ -227,69 +210,43 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ===== FILA 4: SALUD DE DATOS ===== */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
-
-          {/* Endogenous data health */}
-          <div className="lg:col-span-2 border-2 border-[#333]">
-            <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333] flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Endogenous — Cobertura de Datos</span>
-              <Link to="/model-inputs" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">→ MODEL INPUTS</Link>
-            </div>
-            <div className="grid grid-cols-5 gap-0">
-              {COUNTRIES.map(c => {
-                const st = getCountryStatus(c.label)
-                return (
-                  <div key={c.prefix} className="p-2 border-r border-b border-[#222] text-center">
-                    <div className="text-[10px] text-[#555] uppercase tracking-wider mb-0.5">{c.label}</div>
-                    <div className={`text-sm font-mono font-bold ${st.pct >= 80 ? 'text-[#4ade80]' : st.pct >= 50 ? 'text-[#f59e0b]' : 'text-[#ef4444]'}`}>
-                      {st.ok}/{st.total}
-                    </div>
-                    <div className="text-[9px] text-[#444]">{st.pct}%</div>
-                  </div>
-                )
-              })}
-            </div>
+        {/* ===== FILA 4: EXOGENOUS ===== */}
+        <div className="border-2 border-[#333] mb-3">
+          <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333] flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">II.6 — Exogenous Drivers</span>
+            <Link to="/exogenous/operativa" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">OPERATIVA →</Link>
           </div>
-
-          {/* Control center */}
-          <div className="border-2 border-[#333]">
-            <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333] flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Sistema</span>
-              <Link to="/data" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">→ DATA</Link>
-            </div>
-            <div className="p-3 space-y-2">
-              {[
-                { label: 'Fuentes OK',         value: counts.ok,    color: 'text-[#4ade80]' },
-                { label: 'Por vencer',          value: counts.warning, color: 'text-[#f59e0b]' },
-                { label: 'Desactualizadas',     value: counts.stale, color: 'text-[#ef4444]' },
-              ].map(row => (
-                <div key={row.label} className="flex items-center justify-between">
-                  <span className="text-xs text-[#555] uppercase tracking-wider">{row.label}</span>
-                  <span className={`text-base font-mono font-bold ${row.color}`}>{row.value}</span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-0">
+            {[
+              { id: 'exo_brent',       label: 'Brent',      unit: '$/bbl' },
+              { id: 'exo_wti',         label: 'WTI',        unit: '$/bbl' },
+              { id: 'exo_iron',        label: 'Iron Ore',   unit: '$/t'   },
+              { id: 'exo_copper',      label: 'Copper',     unit: '$/lb'  },
+              { id: 'exo_gold',        label: 'Gold',       unit: '$/oz'  },
+              { id: 'exo_chn_pmi',     label: 'China PMI',  unit: 'pts'   },
+              { id: 'exo_us10y',       label: 'US 10Y',     unit: '%'     },
+              { id: 'exo_vix',         label: 'VIX',        unit: 'pts'   },
+            ].map(item => {
+              const src = sources.find(s => s.id === item.id)
+              const val = src?._value
+              const hasVal = val != null && val !== ''
+              const n = hasVal ? Number(val) : null
+              return (
+                <div key={item.id} className="p-2 border-r border-b border-[#222] text-center">
+                  <div className="text-[10px] text-[#555] uppercase tracking-wider mb-0.5">{item.label}</div>
+                  <div className={`text-sm font-mono font-bold ${hasVal ? 'text-white' : 'text-[#333]'}`}>
+                    {hasVal && n != null ? (item.unit === '%' ? n.toFixed(2) + '%' : n.toFixed(item.unit === '$/lb' ? 3 : 1)) : '—'}
+                  </div>
+                  <div className="text-[9px] text-[#444]">{item.unit}</div>
                 </div>
-              ))}
-              <div className="border-t border-[#222] pt-2 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-[#555] uppercase tracking-wider">Exógenos OK</span>
-                  <span className={`text-sm font-mono font-bold ${exoOk >= exoSources.length * 0.7 ? 'text-[#4ade80]' : 'text-[#f59e0b]'}`}>
-                    {exoOk}/{exoSources.length}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-[#555] uppercase tracking-wider">Z-scores</span>
-                  <span className={`text-sm font-mono font-bold ${hasZscores ? 'text-[#4ade80]' : 'text-[#ef4444]'}`}>
-                    {hasZscores ? `${Object.keys(zScores).length} vars` : 'SIN DATOS'}
-                  </span>
-                </div>
-              </div>
-            </div>
+              )
+            })}
           </div>
         </div>
 
         {/* ===== FOOTER ===== */}
         <div className="flex items-center justify-between text-[10px] text-[#444] uppercase tracking-wider">
-          <span>{sources.length} indicadores · {Object.keys(zScores).length} z-scores cargados</span>
+          <span>{sources.length} indicadores · {Object.keys(zScores).length} z-scores</span>
           <span>POLARIS FRAMEWORK v0.1</span>
         </div>
 
