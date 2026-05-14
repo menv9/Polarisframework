@@ -627,35 +627,63 @@ async function fetchImfLatest(dataset, seriesKey, startPeriod = '2000') {
   })
 }
 
-async function fetchOecdNiipLatest(country) {
-  const url = `https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_BOP@DF_IIP,1.0/${encodeURIComponent(country)}.WXD.FA.N.LE.A.USD_EXC.N?lastNObservations=10&dimensionAtObservation=AllDimensions`
-  const { data } = await axios.get(url, {
+async function fetchOecdNiipUsdRows(country, lastN = null) {
+  const params = new URLSearchParams({ dimensionAtObservation: 'AllDimensions' })
+  if (lastN) params.set('lastNObservations', String(lastN))
+  const url = `https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_BOP@DF_IIP,1.0/${encodeURIComponent(country)}.WXD.FA.N.LE.A.USD_EXC.N?${params.toString()}`
+  const { data } = await getWithRetry(url, {
     timeout: 30000,
     headers: { Accept: 'application/vnd.sdmx.data+json' },
-  })
+  }, 3, `[OECD NIIP] ${country}`)
   const struct = data?.data?.structures?.[0]
   const dims = struct?.dimensions?.observation || []
   const timeIdx = dims.findIndex((d) => d.id === 'TIME_PERIOD')
   const timeValues = dims[timeIdx]?.values || []
   const observations = data?.data?.dataSets?.[0]?.observations || {}
-  let latest = null
-  for (const [key, val] of Object.entries(observations)) {
-    const indices = key.split(':').map((n) => parseInt(n, 10))
-    const tIdx = indices[timeIdx]
-    const v = Number(val?.[0])
-    if (!Number.isFinite(v)) continue
-    if (!latest || tIdx > latest.tIdx) {
-      latest = { tIdx, value: v, date: timeValues[tIdx]?.id || null }
-    }
-  }
+  return Object.entries(observations)
+    .map(([key, val]) => {
+      const indices = key.split(':').map((n) => parseInt(n, 10))
+      const tIdx = indices[timeIdx]
+      const value = Number(val?.[0])
+      const date = timeValues[tIdx]?.id || null
+      return date && Number.isFinite(value) ? { date, value } : null
+    })
+    .filter(Boolean)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+}
+
+async function fetchOecdNiipHistory(country) {
+  const [niipRows, gdpRows] = await Promise.all([
+    fetchOecdNiipUsdRows(country),
+    fetchWorldBankHistory(country, 'NY.GDP.MKTP.CD'),
+  ])
+  const gdpByYear = new Map(gdpRows.map((row) => [String(row.date).slice(0, 4), row.value]))
+  const series = niipRows
+    .map((row) => {
+      const year = String(row.date).slice(0, 4)
+      const gdp = gdpByYear.get(year)
+      if (!Number.isFinite(gdp) || gdp === 0) return null
+      return {
+        date: `${year}-01-01`,
+        value: Number((((row.value * 1_000_000) / gdp) * 100).toFixed(6)),
+        raw: row.value,
+      }
+    })
+    .filter(Boolean)
+  return { provider: 'oecd-sdmx/worldbank', transform: 'niip_usd_to_pct_gdp', series }
+}
+
+async function fetchOecdNiipLatest(country) {
+  const result = await fetchOecdNiipHistory(country)
+  const latest = result.series.at(-1)
   if (!latest) throw new Error(`No OECD IIP observations for ${country}`)
   return normalizeLatest({
-    provider: 'oecd-sdmx',
-    seriesId: `IIP/${country}`,
+    provider: result.provider,
+    seriesId: `IIP_PCT_GDP/${country}`,
     date: latest.date,
     value: latest.value,
-    raw: latest.value,
-    meta: { country, unit: 'USD millions', dataflow: 'DSD_BOP@DF_IIP' },
+    raw: latest.raw,
+    meta: { country, unit: 'percent of GDP', dataflow: 'DSD_BOP@DF_IIP', transform: result.transform },
   })
 }
 
@@ -1340,6 +1368,9 @@ async function fetchHistoryForSource(source) {
   }
   if (url.pathname === '/api/source/cftc/latest') {
     return fetchCftcHistory(url.searchParams.get('market'), url.searchParams.get('invert') === 'true')
+  }
+  if (url.pathname === '/api/source/oecd/niip/latest') {
+    return fetchOecdNiipHistory(url.searchParams.get('country'))
   }
   if (url.pathname === '/api/source/imf-datamapper/latest') {
     return fetchImfDataMapperHistory(url.searchParams.get('indicator'), url.searchParams.get('country'))
