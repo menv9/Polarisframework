@@ -70,6 +70,42 @@ export default function DataHubPage() {
             <Step label="4. Model Features" text="Crear features y z-scores." />
           </div>
         </div>
+
+        <div className="mt-5 border-2 border-[#333] bg-[#080808]">
+          <div className="px-4 py-3 border-b-2 border-[#333]">
+            <div className="text-sm font-bold uppercase tracking-widest text-white">Contrato de datos</div>
+            <div className="text-[10px] text-[#777] uppercase tracking-wider mt-1">
+              El framework consume Model Features. Las otras capas conectan, auditan y persisten.
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-0">
+            <ContractStep
+              label="Source Registry"
+              output="Fuente + fit"
+              text="Endpoint, latest value, exact/derived/proxy/manual y metadata."
+            />
+            <ContractStep
+              label="Coverage Matrix"
+              output="Usabilidad"
+              text="Comprueba cobertura, comparabilidad y transformacion esperada."
+            />
+            <ContractStep
+              label="History Pipeline"
+              output="Historico canonico"
+              text="Series persistidas por source_id, sin features finales."
+            />
+            <ContractStep
+              label="Model Features"
+              output="Senal normalizada"
+              text="Z-score, percentil, spread o estado listo para modelo."
+            />
+            <ContractStep
+              label="Framework"
+              output="Decision"
+              text="Consume feature_value, no valores raw mezclados."
+            />
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -79,6 +115,16 @@ function Step({ label, text }) {
   return (
     <div className="p-3 border-r border-b md:border-b-0 border-[#222]">
       <div className="text-[10px] font-bold uppercase tracking-widest text-[#ecd987]">{label}</div>
+      <div className="text-xs text-[#888] mt-2 leading-tight">{text}</div>
+    </div>
+  )
+}
+
+function ContractStep({ label, output, text }) {
+  return (
+    <div className="p-3 border-r border-b md:border-b-0 border-[#222] min-h-[120px]">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-[#ecd987]">{label}</div>
+      <div className="text-xs font-bold uppercase tracking-wider text-white mt-2">{output}</div>
       <div className="text-xs text-[#888] mt-2 leading-tight">{text}</div>
     </div>
   )
