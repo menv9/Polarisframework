@@ -23,13 +23,57 @@ export default function Navbar() {
           <span className="text-sm text-[#777] border-l-2 border-[#333] pl-3 uppercase tracking-wider">Framework</span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-6">
+        <div className="hidden md:flex items-center gap-4">
+          {/* Análisis */}
           {[
             { to: '/dashboard',           label: 'Dashboard'  },
             { to: '/world-view/operativa',label: 'World View' },
             { to: '/endogenous',          label: 'Endogenous' },
             { to: '/exogenous/operativa', label: 'Exogenous'  },
-            { to: '/data',                label: 'Data'       },
+          ].map(({ to, label }) => (
+            <Link
+              key={to}
+              to={to}
+              className={`text-sm font-medium uppercase tracking-wider transition-colors ${
+                location.pathname.startsWith(to) && to !== '/'
+                  ? 'text-[#ecd987]'
+                  : 'text-[#888] hover:text-[#ecd987]'
+              }`}
+            >
+              {label}
+            </Link>
+          ))}
+
+          {/* Separador */}
+          <span className="text-[#222]">|</span>
+
+          {/* Ejecución */}
+          {[
+            { to: '/timing/operativa',    label: 'Timing'    },
+            { to: '/risk/operativa',      label: 'Risk'      },
+            { to: '/execution/operativa', label: 'Execution' },
+          ].map(({ to, label }) => (
+            <Link
+              key={to}
+              to={to}
+              className={`text-sm font-medium uppercase tracking-wider transition-colors ${
+                location.pathname.startsWith(to)
+                  ? 'text-[#ecd987]'
+                  : 'text-[#888] hover:text-[#ecd987]'
+              }`}
+            >
+              {label}
+            </Link>
+          ))}
+
+          {/* Separador */}
+          <span className="text-[#222]">|</span>
+
+          {/* Aprendizaje */}
+          {[
+            { to: '/journal',     label: 'Journal'     },
+            { to: '/performance', label: 'Performance' },
+            { to: '/data',        label: 'Data'        },
           ].map(({ to, label }) => (
             <Link
               key={to}

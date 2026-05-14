@@ -282,6 +282,29 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* ===== FILA 5: PIPELINE DE EJECUCIÓN ===== */}
+        <div className="border-2 border-[#333] mb-3">
+          <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333]">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Pipeline de Ejecución — Capa 1 Completa</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-0">
+            {[
+              { label: 'Timing',     desc: '¿Cuándo entrar?',         to: '/timing/operativa',    color: 'text-[#a3a3a3]' },
+              { label: 'Risk Mgmt', desc: 'Sizing · Stops',           to: '/risk/operativa',      color: 'text-[#a3a3a3]' },
+              { label: 'Execution', desc: 'Costes · Órdenes',         to: '/execution/operativa', color: 'text-[#a3a3a3]' },
+              { label: 'Journal',   desc: 'Registrar · Performance',  to: '/journal',             color: 'text-[#a3a3a3]' },
+            ].map(item => (
+              <Link key={item.label} to={item.to}
+                className="p-3 border-r border-[#222] hover:bg-[#0a0a0a] transition-colors group">
+                <div className="text-[10px] text-[#444] uppercase tracking-wider mb-1">{item.desc}</div>
+                <div className={`text-base font-bold uppercase tracking-wider ${item.color} group-hover:text-[#ecd987] transition-colors`}>
+                  {item.label} →
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
         {/* ===== FOOTER ===== */}
         <div className="flex items-center justify-between text-[10px] text-[#444] uppercase tracking-wider">
           <span>{sources.length} indicadores · {Object.keys(zScores).length} z-scores</span>

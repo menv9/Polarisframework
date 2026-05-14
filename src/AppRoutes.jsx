@@ -18,6 +18,11 @@ import EndogenousOpsPage from './pages/EndogenousOpsPage'
 import ModelInputsPage from './pages/ModelInputsPage'
 import EndogenousBetasPage from './pages/EndogenousBetasPage'
 import ExogenousOpsPage from './pages/ExogenousOpsPage'
+import TimingOpsPage from './pages/TimingOpsPage'
+import RiskOpsPage from './pages/RiskOpsPage'
+import ExecutionOpsPage from './pages/ExecutionOpsPage'
+import JournalPage from './pages/JournalPage'
+import PerformancePage from './pages/PerformancePage'
 
 function Layout({ children }) {
   return (
@@ -82,6 +87,11 @@ export default function AppRoutes() {
                 <Route path="/endogenous/zscores" element={<ModelInputsPage />} />
                 <Route path="/endogenous/betas" element={<EndogenousBetasPage />} />
                 <Route path="/exogenous/operativa" element={<ExogenousOpsPage />} />
+                <Route path="/timing/operativa"   element={<TimingOpsPage />} />
+                <Route path="/risk/operativa"      element={<RiskOpsPage />} />
+                <Route path="/execution/operativa" element={<ExecutionOpsPage />} />
+                <Route path="/journal"             element={<JournalPage />} />
+                <Route path="/performance"         element={<PerformancePage />} />
               </Routes>
             </Layout>
           </ProtectedRoute>
