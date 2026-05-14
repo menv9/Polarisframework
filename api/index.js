@@ -2226,7 +2226,9 @@ app.post('/api/auth/invite', async (req, res) => {
   const { email } = req.body
   if (!email) return res.status(400).json({ error: 'Email requerido' })
 
-  const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email)
+  const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+    redirectTo: 'https://polarisframework.vercel.app/',
+  })
   if (error) return res.status(400).json({ error: error.message })
   res.json({ user: data.user })
 })

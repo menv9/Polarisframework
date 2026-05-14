@@ -2335,6 +2335,9 @@ const SOURCE_OVERRIDES = {
   endo_usa_tot: { apiPath: '/api/source/worldbank/tot/latest?country=USA' },
   endo_usa_cpi: { scraper: 'fred', fredSeriesId: 'CPIAUCSL', fredYoY: true },
   endo_usa_core_cpi: { scraper: 'fred', fredSeriesId: 'CPILFESL', fredYoY: true },
+  // PMI proxies: S&P/ISM PMI histories are not available in the free APIs used here.
+  // These FRED/OECD manufacturing business tendency series keep history automated.
+  endo_usa_pmi: { scraper: 'fred', fredSeriesId: 'BSCICP02USM460S' },
   endo_usa_nfp: { scraper: 'fred', fredSeriesId: 'PAYEMS', fredYoY: true },
   endo_usa_policy: { scraper: 'fred', fredSeriesId: 'DFF' },
   endo_usa_cftc: { apiPath: '/api/source/cftc/latest?market=USD%20INDEX' },
@@ -2351,6 +2354,15 @@ const SOURCE_OVERRIDES = {
   endo_nzl_umcsi: { scraper: 'fred', fredSeriesId: 'CSCICP03NZM665S' },
   endo_swe_umcsi: { scraper: 'fred', fredSeriesId: 'CSCICP03SEM665S' },
   endo_nor_umcsi: { scraper: 'fred', fredSeriesId: 'BSCICP02NOQ460S' },
+  endo_eur_pmi: { scraper: 'fred', fredSeriesId: 'BSCICP02EZM460S' },
+  endo_jpn_pmi: { scraper: 'fred', fredSeriesId: 'JPNBSBUCT02STSAQ' },
+  endo_gbr_pmi: { scraper: 'fred', fredSeriesId: 'BSCICP02GBM460S' },
+  endo_che_pmi: { scraper: 'fred', fredSeriesId: 'BSCICP02CHM460S' },
+  endo_can_pmi: { scraper: 'fred', fredSeriesId: 'CANBSCICP02STSAQ' },
+  endo_aus_pmi: { scraper: 'fred', fredSeriesId: 'BSCICP02AUQ460S' },
+  endo_nzl_pmi: { scraper: 'fred', fredSeriesId: 'BSCICP02NZQ460S' },
+  endo_swe_pmi: { scraper: 'fred', fredSeriesId: 'BSCICP02SEM460S' },
+  endo_nor_pmi: { scraper: 'fred', fredSeriesId: 'BSCICP02NOQ460S' },
   endo_usa_cb_balance: { scraper: 'fred', fredSeriesId: 'WALCL' },
   endo_eur_cb_balance: { scraper: 'fred', fredSeriesId: 'ECBASSETSW' },
   endo_jpn_cb_balance: { scraper: 'fred', fredSeriesId: 'JPNASSETS' },
@@ -2420,6 +2432,7 @@ const SOURCE_OVERRIDES = {
   exo_eurusd: { apiPath: '/api/source/yahoo/latest?symbol=EURUSD%3DX' },
   exo_usdjpy: { apiPath: '/api/source/yahoo/latest?symbol=JPY%3DX' },
   exo_gbpusd: { apiPath: '/api/source/yahoo/latest?symbol=GBPUSD%3DX' },
+  exo_eur_pmi_comp: { scraper: 'fred', fredSeriesId: 'BSCICP02EZM460S' },
   exo_vix: { scraper: 'fred', fredSeriesId: 'VIXCLS' },
   // Policy rates — 7 países vía FRED (series OECD immediate rates o tasa oficial)
   endo_jpn_policy: { scraper: 'fred', fredSeriesId: 'IRSTCI01JPM156N' },
@@ -2553,6 +2566,61 @@ const DATA_QUALITY_OVERRIDES = {
     dataMeasure: 'OECD business confidence Norway proxy',
     dataCheck: 'FRED no publica CSCICP03 para Noruega; se usa confianza empresarial trimestral como proxy de sentimiento.',
   },
+  endo_usa_pmi: {
+    dataFit: 'proxy',
+    dataMeasure: 'OECD manufacturing business confidence (FRED BSCICP02USM460S)',
+    dataCheck: 'Proxy gratuito de ISM/PMI; no es el PMI exacto de ISM/S&P Global.',
+  },
+  endo_eur_pmi: {
+    dataFit: 'proxy',
+    dataMeasure: 'OECD manufacturing business confidence (FRED BSCICP02EZM460S)',
+    dataCheck: 'Proxy gratuito de HCOB/S&P PMI; no es el PMI exacto.',
+  },
+  endo_jpn_pmi: {
+    dataFit: 'proxy',
+    dataMeasure: 'OECD manufacturing business situation (FRED JPNBSBUCT02STSAQ)',
+    dataCheck: 'Proxy trimestral gratuito de Jibun Bank PMI; no es el PMI exacto.',
+  },
+  endo_gbr_pmi: {
+    dataFit: 'proxy',
+    dataMeasure: 'OECD manufacturing business confidence (FRED BSCICP02GBM460S)',
+    dataCheck: 'Proxy gratuito de S&P Global UK PMI; no es el PMI exacto.',
+  },
+  endo_che_pmi: {
+    dataFit: 'proxy',
+    dataMeasure: 'OECD manufacturing business confidence (FRED BSCICP02CHM460S)',
+    dataCheck: 'Proxy gratuito de procure.ch PMI; no es el PMI exacto.',
+  },
+  endo_can_pmi: {
+    dataFit: 'proxy',
+    dataMeasure: 'OECD manufacturing business confidence (FRED CANBSCICP02STSAQ)',
+    dataCheck: 'Proxy trimestral gratuito de Ivey/S&P PMI; no es el PMI exacto.',
+  },
+  endo_aus_pmi: {
+    dataFit: 'proxy',
+    dataMeasure: 'OECD manufacturing business confidence (FRED BSCICP02AUQ460S)',
+    dataCheck: 'Proxy trimestral gratuito de Judo Bank PMI; no es el PMI exacto.',
+  },
+  endo_nzl_pmi: {
+    dataFit: 'proxy',
+    dataMeasure: 'OECD manufacturing business confidence (FRED BSCICP02NZQ460S)',
+    dataCheck: 'Proxy trimestral gratuito de BusinessNZ PMI; no es el PMI exacto.',
+  },
+  endo_swe_pmi: {
+    dataFit: 'proxy',
+    dataMeasure: 'OECD manufacturing business confidence (FRED BSCICP02SEM460S)',
+    dataCheck: 'Proxy gratuito de Silf/Swedbank PMI; no es el PMI exacto.',
+  },
+  endo_nor_pmi: {
+    dataFit: 'proxy',
+    dataMeasure: 'OECD manufacturing business confidence (FRED BSCICP02NOQ460S)',
+    dataCheck: 'Proxy trimestral gratuito de DNB PMI; no es el PMI exacto.',
+  },
+  exo_eur_pmi_comp: {
+    dataFit: 'proxy',
+    dataMeasure: 'OECD manufacturing business confidence (FRED BSCICP02EZM460S)',
+    dataCheck: 'Proxy gratuito de Eurozone composite PMI; no es HCOB/S&P composite exacto.',
+  },
   exo_embi: {
     dataFit: 'proxy',
     dataMeasure: 'ICE BofA EM Corporate OAS',
@@ -2618,7 +2686,7 @@ function inferFreeAccess(source) {
   const isPmi = text.includes('pmi') && !source.id.includes('usa')
   const isTot = source.id.endsWith('_tot') || text.includes('terms of trade')
 
-  if (isPmi) {
+  if (isPmi && !source.fredSeriesId && !source.apiPath) {
     return {
       primarySource: 'PMI manual',
       accessKind: 'manual',
