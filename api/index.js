@@ -1097,28 +1097,29 @@ async function fetchForexFactoryCalendar() {
     return forexFactoryCalendarCache
   }
 
-  const [thisWeekResult, nextWeekResult] = await Promise.allSettled([
+  const [thisWeekResult, fxMacro] = await Promise.allSettled([
     getWithRetry('https://nfs.faireconomy.media/ff_calendar_thisweek.json', { timeout: 20000 }, 3, '[FF] thisweek'),
-    getWithRetry('https://nfs.faireconomy.media/ff_calendar_nextweek.json', { timeout: 20000 }, 3, '[FF] nextweek'),
+    fetchFxMacroDataCalendar(),
   ])
 
   const warnings = []
   const thisWeek = thisWeekResult.status === 'fulfilled' ? thisWeekResult.value : null
-  const nextWeek = nextWeekResult.status === 'fulfilled' ? nextWeekResult.value : null
   if (thisWeekResult.status === 'rejected') {
     warnings.push(`thisweek unavailable: ${thisWeekResult.reason?.message || 'fetch failed'}`)
-  }
-  if (nextWeekResult.status === 'rejected') {
-    warnings.push(`nextweek unavailable: ${nextWeekResult.reason?.message || 'fetch failed'}`)
   }
 
   const forexFactoryEvents = [
     ...(Array.isArray(thisWeek?.data) ? thisWeek.data : []),
-    ...(Array.isArray(nextWeek?.data) ? nextWeek.data : []),
   ]
-  const fxMacro = await fetchFxMacroDataCalendar()
-  warnings.push(...fxMacro.warnings)
-  const data = mergeCalendarEvents([...forexFactoryEvents, ...fxMacro.events])
+  if (fxMacro.status === 'rejected') {
+    warnings.push(`fxmacrodata unavailable: ${fxMacro.reason?.message || 'fetch failed'}`)
+  } else {
+    warnings.push(...fxMacro.value.warnings)
+  }
+  const data = mergeCalendarEvents([
+    ...forexFactoryEvents,
+    ...(fxMacro.status === 'fulfilled' ? fxMacro.value.events : []),
+  ])
   if (!data.length) {
     throw new Error(warnings.join('; ') || 'No calendar sources returned events')
   }
