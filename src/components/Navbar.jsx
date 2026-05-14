@@ -41,6 +41,9 @@ export default function Navbar() {
               <Link to="/dashboard" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
                 Dashboard
               </Link>
+              <Link to="/endogenous" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
+                Endogenous
+              </Link>
               <Link to="/data" className="text-sm font-medium text-[#888] hover:text-[#ecd987] uppercase tracking-wider">
                 Data
               </Link>
