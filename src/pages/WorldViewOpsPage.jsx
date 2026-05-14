@@ -1,62 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import WorldViewSidebar from '../components/worldview/WorldViewSidebar'
+import { useModelStore, WV_DATA_MAP } from '../store/ModelDataContext'
 
-const STORAGE_KEY_WV = 'polaris_worldview_data'
 const STORAGE_KEY_SOURCES = 'polaris_data_sources'
-
-// Mapeo: clave local → ID en dataSources (store compartido con /data)
-const WV_DATA_MAP = {
-  gdpUsa:    'wv_gdp_usa',
-  gdpEur:    'wv_gdp_eur',
-  gdpChn:    'wv_gdp_chn',
-  gdpJpn:    'wv_gdp_jpn',
-  gdpResto:  'wv_cesi',
-  vix:       'wv_vix',
-  hyOas:     'wv_hy_oas',
-  sp200dma:  'wv_sp500',
-  embi:      'wv_embi',
-  smartZ:    'wv_cftc',
-  retailZ:   'wv_retail',
-  dxy:       'wv_dxy',
-  dxy200dma: 'wv_dxy_200dma',
-  cpiG7:     'wv_cpi_usa',
-  breakevens:'wv_breakevens',
-}
-
-const DEFAULT_WV_DATA = {
-  gdpUsa: 0.3, gdpEur: -0.2, gdpChn: 0.5, gdpJpn: 0.1, gdpResto: 0.0,
-  vix: 15, hyOas: 45, sp200dma: 1, embi: 55,
-  smartZ: 0.5, retailZ: -0.8,
-  dxy: 103.5, dxy200dma: 101.0, dxyRising: 1,
-  cpiG7: 2.8, breakevens: 2.3,
-}
-
-// Lee valores desde el store compartido con DataPage, fallback al propio
-function loadWorldViewData() {
-  try {
-    const savedSources = localStorage.getItem(STORAGE_KEY_SOURCES)
-    if (savedSources) {
-      const sources = JSON.parse(savedSources)
-      const fromSources = {}
-      for (const [key, id] of Object.entries(WV_DATA_MAP)) {
-        const source = sources.find((s) => s.id === id)
-        if (source?._value != null && source._value !== '') {
-          const num = Number(source._value)
-          if (!isNaN(num)) fromSources[key] = num
-        }
-      }
-      if (Object.keys(fromSources).length > 0) {
-        return { ...DEFAULT_WV_DATA, ...fromSources }
-      }
-    }
-    const saved = localStorage.getItem(STORAGE_KEY_WV)
-    if (saved) return JSON.parse(saved)
-  } catch {
-    // ignore
-  }
-  return DEFAULT_WV_DATA
-}
 
 // Escribe un valor de vuelta al store compartido con DataPage
 function syncValueToSources(key, value) {
@@ -77,12 +24,7 @@ function syncValueToSources(key, value) {
 }
 
 export default function WorldViewOpsPage() {
-  const [data, setData] = useState(loadWorldViewData)
-
-  // Persistir cambios en localStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_WV, JSON.stringify(data))
-  }, [data])
+  const { worldview: data, setWorldview: setData } = useModelStore()
 
   const handleChange = (key, value) => {
     setData((prev) => ({ ...prev, [key]: value }))

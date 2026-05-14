@@ -1,10 +1,7 @@
 import { useState, useEffect, Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import { INDICATORS as BASE_INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
-
-const STORAGE_KEY_ZSCORES = 'polaris_endogenous_zscores'
-const STORAGE_KEY_WV      = 'polaris_worldview_data'
-const STORAGE_KEY_SOURCES = 'polaris_data_sources'
+import { useModelStore } from '../store/ModelDataContext'
 
 const COUNTRIES = [
   { label: 'USD', prefix: 'usa', cyclical: false },
@@ -112,47 +109,10 @@ function getSourceId(prefix, key) {
   return `endo_${prefix}_${suffix}`
 }
 
-const DEFAULT_WV_DATA = {
-  gdpUsa: 0.3, gdpEur: -0.2, gdpChn: 0.5, gdpJpn: 0.1, gdpResto: 0.0,
-  vix: 15, hyOas: 45, sp200dma: 1, embi: 55,
-  smartZ: 0.5, retailZ: -0.8,
-  dxy: 103.5, dxy200dma: 101.0, dxyRising: 1,
-  cpiG7: 2.8, breakevens: 2.3,
-}
-
-const WV_DATA_MAP = {
-  gdpUsa: 'wv_gdp_usa', gdpEur: 'wv_gdp_eur', gdpChn: 'wv_gdp_chn',
-  gdpJpn: 'wv_gdp_jpn', gdpResto: 'wv_cesi',
-  vix: 'wv_vix', hyOas: 'wv_hy_oas', sp200dma: 'wv_sp500', embi: 'wv_embi',
-  smartZ: 'wv_cftc', retailZ: 'wv_retail',
-  dxy: 'wv_dxy', dxy200dma: 'wv_dxy_200dma',
-  cpiG7: 'wv_cpi_usa', breakevens: 'wv_breakevens',
-}
-
-function loadWorldViewData() {
-  try {
-    const savedSources = localStorage.getItem(STORAGE_KEY_SOURCES)
-    if (savedSources) {
-      const sources = JSON.parse(savedSources)
-      const fromSources = {}
-      for (const [key, id] of Object.entries(WV_DATA_MAP)) {
-        const source = sources.find((s) => s.id === id)
-        if (source?._value != null && source._value !== '') {
-          const num = Number(source._value)
-          if (!isNaN(num)) fromSources[key] = num
-        }
-      }
-      if (Object.keys(fromSources).length > 0) return { ...DEFAULT_WV_DATA, ...fromSources }
-    }
-    const saved = localStorage.getItem(STORAGE_KEY_WV)
-    if (saved) return JSON.parse(saved)
-  } catch { /* ignore */ }
-  return DEFAULT_WV_DATA
-}
 
 function loadSourceValues() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY_SOURCES)
+    const saved = localStorage.getItem('polaris_data_sources')
     if (!saved) return {}
     const sources = JSON.parse(saved)
     const map = {}
@@ -164,20 +124,6 @@ function loadSourceValues() {
     }
     return map
   } catch { return {} }
-}
-
-function loadZScores() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY_ZSCORES)
-    if (saved) return JSON.parse(saved)
-  } catch { /* ignore */ }
-  const defaults = {}
-  for (const c of COUNTRIES) {
-    for (const ind of INDICATORS) {
-      defaults[`${c.prefix}_${ind.key}`] = 0
-    }
-  }
-  return defaults
 }
 
 function getRegimeMultiplier(regime, cyclical) {
@@ -219,18 +165,13 @@ function fmtScore(v) {
 }
 
 export default function EndogenousOpsPage() {
-  const [zScores, setZScores]   = useState(loadZScores)
-  const [wvData]                = useState(loadWorldViewData)
+  const { zscores: zScores, setZscores: setZScores, worldview: wvData } = useModelStore()
   const [betas]                 = useState(loadBetas)
   const [sourceValues]          = useState(loadSourceValues)
   const [pairA, setPairA]     = useState('usa')
   const [pairB, setPairB]     = useState('eur')
   const [activeTab, setActiveTab] = useState('usa')
   const [resetMsg, setResetMsg] = useState(null)
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_ZSCORES, JSON.stringify(zScores))
-  }, [zScores])
 
   const handleZChange = (prefix, key, value) =>
     setZScores(prev => ({ ...prev, [`${prefix}_${key}`]: Number(value) }))

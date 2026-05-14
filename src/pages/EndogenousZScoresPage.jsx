@@ -1,9 +1,7 @@
 import { useState, useEffect, useMemo, useRef, Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import { INDICATORS as BASE_INDICATORS } from '../lib/endogenousBetas'
-
-const STORAGE_KEY_HISTORY = 'polaris_endogenous_history'
-const STORAGE_KEY_ZSCORES = 'polaris_endogenous_zscores'
+import { useModelStore } from '../store/ModelDataContext'
 
 const COUNTRIES = [
   { label: 'USD', prefix: 'usa' },
@@ -134,18 +132,6 @@ function parseSeriesCSV(text) {
   return result
 }
 
-// ── Migration: old {values:[]} → new {series:[{date,value}]} ─────────────────
-function migrateEntry(entry) {
-  if (!entry) return null
-  if (entry.series) return entry
-  if (Array.isArray(entry.values) && entry.values.length > 0) {
-    const dates = autoMonthlyDates(entry.values.length)
-    const series = entry.values.map((value, i) => ({ date: dates[i], value }))
-    return { series, lastImported: entry.lastImported ?? new Date().toISOString().split('T')[0] }
-  }
-  return null
-}
-
 // ── Estadísticas ─────────────────────────────────────────────────────────────
 function computeStats(series) {
   if (!series || series.length === 0) return null
@@ -190,34 +176,6 @@ function loadCustomUrls() {
   return {}
 }
 
-// ── localStorage ─────────────────────────────────────────────────────────────
-function loadHistory() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY_HISTORY)
-    if (!saved) return {}
-    const raw = JSON.parse(saved)
-    const migrated = {}
-    for (const [key, entry] of Object.entries(raw)) {
-      const m = migrateEntry(entry)
-      if (m) migrated[key] = m
-    }
-    return migrated
-  } catch { return {} }
-}
-
-function syncZScores(history) {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY_ZSCORES)
-    const current = saved ? JSON.parse(saved) : {}
-    const updated = { ...current }
-    for (const [key, entry] of Object.entries(history)) {
-      if (!entry?.series?.length) continue
-      const stats = computeStats(entry.series)
-      if (stats) updated[key] = stats.z
-    }
-    localStorage.setItem(STORAGE_KEY_ZSCORES, JSON.stringify(updated))
-  } catch { /* ignore */ }
-}
 
 // ── Helpers de formato ───────────────────────────────────────────────────────
 function fmt2(v) { return v == null ? '—' : v.toFixed(2) }
@@ -280,7 +238,7 @@ function exportModelInputsCsv({ history, activeTab, activeCountry, activeStats }
 
 // ── Componente ────────────────────────────────────────────────────────────────
 export default function ModelInputsPage() {
-  const [history, setHistory]           = useState(loadHistory)
+  const { history, setHistory }         = useModelStore()
   const [sourceUrls]                    = useState(loadSourceUrls)
   const [customUrls, setCustomUrls]     = useState(loadCustomUrls)
   const [activeTab, setActiveTab]       = useState('usa')
@@ -290,14 +248,11 @@ export default function ModelInputsPage() {
   const [syncMsg, setSyncMsg]           = useState(null)
   const [featureMsg, setFeatureMsg]     = useState(null)
   const [buildingFeatures, setBuildingFeatures] = useState(false)
+  const [loadingHistory, setLoadingHistory] = useState(new Set())
+  const [loadAllMsg, setLoadAllMsg]     = useState(null)
   const [urlEditKey, setUrlEditKey]     = useState(null)
   const [urlEditValue, setUrlEditValue] = useState('')
   const fileInputRef                    = useRef(null)
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(history))
-    syncZScores(history)
-  }, [history])
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_URLS, JSON.stringify(customUrls))
@@ -393,7 +348,7 @@ export default function ModelInputsPage() {
   }
 
   const handleSyncManual = () => {
-    syncZScores(history)
+    setHistory(prev => ({ ...prev }))
     setSyncMsg('Z-scores sincronizados ✓')
     setTimeout(() => setSyncMsg(null), 2500)
   }
@@ -401,6 +356,56 @@ export default function ModelInputsPage() {
   const handleClearAll = () => {
     if (!window.confirm('¿Borrar TODO el histórico de z-scores?')) return
     setHistory({})
+  }
+
+  const handleLoadFromHistory = async (prefix, key) => {
+    const sourceId = getSourceId(prefix, key)
+    const storageKey = `${prefix}_${key}`
+    setLoadingHistory(prev => new Set(prev).add(storageKey))
+    try {
+      const res = await fetch(`/api/history/series/${sourceId}?limit=500&order=asc`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const body = await res.json()
+      const observations = body.observations || []
+      if (observations.length === 0) throw new Error('sin datos en history')
+      const series = observations
+        .map(o => ({ date: String(o.date).substring(0, 7), value: Number(o.value) }))
+        .filter(o => !isNaN(o.value))
+      setHistory(prev => ({
+        ...prev,
+        [storageKey]: { series, lastImported: new Date().toISOString().split('T')[0] },
+      }))
+    } catch (err) {
+      console.warn(`History load failed for ${sourceId}:`, err.message)
+    } finally {
+      setLoadingHistory(prev => { const next = new Set(prev); next.delete(storageKey); return next })
+    }
+  }
+
+  const handleLoadAllFromHistory = async () => {
+    setLoadAllMsg('Cargando...')
+    let ok = 0, errors = 0
+    for (const ind of INDICATORS) {
+      const sourceId = getSourceId(activeTab, ind.key)
+      const storageKey = `${activeTab}_${ind.key}`
+      try {
+        const res = await fetch(`/api/history/series/${sourceId}?limit=500&order=asc`)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const body = await res.json()
+        const observations = body.observations || []
+        if (observations.length === 0) continue
+        const series = observations
+          .map(o => ({ date: String(o.date).substring(0, 7), value: Number(o.value) }))
+          .filter(o => !isNaN(o.value))
+        setHistory(prev => ({
+          ...prev,
+          [storageKey]: { series, lastImported: new Date().toISOString().split('T')[0] },
+        }))
+        ok++
+      } catch { errors++ }
+    }
+    setLoadAllMsg(`Cargado: ${ok} OK / ${errors} sin datos`)
+    setTimeout(() => setLoadAllMsg(null), 4000)
   }
 
   const handleBuildFeatures = async () => {
@@ -511,9 +516,20 @@ export default function ModelInputsPage() {
             <span className="text-xs text-[#555]">
               {tabCoverage[activeTab] ?? 0} / {INDICATORS.length} indicadores con histórico
             </span>
+            {loadAllMsg && (
+              <span className={`text-xs font-bold uppercase tracking-wider ${loadAllMsg.startsWith('Carg') && !loadAllMsg.includes('OK') ? 'text-[#f59e0b]' : 'text-[#4ade80]'}`}>
+                {loadAllMsg}
+              </span>
+            )}
+            <button
+              onClick={handleLoadAllFromHistory}
+              className="ml-auto text-[10px] font-bold uppercase tracking-wider border border-[#60a5fa] text-[#60a5fa] px-2 py-0.5 hover:text-white hover:border-white"
+            >
+              LOAD ALL FROM HISTORY
+            </button>
             <button
               onClick={handleClearAll}
-              className="ml-auto text-[10px] font-bold uppercase tracking-wider text-[#444] hover:text-[#ef4444]"
+              className="text-[10px] font-bold uppercase tracking-wider text-[#444] hover:text-[#ef4444]"
             >
               BORRAR TODO
             </button>
@@ -641,6 +657,18 @@ export default function ModelInputsPage() {
                               }`}
                             >
                               {isOpen ? 'CERRAR' : stats ? 'EDITAR' : 'IMPORTAR'}
+                            </button>
+                            <button
+                              onClick={() => handleLoadFromHistory(activeTab, ind.key)}
+                              disabled={loadingHistory.has(storageKey)}
+                              className={`text-xs font-bold uppercase tracking-wider px-2 py-0.5 border ${
+                                loadingHistory.has(storageKey)
+                                  ? 'border-[#333] text-[#444] cursor-not-allowed'
+                                  : 'border-[#60a5fa] text-[#60a5fa] hover:text-white hover:border-white'
+                              }`}
+                              title={`Cargar desde History: ${getSourceId(activeTab, ind.key)}`}
+                            >
+                              {loadingHistory.has(storageKey) ? '...' : 'HIST'}
                             </button>
                             {stats && (
                               <button

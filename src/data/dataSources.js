@@ -2311,6 +2311,86 @@ const rawDataSources = [
     lastUpdate: '2026-05-12',
     notes: 'Impact: EUR/GBP, commodity proxies via UK terms of trade',
   },
+
+  // --- Commodities faltantes ---
+  {
+    id: 'exo_coal',
+    indicator: 'Coal (Thermal / Coking)',
+    category: 'COMMODITIES',
+    module: 'Exogenous — Commodities',
+    scraper: 'api',
+    scrapeUrl: '',
+    frequency: 'Diaria',
+    frequencyDays: 1,
+    lastUpdate: '2026-05-14',
+    notes: 'Newcastle thermal / Australian coking. Impact: AUD, NZD. Pendiente conectar endpoint gratuito.',
+  },
+  {
+    id: 'exo_grains',
+    indicator: 'Grains (Soy / Corn / Wheat)',
+    category: 'COMMODITIES',
+    module: 'Exogenous — Commodities',
+    scraper: 'api',
+    scrapeUrl: '',
+    frequency: 'Diaria',
+    frequencyDays: 1,
+    lastUpdate: '2026-05-14',
+    notes: 'CBOT soy, corn, wheat futures. Impact: BRL, ARS, AUD. Pendiente conectar endpoint gratuito.',
+  },
+
+  // --- Global Growth ---
+  {
+    id: 'exo_global_pmi',
+    indicator: 'Global PMI Manufacturing',
+    category: 'GLOBAL',
+    module: 'Exogenous — China',
+    scraper: 'api',
+    scrapeUrl: '',
+    frequency: 'Mensual',
+    frequencyDays: 30,
+    lastUpdate: '2026-05-14',
+    notes: 'S&P Global / JPMorgan Global Manufacturing PMI. Leading de ciclo global. Pendiente endpoint gratuito.',
+  },
+
+  // --- Timing ---
+  {
+    id: 'timing_event_calendar',
+    indicator: 'Level 1 Event Calendar',
+    category: 'EVENTS',
+    module: 'Timing + Risk — Events',
+    scraper: 'manual',
+    scrapeUrl: 'https://www.forexfactory.com/calendar',
+    frequency: 'Semanal',
+    frequencyDays: 7,
+    lastUpdate: '2026-05-14',
+    notes: 'FOMC, NFP, CPI, ECB, BoJ. Blackout 48h pre/post evento Nivel 1. Input manual semanal.',
+  },
+
+  // --- Risk ---
+  {
+    id: 'risk_fx_iv_1m',
+    indicator: 'FX Options 1M ATM Implied Volatility',
+    category: 'VOL',
+    module: 'Timing + Risk — Vol',
+    scraper: 'api',
+    scrapeUrl: '',
+    frequency: 'Diaria',
+    frequencyDays: 1,
+    lastUpdate: '2026-05-14',
+    notes: 'IV 1M ATM para principales pares G10. Ratio IV/RV para sizing. Pendiente endpoint gratuito (Bloomberg BVOL / Refinitiv).',
+  },
+  {
+    id: 'risk_broker_spreads',
+    indicator: 'Broker Spreads / Transaction Costs',
+    category: 'EXECUTION',
+    module: 'Timing + Risk — Execution',
+    scraper: 'manual',
+    scrapeUrl: '',
+    frequency: 'Mensual',
+    frequencyDays: 30,
+    lastUpdate: '2026-05-14',
+    notes: 'Spread medio por par G10 segun broker activo. Input manual mensual o cuando cambian condiciones.',
+  },
 ]
 
 const SOURCE_OVERRIDES = {
