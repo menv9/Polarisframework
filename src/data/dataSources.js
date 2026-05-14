@@ -2233,6 +2233,8 @@ const SOURCE_OVERRIDES = {
   endo_usa_niip: { scraper: 'fred', fredSeriesId: 'IIPUSNETIQ' },
   endo_usa_umcsi: { scraper: 'fred', fredSeriesId: 'UMCSENT' },
   endo_usa_cb_balance: { scraper: 'fred', fredSeriesId: 'WALCL' },
+  endo_eur_cb_balance: { scraper: 'fred', fredSeriesId: 'ECBASSETSW' },
+  endo_jpn_cb_balance: { scraper: 'fred', fredSeriesId: 'JPNASSETS' },
   endo_usa_reer: { apiPath: '/api/source/bis/reer/latest?currency=USD' },
   endo_eur_cpi: { apiPath: '/api/source/eurostat/latest/prc_hicp_manr?geo=EA20&coicop=CP00&unit=RCH_A' },
   endo_eur_core_cpi: { apiPath: '/api/source/eurostat/latest/prc_hicp_manr?geo=EA20&coicop=TOT_X_NRG_FOOD&unit=RCH_A' },
