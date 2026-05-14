@@ -244,6 +244,8 @@ export default function ModelInputsPage() {
   const [importText, setImportText]     = useState('')
   const [importError, setImportError]   = useState('')
   const [syncMsg, setSyncMsg]           = useState(null)
+  const [featureMsg, setFeatureMsg]     = useState(null)
+  const [buildingFeatures, setBuildingFeatures] = useState(false)
   const [urlEditKey, setUrlEditKey]     = useState(null)
   const [urlEditValue, setUrlEditValue] = useState('')
   const fileInputRef                    = useRef(null)
@@ -357,6 +359,25 @@ export default function ModelInputsPage() {
     setHistory({})
   }
 
+  const handleBuildFeatures = async () => {
+    setBuildingFeatures(true)
+    setFeatureMsg(null)
+    try {
+      const res = await fetch('/api/features/build-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 25 }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.message || body.error || 'Feature build failed')
+      setFeatureMsg(`Features: OK ${body.ok || 0} / ERR ${body.errors || 0} / processed ${body.processed || 0}`)
+    } catch (err) {
+      setFeatureMsg(`Error: ${err.message}`)
+    } finally {
+      setBuildingFeatures(false)
+    }
+  }
+
   const activeCountry = COUNTRIES.find(c => c.prefix === activeTab)
 
   return (
@@ -373,6 +394,16 @@ export default function ModelInputsPage() {
           </div>
           <div className="flex items-center gap-3">
             {syncMsg && <span className="text-xs font-bold text-[#4ade80] uppercase tracking-wider">{syncMsg}</span>}
+            {featureMsg && <span className={`text-xs font-bold uppercase tracking-wider ${featureMsg.startsWith('Error') ? 'text-[#ef4444]' : 'text-[#4ade80]'}`}>{featureMsg}</span>}
+            <button
+              onClick={handleBuildFeatures}
+              disabled={buildingFeatures}
+              className={`px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 ${
+                buildingFeatures ? 'border-[#333] text-[#555] cursor-not-allowed' : 'border-[#60a5fa] text-[#60a5fa] hover:text-white hover:border-white'
+              }`}
+            >
+              {buildingFeatures ? 'BUILDING...' : 'BUILD FEATURES'}
+            </button>
             <button
               onClick={handleSyncManual}
               className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#4ade80] text-[#4ade80] hover:text-white hover:border-white"

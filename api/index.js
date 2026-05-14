@@ -881,6 +881,131 @@ async function readHistorySeries(sourceId, { limit = 500, offset = 0, order = 'a
   }
 }
 
+async function readAllHistoryObservations(sourceId) {
+  if (supabaseAdmin) {
+    const rows = []
+    const pageSize = 1000
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await supabaseAdmin
+        .from('history_observations')
+        .select('source_id,date,value,raw,fetched_at')
+        .eq('source_id', sourceId)
+        .order('date', { ascending: true })
+        .range(offset, offset + pageSize - 1)
+      if (error) throw new Error(`Supabase history read failed: ${error.message}`)
+      rows.push(...(data || []))
+      if (!data || data.length < pageSize) break
+    }
+    return rows.map((row) => ({ date: row.date, value: Number(row.value), raw: row.raw })).filter((row) => Number.isFinite(row.value))
+  }
+
+  const filePath = path.join(HISTORY_SERIES_DIR, `${safeFileName(sourceId)}.json`)
+  const raw = await fs.readFile(filePath, 'utf8')
+  const payload = JSON.parse(raw)
+  return normalizeHistorySeries(payload.series)
+}
+
+function rollingStats(values) {
+  const n = values.length
+  if (!n) return null
+  const mean = values.reduce((sum, value) => sum + value, 0) / n
+  const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / n
+  return { mean, std: Math.sqrt(variance) }
+}
+
+function buildRawFeature(series) {
+  return series.map((row) => ({ date: row.date, value: Number(row.value.toFixed(8)) }))
+}
+
+function buildYoYFeature(series, lag = 12) {
+  return annualPercentChange(series, lag)
+}
+
+function buildRollingZScoreFeature(series, window = 120) {
+  return series
+    .map((row, index) => {
+      const sample = series.slice(Math.max(0, index - window + 1), index + 1).map((item) => item.value)
+      if (sample.length < Math.min(window, 24)) return null
+      const stats = rollingStats(sample)
+      if (!stats || stats.std === 0) return null
+      const z = Math.max(-4, Math.min(4, (row.value - stats.mean) / stats.std))
+      return { date: row.date, value: Number(z.toFixed(6)) }
+    })
+    .filter(Boolean)
+}
+
+function buildRollingPercentileFeature(series, window = 1300) {
+  return series
+    .map((row, index) => {
+      const sample = series.slice(Math.max(0, index - window + 1), index + 1).map((item) => item.value)
+      if (sample.length < Math.min(window, 60)) return null
+      const rank = sample.filter((value) => value <= row.value).length
+      return { date: row.date, value: Number(((rank / sample.length) * 100).toFixed(6)) }
+    })
+    .filter(Boolean)
+}
+
+function buildFeatureSeries(series, method, window) {
+  if (method === 'raw') return buildRawFeature(series)
+  if (method === 'yoy') return buildYoYFeature(series, 12)
+  if (method === 'rolling_zscore') return buildRollingZScoreFeature(series, window || 120)
+  if (method === 'rolling_percentile') return buildRollingPercentileFeature(series, window || 1300)
+  throw new Error(`Unsupported feature method: ${method}`)
+}
+
+async function upsertModelFeatureRows(sourceId, method, featureRows, window = null) {
+  if (!supabaseAdmin) throw new Error('Supabase is required for model_features')
+  const featureId = `${sourceId}:${method}${window ? `:${window}` : ''}`
+  const now = new Date().toISOString()
+
+  const { error: deleteError } = await supabaseAdmin
+    .from('model_features')
+    .delete()
+    .eq('feature_id', featureId)
+  if (deleteError) throw new Error(`Supabase model_features delete failed: ${deleteError.message}`)
+
+  const rows = featureRows.map((row) => ({
+    feature_id: featureId,
+    source_id: sourceId,
+    date: row.date,
+    value: row.value,
+    method,
+    window_size: window,
+    fetched_at: now,
+  }))
+
+  for (let index = 0; index < rows.length; index += 1000) {
+    const chunk = rows.slice(index, index + 1000)
+    const { error } = await supabaseAdmin
+      .from('model_features')
+      .upsert(chunk, { onConflict: 'feature_id,date' })
+    if (error) throw new Error(`Supabase model_features upsert failed: ${error.message}`)
+  }
+
+  return {
+    featureId,
+    sourceId,
+    method,
+    windowSize: window,
+    count: rows.length,
+    start: rows[0]?.date || null,
+    end: rows.at(-1)?.date || null,
+    fetchedAt: now,
+  }
+}
+
+async function buildFeaturesForSource(sourceId, methods = ['raw', 'rolling_zscore'], windowByMethod = {}) {
+  const series = normalizeHistorySeries(await readAllHistoryObservations(sourceId))
+  if (!series.length) throw new Error(`No history observations for ${sourceId}`)
+  const results = []
+  for (const method of methods) {
+    const window = windowByMethod[method] || (method === 'rolling_zscore' ? 120 : method === 'rolling_percentile' ? 1300 : null)
+    const featureRows = buildFeatureSeries(series, method, window)
+    results.push(await upsertModelFeatureRows(sourceId, method, featureRows, window))
+  }
+  return results
+}
+
 async function fetchFredHistorySeries(seriesId, transform = null, limit = 5000) {
   const series = normalizeHistorySeries(await fetchFredNumericObservations(seriesId, limit).then((rows) => rows.reverse()))
   return {
@@ -1168,6 +1293,49 @@ app.post('/api/history/ingest-all', async (req, res) => {
     errors: results.filter((row) => row.status === 'error').length,
     results,
   })
+})
+
+app.post('/api/features/build/:sourceId', async (req, res) => {
+  try {
+    const methods = Array.isArray(req.body?.methods) && req.body.methods.length
+      ? req.body.methods
+      : ['raw', 'rolling_zscore']
+    const windowByMethod = req.body?.windowByMethod || {}
+    res.json({
+      sourceId: req.params.sourceId,
+      results: await buildFeaturesForSource(req.params.sourceId, methods, windowByMethod),
+    })
+  } catch (err) {
+    res.status(502).json({ error: 'Feature build failed', message: err.message })
+  }
+})
+
+app.post('/api/features/build-all', async (req, res) => {
+  try {
+    const status = await readHistoryStatus()
+    const sourceIds = Object.values(status)
+      .filter((row) => row.status === 'ok' && row.count > 0)
+      .map((row) => row.sourceId)
+    const limit = Math.max(1, Math.min(Number(req.body?.limit) || 20, 100))
+    const batch = sourceIds.slice(0, limit)
+    const results = []
+    for (const sourceId of batch) {
+      try {
+        results.push({ sourceId, ok: true, results: await buildFeaturesForSource(sourceId) })
+      } catch (err) {
+        results.push({ sourceId, ok: false, error: err.message })
+      }
+    }
+    res.json({
+      totalAvailable: sourceIds.length,
+      processed: results.length,
+      ok: results.filter((row) => row.ok).length,
+      errors: results.filter((row) => !row.ok).length,
+      results,
+    })
+  } catch (err) {
+    res.status(502).json({ error: 'Feature build-all failed', message: err.message })
+  }
 })
 
 // FRED proxy endpoints
