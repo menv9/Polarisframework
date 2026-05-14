@@ -297,11 +297,16 @@ export default function EconomicCalendarPage() {
         {syncResult && !error && (
           <div className="mb-4 border-2 border-[#333] bg-[#080808] px-3 py-2">
             <div className="text-xs font-mono uppercase tracking-wider text-[#aaa]">
-              SYNC OK · EVENTS {syncResult.scanned} · RELEASED {syncResult.released} · SAVED {syncResult.saved} · STORAGE {syncResult.storage}
+              SYNC OK · EVENTS {syncResult.scanned} · ACTUAL {syncResult.released} · SAVED/UPDATED {syncResult.saved} · STORAGE {syncResult.storage}
             </div>
-            {syncResult.released === 0 && (
+            {syncResult.saved === 0 && (
               <div className="mt-1 text-[10px] text-[#777] uppercase tracking-wider">
-                No hay valores actual nuevos para guardar; el calendario de eventos si fue refrescado.
+                No se ha persistido ningun evento nuevo. Si storage es missing-table, crea calendar_releases primero.
+              </div>
+            )}
+            {syncResult.saved > 0 && (
+              <div className="mt-1 text-[10px] text-[#777] uppercase tracking-wider">
+                Eventos del calendario guardados solo dentro de Economic Calendar; no salen a registry, history ni features.
               </div>
             )}
             {syncResult.warnings?.length > 0 && (

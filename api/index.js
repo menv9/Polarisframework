@@ -1067,7 +1067,7 @@ async function fetchFxMacroDataCalendar() {
 
 function mergeCalendarEvents(events) {
   const today = new Date()
-  const minDate = new Date(today.getFullYear(), today.getMonth(), 1)
+  const minDate = new Date(today.getFullYear(), today.getMonth() - 1, 1)
   const byKey = new Map()
   events.forEach((event) => {
     const eventTime = new Date(calendarEventDateTime(event) || 0)
@@ -1134,7 +1134,7 @@ async function readCalendarReleases() {
       .select('*')
       .order('event_date', { ascending: false })
       .order('saved_at', { ascending: false })
-      .limit(500)
+      .limit(2000)
     if (isMissingCalendarTableError(error)) {
       return {
         storage: 'missing-table',
@@ -1866,13 +1866,13 @@ app.post('/api/calendar/sync', async (_req, res) => {
     const calendar = await fetchForexFactoryCalendar()
     const events = calendar.data
     const releases = events
-      .filter((event) => calendarEventName(event) && calendarEventDate(event) && hasReleasedActual(event))
+      .filter((event) => calendarEventName(event) && calendarEventDate(event))
       .map(toCalendarRelease)
     const result = await upsertCalendarReleases(releases)
     res.json({
       storage: result.storage,
       scanned: events.length,
-      released: releases.length,
+      released: events.filter(hasReleasedActual).length,
       saved: result.inserted,
       total: result.total,
       warnings: [...(calendar.warnings || []), ...(result.warnings || [])],
