@@ -1,30 +1,43 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useMemo } from 'react'
+import { dataSources as defaultDataSources } from '../data/dataSources'
 
 // ── Claves localStorage ───────────────────────────────────────────────────────
 export const STORAGE_KEY_HISTORY = 'polaris_endogenous_history'
 export const STORAGE_KEY_ZSCORES = 'polaris_endogenous_zscores'
-export const STORAGE_KEY_WV      = 'polaris_worldview_data'
 export const STORAGE_KEY_SOURCES = 'polaris_data_sources'
+
+// Campos que el usuario puede editar en DataPage (se preservan al hacer merge)
+const USER_EDITABLE_FIELDS = ['lastUpdate', '_lastScrape', '_scrapedValue', '_value', '_refreshError']
 
 // ── Worldview defaults y mapa de fuentes ─────────────────────────────────────
 export const DEFAULT_WV_DATA = {
   gdpUsa: 0.3, gdpEur: -0.2, gdpChn: 0.5, gdpJpn: 0.1, gdpResto: 0.0,
   vix: 15, hyOas: 45, sp200dma: 1, embi: 55,
   smartZ: 0.5, retailZ: -0.8,
-  dxy: 103.5, dxy200dma: 101.0, dxyRising: 1,
+  dxy: 103.5, dxyRising: 1,
   cpiG7: 2.8, breakevens: 2.3,
 }
 
+// Mapa worldview key → source ID en dataSources
 export const WV_DATA_MAP = {
-  gdpUsa: 'wv_gdp_usa', gdpEur: 'wv_gdp_eur', gdpChn: 'wv_gdp_chn',
-  gdpJpn: 'wv_gdp_jpn', gdpResto: 'wv_cesi',
-  vix: 'wv_vix', hyOas: 'wv_hy_oas', sp200dma: 'wv_sp500', embi: 'wv_embi',
-  smartZ: 'wv_cftc', retailZ: 'wv_retail',
-  dxy: 'wv_dxy', dxy200dma: 'wv_dxy_200dma',
-  cpiG7: 'wv_cpi_usa', breakevens: 'wv_breakevens',
+  gdpUsa:     'wv_gdp_usa',
+  gdpEur:     'wv_gdp_eur',
+  gdpChn:     'wv_gdp_chn',
+  gdpJpn:     'wv_gdp_jpn',
+  gdpResto:   'wv_cesi',
+  vix:        'wv_vix',
+  hyOas:      'wv_hy_oas',
+  sp200dma:   'wv_sp500',
+  embi:       'wv_embi',
+  smartZ:     'wv_cftc',
+  retailZ:    'wv_retail',
+  dxy:        'wv_dxy',
+  dxyRising:  'wv_dxy_200dma',
+  cpiG7:      'wv_cpi_usa',
+  breakevens: 'wv_breakevens',
 }
 
-// ── Utilidades internas ───────────────────────────────────────────────────────
+// ── Utilidades ────────────────────────────────────────────────────────────────
 function autoMonthlyDates(n) {
   const today = new Date()
   return Array.from({ length: n }, (_, i) => {
@@ -57,6 +70,30 @@ function computeStats(series) {
   return { n, mean, std, last, z }
 }
 
+function deriveZscores(history, current = {}) {
+  const updated = { ...current }
+  for (const [key, entry] of Object.entries(history)) {
+    if (!entry?.series?.length) continue
+    const stats = computeStats(entry.series)
+    if (stats) updated[key] = stats.z
+  }
+  return updated
+}
+
+// Deriva el objeto worldview desde el array de dataSources
+function deriveWorldview(sources) {
+  const sourceMap = new Map(sources.map(s => [s.id, s]))
+  const derived = {}
+  for (const [key, id] of Object.entries(WV_DATA_MAP)) {
+    const source = sourceMap.get(id)
+    if (source?._value != null && source._value !== '') {
+      const num = Number(source._value)
+      if (!isNaN(num)) derived[key] = num
+    }
+  }
+  return { ...DEFAULT_WV_DATA, ...derived }
+}
+
 // ── Cargadores de localStorage ────────────────────────────────────────────────
 function loadHistory() {
   try {
@@ -80,47 +117,37 @@ function loadZscores() {
   return {}
 }
 
-function loadWorldview() {
+function loadDataSources() {
   try {
-    const savedSources = localStorage.getItem(STORAGE_KEY_SOURCES)
-    if (savedSources) {
-      const sources = JSON.parse(savedSources)
-      const fromSources = {}
-      for (const [key, id] of Object.entries(WV_DATA_MAP)) {
-        const source = sources.find(s => s.id === id)
-        if (source?._value != null && source._value !== '') {
-          const num = Number(source._value)
-          if (!isNaN(num)) fromSources[key] = num
-        }
-      }
-      if (Object.keys(fromSources).length > 0) return { ...DEFAULT_WV_DATA, ...fromSources }
+    const saved = localStorage.getItem(STORAGE_KEY_SOURCES)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      return defaultDataSources.map(defaultSrc => {
+        const savedSrc = parsed.find(s => s.id === defaultSrc.id)
+        if (!savedSrc) return defaultSrc
+        const preserved = USER_EDITABLE_FIELDS.reduce((acc, field) => {
+          if (Object.hasOwn(savedSrc, field)) acc[field] = savedSrc[field]
+          return acc
+        }, {})
+        return { ...defaultSrc, ...preserved }
+      })
     }
-    const saved = localStorage.getItem(STORAGE_KEY_WV)
-    if (saved) return JSON.parse(saved)
   } catch { /* ignore */ }
-  return DEFAULT_WV_DATA
-}
-
-// Calcula z-scores desde history y los fusiona con los existentes
-function deriveZscores(history, current = {}) {
-  const updated = { ...current }
-  for (const [key, entry] of Object.entries(history)) {
-    if (!entry?.series?.length) continue
-    const stats = computeStats(entry.series)
-    if (stats) updated[key] = stats.z
-  }
-  return updated
+  return defaultDataSources
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
 const ModelDataContext = createContext(null)
 
 export function ModelDataProvider({ children }) {
-  const [history,   setHistory]   = useState(loadHistory)
-  const [zscores,   setZscores]   = useState(loadZscores)
-  const [worldview, setWorldview] = useState(loadWorldview)
+  const [history,     setHistory]     = useState(loadHistory)
+  const [zscores,     setZscores]     = useState(loadZscores)
+  const [dataSources, setDataSources] = useState(loadDataSources)
 
-  // Cuando cambia el histórico, re-deriva z-scores automáticamente
+  // worldview se deriva reactivamente de dataSources — sin estado propio
+  const worldview = useMemo(() => deriveWorldview(dataSources), [dataSources])
+
+  // Cuando cambia history, re-deriva z-scores automáticamente
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(history))
     setZscores(prev => {
@@ -130,18 +157,23 @@ export function ModelDataProvider({ children }) {
     })
   }, [history])
 
-  // Persiste z-scores si se modifican manualmente desde otra página
+  // Persiste zscores cuando se actualizan
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_ZSCORES, JSON.stringify(zscores))
   }, [zscores])
 
-  // Persiste worldview
+  // Persiste dataSources cuando DataPage actualiza un _value
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_WV, JSON.stringify(worldview))
-  }, [worldview])
+    localStorage.setItem(STORAGE_KEY_SOURCES, JSON.stringify(dataSources))
+  }, [dataSources])
 
   return (
-    <ModelDataContext.Provider value={{ history, setHistory, zscores, setZscores, worldview, setWorldview }}>
+    <ModelDataContext.Provider value={{
+      history, setHistory,
+      zscores, setZscores,
+      dataSources, setDataSources,
+      worldview,
+    }}>
       {children}
     </ModelDataContext.Provider>
   )

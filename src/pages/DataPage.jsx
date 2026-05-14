@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { dataSources, getNextUpdate, getStatus, countByStatus, getAccessSummary } from '../data/dataSources'
+import { useModelStore } from '../store/ModelDataContext'
 
 function exportCsv(sources) {
   const headers = [
@@ -125,16 +126,11 @@ async function fetchSourceData(source) {
 }
 
 export default function DataPage() {
-  const [sources, setSources] = useState(loadSources)
+  const { dataSources: sources, setDataSources: setSources } = useModelStore()
   const [loadingAll, setLoadingAll] = useState(false)
   const [loadingId, setLoadingId] = useState(null)
   const [lastGlobalRefresh, setLastGlobalRefresh] = useState(null)
   const [globalRefreshResult, setGlobalRefreshResult] = useState(null)
-
-  // Persistir cambios en localStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sources))
-  }, [sources])
 
   const counts = useMemo(() => countByStatus(sources), [sources])
   const accessSummary = useMemo(() => getAccessSummary(sources), [sources])

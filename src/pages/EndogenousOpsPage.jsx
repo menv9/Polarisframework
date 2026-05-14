@@ -165,28 +165,12 @@ function fmtScore(v) {
 }
 
 export default function EndogenousOpsPage() {
-  const { zscores: zScores, setZscores: setZScores, worldview: wvData } = useModelStore()
+  const { zscores: zScores, worldview: wvData } = useModelStore()
   const [betas]                 = useState(loadBetas)
   const [sourceValues]          = useState(loadSourceValues)
   const [pairA, setPairA]     = useState('usa')
   const [pairB, setPairB]     = useState('eur')
   const [activeTab, setActiveTab] = useState('usa')
-  const [resetMsg, setResetMsg] = useState(null)
-
-  const handleZChange = (prefix, key, value) =>
-    setZScores(prev => ({ ...prev, [`${prefix}_${key}`]: Number(value) }))
-
-  const handleReset = () => {
-    const defaults = {}
-    for (const c of COUNTRIES) {
-      for (const ind of INDICATORS) {
-        defaults[`${c.prefix}_${ind.key}`] = 0
-      }
-    }
-    setZScores(defaults)
-    setResetMsg('Z-scores reseteados a 0')
-    setTimeout(() => setResetMsg(null), 3000)
-  }
 
   const regimeOn  = wvData.vix < 30 && wvData.hyOas < 30 && wvData.sp200dma === 1 && wvData.embi < 40
   const regimeOff = wvData.vix > 70 || wvData.hyOas > 70 || wvData.sp200dma === 0 || wvData.embi > 70
@@ -217,15 +201,6 @@ export default function EndogenousOpsPage() {
         <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-[#333]">
           <h1 className="text-2xl font-bold uppercase tracking-widest">OPERATIVA — ENDOGENOUS</h1>
           <div className="flex items-center gap-3">
-            {resetMsg && (
-              <span className="text-xs font-bold uppercase tracking-wider text-[#f59e0b]">{resetMsg}</span>
-            )}
-            <button
-              onClick={handleReset}
-              className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#555] text-[#777] hover:text-white hover:border-white"
-            >
-              RESET Z-SCORES
-            </button>
             <Link
               to="/model-inputs"
               className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#333] text-[#777] hover:text-white hover:border-white"
@@ -458,15 +433,9 @@ export default function EndogenousOpsPage() {
                             })()}
                           </td>
                           <td className="px-2 py-1.5">
-                            <input
-                              type="number"
-                              value={z}
-                              min={-4}
-                              max={4}
-                              step={0.01}
-                              onChange={e => handleZChange(activeCountry.prefix, ind.key, e.target.value)}
-                              className="w-20 bg-[#111] border-b-2 border-[#ecd987] text-sm font-mono font-bold text-white px-2 py-0.5 text-right outline-none focus:border-white"
-                            />
+                            <span className={`text-sm font-mono font-bold ${z === 0 ? 'text-[#555]' : z > 0 ? 'text-[#4ade80]' : 'text-[#ef4444]'}`}>
+                              {z >= 0 ? '+' : ''}{z.toFixed(3)}
+                            </span>
                           </td>
                           <td className="px-2 py-1.5">
                             <span className="text-xs font-mono text-[#777]">{(effectiveBeta / betaTotal).toFixed(3)}</span>
