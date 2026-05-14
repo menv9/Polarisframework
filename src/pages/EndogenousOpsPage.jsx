@@ -2,6 +2,14 @@ import { useState, Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import { INDICATORS as BASE_INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 import { useModelStore } from '../store/ModelDataContext'
+import { getFreshness, FRESHNESS_DOT, FRESHNESS_TEXT } from '../lib/freshness'
+
+const ENDO_FREQ = {
+  real_2y: 1, '10y_real': 1, policy: 1,
+  cftc: 7,
+  core_cpi: 30, cpi: 30, nfp: 30, pmi: 30, umcsi: 30, cb_balance: 30,
+  ca_gdp: 90, reer: 90, tot: 90, niip: 90, debt: 90,
+}
 
 const COUNTRIES = [
   { label: 'USD', prefix: 'usa', cyclical: false },
@@ -194,7 +202,7 @@ function Tooltip({ text, align = 'center' }) {
 }
 
 export default function EndogenousOpsPage() {
-  const { zscores: zScores, worldview: wvData } = useModelStore()
+  const { zscores: zScores, worldview: wvData, history } = useModelStore()
   const [betas]        = useState(loadBetas)
   const [sourceValues] = useState(loadSourceValues)
   const [pairA, setPairA]   = useState('usa')
@@ -462,6 +470,8 @@ export default function EndogenousOpsPage() {
                         const contrib  = (beta / betaTotal) * z * ind.sign * activeRegimeMult
                         const rawVal   = sourceValues[getSourceId(activeCountry.prefix, ind.key)]
                         const hasData  = z !== 0 || rawVal != null
+                        const entry    = history[`${activeCountry.prefix}_${ind.key}`]
+                        const fresh    = getFreshness(entry?.lastImported, ENDO_FREQ[ind.key])
 
                         return (
                           <tr key={ind.key} className={`border-b border-[#111] hover:bg-[#0a0a0a] transition-colors ${!hasData ? 'opacity-40' : ''}`}>
@@ -499,14 +509,18 @@ export default function EndogenousOpsPage() {
                               <ContribBar contrib={contrib} maxContrib={maxContrib} />
                             </td>
 
-                            {/* Horizon */}
+                            {/* Horizon + freshness */}
                             <td className="px-3 py-2">
-                              <span className={`text-[9px] font-bold uppercase tracking-wider ${
-                                ind.horizon === 'SHORT'  ? 'text-[#60a5fa]' :
-                                ind.horizon === 'MEDIUM' ? 'text-[#f59e0b]' : 'text-[#666]'
-                              }`}>
-                                {ind.horizon === 'SHORT' ? 'S' : ind.horizon === 'MEDIUM' ? 'M' : 'L'}
-                              </span>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className={`text-[9px] font-bold uppercase tracking-wider ${
+                                  ind.horizon === 'SHORT'  ? 'text-[#60a5fa]' :
+                                  ind.horizon === 'MEDIUM' ? 'text-[#f59e0b]' : 'text-[#666]'
+                                }`}>
+                                  {ind.horizon === 'SHORT' ? 'S' : ind.horizon === 'MEDIUM' ? 'M' : 'L'}
+                                </span>
+                                <span className={`inline-block w-1.5 h-1.5 rounded-full ${FRESHNESS_DOT[fresh.status]}`}
+                                  title={fresh.label} />
+                              </div>
                             </td>
                           </tr>
                         )

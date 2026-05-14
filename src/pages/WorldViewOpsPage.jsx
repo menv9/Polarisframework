@@ -1,6 +1,25 @@
 import { Link } from 'react-router-dom'
 import WorldViewSidebar from '../components/worldview/WorldViewSidebar'
 import { useModelStore, WV_DATA_MAP, DEFAULT_WV_DATA } from '../store/ModelDataContext'
+import { getFreshness, FRESHNESS_DOT, FRESHNESS_TEXT } from '../lib/freshness'
+
+const WV_FREQ = {
+  gdpUsa: 90, gdpEur: 90, gdpChn: 90, gdpJpn: 90, gdpResto: 30,
+  vix: 7, hyOas: 7, sp200dma: 7, embi: 7,
+  smartZ: 7, retailZ: 7,
+  dxy: 1, dxyRising: 1,
+  cpiG7: 30, breakevens: 7,
+}
+
+function FreshDot({ lastUpdate, frequencyDays }) {
+  const f = getFreshness(lastUpdate, frequencyDays)
+  return (
+    <span className="flex items-center gap-1">
+      <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${FRESHNESS_DOT[f.status]}`} />
+      <span className={`text-[9px] font-mono ${FRESHNESS_TEXT[f.status]}`}>{f.label}</span>
+    </span>
+  )
+}
 
 function fmt(value, key) {
   if (value == null) return '—'
@@ -9,7 +28,8 @@ function fmt(value, key) {
 }
 
 export default function WorldViewOpsPage() {
-  const { worldview: data } = useModelStore()
+  const { worldview: data, dataSources } = useModelStore()
+  const sourceMap = new Map(dataSources.map(s => [s.id, s]))
 
   const scoreGDP  = data.gdpUsa * 0.25 + data.gdpEur * 0.18 + data.gdpChn * 0.18 + data.gdpJpn * 0.05 + data.gdpResto * 0.34
   const regimeOn  = data.vix < 30 && data.hyOas < 30 && data.sp200dma === 1 && data.embi < 40
@@ -122,21 +142,23 @@ export default function WorldViewOpsPage() {
               <table className="w-full text-sm table-fixed">
                 <thead>
                   <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#777]">
-                    <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[40%]">Parametro</th>
-                    <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[48%]">Valor</th>
-                    <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[12%]">Fuente</th>
+                    <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[38%]">Parametro</th>
+                    <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[38%]">Valor</th>
+                    <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[14%]">Freshness</th>
+                    <th className="px-2 py-1.5 text-xs font-bold uppercase tracking-widest w-[10%]">Fuente</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ROWS.map(({ section, sectionColor, items }) => (
                     <>
                       <tr key={section} className="border-y border-[#333] bg-[#161616]">
-                        <td colSpan={3} className="px-2 py-1.5">
+                        <td colSpan={4} className="px-2 py-1.5">
                           <span className={`text-sm font-bold uppercase tracking-widest ${sectionColor || 'text-[#ecd987]'}`}>{section}</span>
                         </td>
                       </tr>
                       {items.map(({ key, label }) => {
                         const sourceId = WV_DATA_MAP[key]
+                        const source   = sourceMap.get(sourceId)
                         const val = data[key]
                         const hasValue = val != null && val !== DEFAULT_WV_DATA[key]
                         return (
@@ -151,6 +173,9 @@ export default function WorldViewOpsPage() {
                               {!hasValue && (
                                 <span className="ml-2 text-[10px] text-[#555] uppercase tracking-wider">default</span>
                               )}
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <FreshDot lastUpdate={source?.lastUpdate} frequencyDays={WV_FREQ[key]} />
                             </td>
                             <td className="px-2 py-1.5">
                               <Link
