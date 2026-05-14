@@ -207,10 +207,16 @@ export default function EndogenousOpsPage() {
               RESET Z-SCORES
             </button>
             <Link
-              to="/data?module=Endogenous"
+              to="/endogenous/zscores"
               className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white"
             >
-              FUENTES →
+              CALCULAR Z-SCORES →
+            </Link>
+            <Link
+              to="/data?module=Endogenous"
+              className="text-xs font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]"
+            >
+              → /DATA
             </Link>
           </div>
         </div>
