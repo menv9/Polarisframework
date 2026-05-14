@@ -47,18 +47,46 @@ async function fetchFredData(seriesId, yoy = false) {
   return res.json()
 }
 
+// Permanent failure — don't retry. Carries an HTTP status so we can distinguish
+// "series doesn't exist" (4xx) from "upstream had a hiccup" (5xx / network).
+class PermanentFetchError extends Error {
+  constructor(message, status) {
+    super(message)
+    this.name = 'PermanentFetchError'
+    this.status = status
+  }
+}
+
 async function fetchSourceData(source) {
   const endpoint = source.apiPath || (source.fredSeriesId ? (source.fredYoY ? `/api/fred/yoy/${source.fredSeriesId}` : `/api/fred/latest/${source.fredSeriesId}`) : null)
   if (!endpoint) throw new Error('No automatic endpoint configured')
-  const res = await fetch(endpoint, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.message || res.statusText)
+
+  // Retry transient failures (5xx, network errors) with backoff. 4xx is permanent
+  // (bad series / not found) — fail fast.
+  const delays = [400, 1200, 3000]
+  let lastErr = null
+  for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (res.ok) return await res.json()
+      const body = await res.json().catch(() => ({}))
+      const message = body.message || res.statusText || `HTTP ${res.status}`
+      if (res.status >= 400 && res.status < 500) {
+        throw new PermanentFetchError(message, res.status)
+      }
+      lastErr = new Error(`${res.status} ${message}`)
+    } catch (err) {
+      if (err instanceof PermanentFetchError) throw err
+      lastErr = err
+    }
+    if (attempt < delays.length) {
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt]))
+    }
   }
-  return res.json()
+  throw lastErr || new Error('Fetch failed after retries')
 }
 
 export default function DataPage() {
