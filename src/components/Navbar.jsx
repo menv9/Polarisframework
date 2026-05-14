@@ -26,7 +26,6 @@ const GROUPS = [
     items: [
       { to: '/journal',     label: 'Journal', desc: 'Trade Journal' },
       { to: '/performance', label: 'Perf',    desc: 'Performance' },
-      { to: '/data',        label: 'Data',    desc: 'Data Hub' },
     ],
   },
 ]
@@ -109,6 +108,17 @@ export default function Navbar() {
           {GROUPS.map(group => (
             <NavDropdown key={group.label} group={group} location={location} />
           ))}
+
+          <span className="text-[#222]">|</span>
+
+          <Link
+            to="/data"
+            className={`text-xs font-bold uppercase tracking-wider transition-colors ${
+              location.pathname.startsWith('/data') ? 'text-[#ecd987]' : 'text-[#666] hover:text-[#ecd987]'
+            }`}
+          >
+            Data
+          </Link>
 
           {isAdmin && (
             <>
