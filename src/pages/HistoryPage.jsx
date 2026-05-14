@@ -17,11 +17,27 @@ function endpointOf(source) {
   return source.apiPath || (source.fredSeriesId ? `/api/fred/${source.fredYoY ? 'yoy' : 'latest'}/${source.fredSeriesId}` : '')
 }
 
+function rowStatusOf(source) {
+  return source.history?.status || 'missing'
+}
+
+function displayStatusOf(source) {
+  const rowStatus = rowStatusOf(source)
+  return (statusConfig[rowStatus] || statusConfig.missing).label
+}
+
+function displayHistoryDetail(source) {
+  return source.history?.error
+    || source.history?.file
+    || (source.history?.storage === 'supabase' ? 'Supabase history_observations' : '')
+    || source.endpoint
+    || 'No endpoint automatico'
+}
+
 function exportHistoryCsv(rows) {
   const headers = [
-    'source_id', 'indicator', 'module', 'category', 'status',
-    'observations', 'start_date', 'end_date', 'storage', 'automatable',
-    'endpoint_or_error', 'fetched_at',
+    'fuente', 'indicador', 'modulo', 'estado', 'obs',
+    'start', 'end', 'endpoint_error', 'accion',
   ]
 
   const escape = (value) => {
@@ -31,20 +47,16 @@ function exportHistoryCsv(rows) {
   }
 
   const body = rows.map((source) => {
-    const history = source.history || {}
     return [
       source.id,
       source.indicator,
       source.module,
-      source.category,
-      history.status || 'missing',
-      history.count || 0,
-      history.start || '',
-      history.end || '',
-      history.storage || '',
-      source.automatable ? 'yes' : 'no',
-      history.error || history.file || source.endpoint || '',
-      history.fetchedAt || '',
+      displayStatusOf(source),
+      source.history?.count || 0,
+      source.history?.start || '-',
+      source.history?.end || '-',
+      displayHistoryDetail(source),
+      source.automatable ? 'INGEST' : 'NO AUTO',
     ].map(escape).join(',')
   })
 
@@ -76,7 +88,7 @@ export default function HistoryPage() {
   const visibleSources = useMemo(() => {
     const q = query.trim().toLowerCase()
     return sources.filter((source) => {
-      const rowStatus = source.history?.status || 'missing'
+      const rowStatus = rowStatusOf(source)
       if (filter === 'auto' && !source.automatable) return false
       if (filter !== 'all' && filter !== 'auto' && rowStatus !== filter) return false
       if (!q) return true
@@ -87,7 +99,7 @@ export default function HistoryPage() {
   }, [sources, query, filter])
 
   const counts = useMemo(() => sources.reduce((acc, source) => {
-    const rowStatus = source.history?.status || 'missing'
+    const rowStatus = rowStatusOf(source)
     acc.total += 1
     acc[rowStatus] = (acc[rowStatus] || 0) + 1
     if (source.automatable) acc.auto += 1
@@ -226,7 +238,7 @@ export default function HistoryPage() {
             </thead>
             <tbody>
               {visibleSources.map((source) => {
-                const rowStatus = source.history?.status || 'missing'
+                const rowStatus = rowStatusOf(source)
                 const cfg = statusConfig[rowStatus] || statusConfig.missing
                 return (
                   <tr key={source.id} className="border-b border-[#222] align-top">
@@ -247,7 +259,7 @@ export default function HistoryPage() {
                     <td className="px-2 py-2 font-mono text-xs text-[#aaa]">{source.history?.end || '-'}</td>
                     <td className="px-2 py-2">
                       <div className="text-[10px] text-[#888] leading-tight break-all">
-                        {source.history?.error || source.history?.file || (source.history?.storage === 'supabase' ? 'Supabase history_observations' : '') || source.endpoint || 'No endpoint automatico'}
+                        {displayHistoryDetail(source)}
                       </div>
                     </td>
                     <td className="px-2 py-2">
