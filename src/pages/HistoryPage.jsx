@@ -108,7 +108,7 @@ export default function HistoryPage() {
           <div>
             <h1 className="text-2xl font-bold uppercase tracking-widest">History Pipeline</h1>
             <div className="text-xs text-[#777] uppercase tracking-wider mt-1">
-              Historicos raw descargados a data/history. Model Inputs calcula features despues.
+              Historicos raw persistidos en Supabase. En local puede usar data/history como fallback.
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -200,7 +200,7 @@ export default function HistoryPage() {
                     <td className="px-2 py-2 font-mono text-xs text-[#aaa]">{source.history?.end || '-'}</td>
                     <td className="px-2 py-2">
                       <div className="text-[10px] text-[#888] leading-tight break-all">
-                        {source.history?.error || source.history?.file || source.endpoint || 'No endpoint automatico'}
+                        {source.history?.error || source.history?.file || (source.history?.storage === 'supabase' ? 'Supabase history_observations' : '') || source.endpoint || 'No endpoint automatico'}
                       </div>
                     </td>
                     <td className="px-2 py-2">

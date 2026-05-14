@@ -7,6 +7,7 @@ const AdmZip = require('adm-zip')
 const XLSX = require('xlsx')
 const fs = require('fs/promises')
 const path = require('path')
+const { createClient } = require('@supabase/supabase-js')
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -59,6 +60,11 @@ const FRED_BASE = 'https://api.stlouisfed.org/fred/series/observations'
 const ECB_BASE = 'https://data-api.ecb.europa.eu/service/data'
 const EUROSTAT_BASE = 'https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data'
 const IMF_BASE = 'https://dataservices.imf.org/REST/SDMX_JSON.svc/CompactData'
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+const supabaseAdmin = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+  : null
 
 // Headers para simular navegador real
 const browserHeaders = {
@@ -640,6 +646,18 @@ function safeFileName(id) {
 }
 
 async function readHistoryStatus() {
+  if (supabaseAdmin) {
+    const { data, error } = await supabaseAdmin
+      .from('history_status')
+      .select('*')
+      .order('source_id', { ascending: true })
+    if (error) throw new Error(`Supabase history_status read failed: ${error.message}`)
+    return (data || []).reduce((acc, row) => {
+      acc[row.source_id] = fromSupabaseStatus(row)
+      return acc
+    }, {})
+  }
+
   try {
     const raw = await fs.readFile(HISTORY_STATUS_PATH, 'utf8')
     return JSON.parse(raw)
@@ -651,6 +669,78 @@ async function readHistoryStatus() {
 async function writeHistoryStatus(status) {
   await ensureHistoryDirs()
   await fs.writeFile(HISTORY_STATUS_PATH, JSON.stringify(status, null, 2))
+}
+
+function toSupabaseStatus(row) {
+  return {
+    source_id: row.sourceId,
+    indicator: row.indicator || null,
+    module: row.module || null,
+    provider: row.provider || null,
+    status: row.status,
+    count: row.count || 0,
+    start_date: row.start || null,
+    end_date: row.end || null,
+    fetched_at: row.fetchedAt || new Date().toISOString(),
+    error: row.error || null,
+  }
+}
+
+function fromSupabaseStatus(row) {
+  return {
+    sourceId: row.source_id,
+    indicator: row.indicator,
+    module: row.module,
+    status: row.status,
+    provider: row.provider,
+    count: row.count || 0,
+    start: row.start_date,
+    end: row.end_date,
+    fetchedAt: row.fetched_at,
+    file: null,
+    error: row.error,
+    storage: 'supabase',
+  }
+}
+
+async function upsertSupabaseHistory(source, result, series, statusRow) {
+  const { error: statusError } = await supabaseAdmin
+    .from('history_status')
+    .upsert(toSupabaseStatus(statusRow), { onConflict: 'source_id' })
+  if (statusError) throw new Error(`Supabase history_status upsert failed: ${statusError.message}`)
+
+  const { error: deleteError } = await supabaseAdmin
+    .from('history_observations')
+    .delete()
+    .eq('source_id', source.id)
+  if (deleteError) throw new Error(`Supabase history_observations delete failed: ${deleteError.message}`)
+
+  const fetchedAt = statusRow.fetchedAt
+  const rows = series.map((row) => ({
+    source_id: source.id,
+    date: row.date,
+    value: row.value,
+    raw: row.raw === undefined ? null : row.raw,
+    fetched_at: fetchedAt,
+  }))
+
+  for (let index = 0; index < rows.length; index += 1000) {
+    const chunk = rows.slice(index, index + 1000)
+    const { error } = await supabaseAdmin
+      .from('history_observations')
+      .upsert(chunk, { onConflict: 'source_id,date' })
+    if (error) throw new Error(`Supabase history_observations upsert failed: ${error.message}`)
+  }
+
+  return { ...statusRow, storage: 'supabase', file: null }
+}
+
+async function upsertSupabaseHistoryFailure(row) {
+  const { error } = await supabaseAdmin
+    .from('history_status')
+    .upsert(toSupabaseStatus(row), { onConflict: 'source_id' })
+  if (error) throw new Error(`Supabase history_status failure upsert failed: ${error.message}`)
+  return { ...row, storage: 'supabase' }
 }
 
 function normalizeHistorySeries(series) {
@@ -674,9 +764,26 @@ function annualPercentChange(series, lag = 12) {
 }
 
 async function saveHistoryResult(source, result) {
-  await ensureHistoryDirs()
   const series = normalizeHistorySeries(result.series)
   const now = new Date().toISOString()
+  const statusRow = {
+    sourceId: source.id,
+    indicator: source.indicator,
+    module: source.module,
+    status: 'ok',
+    provider: result.provider,
+    count: series.length,
+    start: series[0]?.date || null,
+    end: series.at(-1)?.date || null,
+    fetchedAt: now,
+    file: null,
+    error: null,
+  }
+  if (supabaseAdmin) {
+    return upsertSupabaseHistory(source, result, series, statusRow)
+  }
+
+  await ensureHistoryDirs()
   const fileName = `${safeFileName(source.id)}.json`
   const payload = {
     sourceId: source.id,
@@ -686,32 +793,19 @@ async function saveHistoryResult(source, result) {
     transform: result.transform || null,
     fetchedAt: now,
     count: series.length,
-    start: series[0]?.date || null,
-    end: series.at(-1)?.date || null,
+    start: statusRow.start,
+    end: statusRow.end,
     series,
   }
   await fs.writeFile(path.join(HISTORY_SERIES_DIR, fileName), JSON.stringify(payload, null, 2))
   const status = await readHistoryStatus()
-  status[source.id] = {
-    sourceId: source.id,
-    indicator: source.indicator,
-    module: source.module,
-    status: 'ok',
-    provider: result.provider,
-    count: payload.count,
-    start: payload.start,
-    end: payload.end,
-    fetchedAt: now,
-    file: `data/history/series/${fileName}`,
-    error: null,
-  }
+  status[source.id] = { ...statusRow, file: `data/history/series/${fileName}` }
   await writeHistoryStatus(status)
   return status[source.id]
 }
 
 async function saveHistoryFailure(source, statusName, message) {
-  const status = await readHistoryStatus()
-  status[source.id] = {
+  const row = {
     sourceId: source.id,
     indicator: source.indicator,
     module: source.module,
@@ -724,6 +818,12 @@ async function saveHistoryFailure(source, statusName, message) {
     file: null,
     error: message,
   }
+  if (supabaseAdmin) {
+    return upsertSupabaseHistoryFailure(row)
+  }
+
+  const status = await readHistoryStatus()
+  status[source.id] = row
   await writeHistoryStatus(status)
   return status[source.id]
 }
@@ -959,7 +1059,11 @@ app.get('/api/health', (_req, res) => {
 })
 
 app.get('/api/history/status', async (_req, res) => {
-  res.json(await readHistoryStatus())
+  try {
+    res.json(await readHistoryStatus())
+  } catch (err) {
+    res.status(502).json({ error: 'History status failed', message: err.message })
+  }
 })
 
 app.post('/api/history/ingest', async (req, res) => {
