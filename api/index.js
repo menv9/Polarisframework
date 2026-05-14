@@ -443,20 +443,70 @@ async function fetchOecdLatest(url) {
   })
 }
 
-async function fetchBisReerLatest(currency) {
-  const bisCurrencyCodes = {
-    USD: 'RBUS',
-    EUR: 'RBXM',
-    JPY: 'RBJP',
-    GBP: 'RBGB',
-    CHF: 'RBCH',
-    CAD: 'RBCA',
-    AUD: 'RBAU',
-    NZD: 'RBNZ',
-    SEK: 'RBSE',
-    NOK: 'RBNO',
+const bisReerCurrencyCodes = {
+  USD: 'RBUS',
+  EUR: 'RBXM',
+  JPY: 'RBJP',
+  GBP: 'RBGB',
+  CHF: 'RBCH',
+  CAD: 'RBCA',
+  AUD: 'RBAU',
+  NZD: 'RBNZ',
+  SEK: 'RBSE',
+  NOK: 'RBNO',
+}
+
+function bisReerCode(currency) {
+  return bisReerCurrencyCodes[String(currency || '').toUpperCase()] || String(currency || '').toUpperCase()
+}
+
+function buildReerDeviationVsMean(series, window = 120) {
+  return normalizeHistorySeries(series)
+    .map((row, index, rows) => {
+      const sample = rows.slice(Math.max(0, index - window + 1), index + 1)
+      if (sample.length < Math.min(window, rows.length)) return null
+      const mean = sample.reduce((sum, item) => sum + item.value, 0) / sample.length
+      if (!Number.isFinite(mean) || mean === 0) return null
+      return {
+        date: row.date,
+        value: Number((((row.value / mean) - 1) * 100).toFixed(6)),
+        raw: row.value,
+      }
+    })
+    .filter(Boolean)
+}
+
+async function fetchFredBisReerHistory(currency) {
+  const targetCode = bisReerCode(currency)
+  const result = await fetchFredHistorySeries(`${targetCode}BIS`, null, HISTORY_FRED_LIMIT)
+  return {
+    provider: 'fred-bis',
+    transform: 'reer_deviation_vs_10y_mean',
+    series: buildReerDeviationVsMean(result.series, 120),
   }
-  const targetCode = bisCurrencyCodes[currency.toUpperCase()] || currency.toUpperCase()
+}
+
+async function fetchBisReerLatest(currency) {
+  if (FRED_API_KEY) {
+    try {
+      const result = await fetchFredBisReerHistory(currency)
+      const latest = result.series.at(-1)
+      if (latest) {
+        return normalizeLatest({
+          provider: result.provider,
+          seriesId: `${bisReerCode(currency)}BIS:reer_deviation_vs_10y_mean`,
+          date: latest.date,
+          value: latest.value,
+          raw: latest.raw,
+          meta: { transform: result.transform, window: 120 },
+        })
+      }
+    } catch (err) {
+      console.warn(`[BIS REER] FRED fallback for ${currency}: ${err.message}`)
+    }
+  }
+
+  const targetCode = bisReerCode(currency)
   const url = 'https://www.bis.org/statistics/eer/broad.xlsx'
   const { data } = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 })
   const workbook = XLSX.read(data, { type: 'buffer' })
@@ -474,7 +524,7 @@ async function fetchBisReerLatest(currency) {
     : String(latestRow[0])
   return normalizeLatest({
     provider: 'bis',
-    seriesId: `BIS_REER_${currency.toUpperCase()}`,
+    seriesId: `BIS_REER_${String(currency).toUpperCase()}`,
     date,
     value: Number.parseFloat(latestRow[colIndex]),
     raw: latestRow[colIndex],
@@ -1128,11 +1178,15 @@ async function fetchEurostatHistory(dataset, filters = {}) {
 }
 
 async function fetchBisReerHistory(currency) {
-  const bisCurrencyCodes = {
-    USD: 'RBUS', EUR: 'RBXM', JPY: 'RBJP', GBP: 'RBGB', CHF: 'RBCH',
-    CAD: 'RBCA', AUD: 'RBAU', NZD: 'RBNZ', SEK: 'RBSE', NOK: 'RBNO',
+  if (FRED_API_KEY) {
+    try {
+      return await fetchFredBisReerHistory(currency)
+    } catch (err) {
+      console.warn(`[BIS REER] FRED history fallback for ${currency}: ${err.message}`)
+    }
   }
-  const targetCode = bisCurrencyCodes[currency.toUpperCase()] || currency.toUpperCase()
+
+  const targetCode = bisReerCode(currency)
   const { data } = await axios.get('https://www.bis.org/statistics/eer/broad.xlsx', { responseType: 'arraybuffer', timeout: 30000 })
   const workbook = XLSX.read(data, { type: 'buffer' })
   const sheetName = workbook.SheetNames.find((name) => name.toLowerCase() === 'real') || workbook.SheetNames[0]
@@ -1150,7 +1204,11 @@ async function fetchBisReerHistory(currency) {
       return { date, value: Number.parseFloat(row[colIndex]) }
     })
     .filter((row) => row.date && Number.isFinite(row.value))
-  return { provider: 'bis', series }
+  return {
+    provider: 'bis',
+    transform: 'reer_deviation_vs_10y_mean',
+    series: buildReerDeviationVsMean(series, 120),
+  }
 }
 
 async function fetchCftcHistory(market, invert = false, yearsBack = 5) {
