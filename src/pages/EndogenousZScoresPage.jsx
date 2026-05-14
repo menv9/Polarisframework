@@ -167,6 +167,8 @@ function getSourceId(prefix, key) {
   return `endo_${prefix}_${suffix}`
 }
 
+const STORAGE_KEY_URLS = 'polaris_endogenous_urls'
+
 function loadSourceUrls() {
   try {
     const saved = localStorage.getItem('polaris_data_sources')
@@ -178,6 +180,14 @@ function loadSourceUrls() {
     }
     return map
   } catch { return {} }
+}
+
+function loadCustomUrls() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_URLS)
+    if (saved) return JSON.parse(saved)
+  } catch { /* ignore */ }
+  return {}
 }
 
 // ── localStorage ─────────────────────────────────────────────────────────────
@@ -228,17 +238,44 @@ function zBar(z) {
 export default function EndogenousZScoresPage() {
   const [history, setHistory]           = useState(loadHistory)
   const [sourceUrls]                    = useState(loadSourceUrls)
+  const [customUrls, setCustomUrls]     = useState(loadCustomUrls)
   const [activeTab, setActiveTab]       = useState('usa')
   const [activeImport, setActiveImport] = useState(null)
   const [importText, setImportText]     = useState('')
   const [importError, setImportError]   = useState('')
   const [syncMsg, setSyncMsg]           = useState(null)
+  const [urlEditKey, setUrlEditKey]     = useState(null)
+  const [urlEditValue, setUrlEditValue] = useState('')
   const fileInputRef                    = useRef(null)
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(history))
     syncZScores(history)
   }, [history])
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_URLS, JSON.stringify(customUrls))
+  }, [customUrls])
+
+  // URL efectiva: override manual > dataSources
+  const getEffectiveUrl = (sourceId) => customUrls[sourceId] || sourceUrls[sourceId] || ''
+
+  const handleUrlEdit = (sourceId) => {
+    setUrlEditKey(sourceId)
+    setUrlEditValue(customUrls[sourceId] || sourceUrls[sourceId] || '')
+  }
+
+  const handleUrlSave = (sourceId) => {
+    const trimmed = urlEditValue.trim()
+    setCustomUrls(prev => {
+      const next = { ...prev }
+      if (trimmed) next[sourceId] = trimmed
+      else delete next[sourceId]  // vacío = volver a dataSources
+      return next
+    })
+    setUrlEditKey(null)
+    setUrlEditValue('')
+  }
 
   const activeStats = useMemo(() => {
     const result = {}
@@ -428,18 +465,41 @@ export default function EndogenousZScoresPage() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-sm font-bold text-[#e5e5e5]">{getIndLabel(ind.key, activeTab)}</span>
                             {(() => {
-                              const url = sourceUrls[getSourceId(activeTab, ind.key)]
-                              return url ? (
-                                <a
-                                  href={url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[10px] font-bold text-[#ecd987] hover:text-white leading-none"
-                                  title={url}
-                                >
-                                  ↗
-                                </a>
-                              ) : null
+                              const sid = getSourceId(activeTab, ind.key)
+                              const url = getEffectiveUrl(sid)
+                              const isCustom = !!customUrls[sid]
+                              const isEditing = urlEditKey === sid
+
+                              if (isEditing) return (
+                                <span className="flex items-center gap-1 ml-1" onClick={e => e.stopPropagation()}>
+                                  <input
+                                    autoFocus
+                                    value={urlEditValue}
+                                    onChange={e => setUrlEditValue(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') handleUrlSave(sid); if (e.key === 'Escape') { setUrlEditKey(null); setUrlEditValue('') } }}
+                                    placeholder="https://..."
+                                    className="w-48 bg-[#111] border-b border-[#ecd987] text-[10px] font-mono text-white px-1 py-0.5 outline-none"
+                                  />
+                                  <button onClick={() => handleUrlSave(sid)} className="text-[10px] font-bold text-[#4ade80] hover:text-white">✓</button>
+                                  <button onClick={() => { setUrlEditKey(null); setUrlEditValue('') }} className="text-[10px] font-bold text-[#555] hover:text-white">✕</button>
+                                </span>
+                              )
+
+                              return (
+                                <span className="flex items-center gap-1 ml-1">
+                                  {url && (
+                                    <a href={url} target="_blank" rel="noopener noreferrer"
+                                      className={`text-[10px] font-bold leading-none ${isCustom ? 'text-[#60a5fa] hover:text-white' : 'text-[#ecd987] hover:text-white'}`}
+                                      title={url}
+                                    >↗</a>
+                                  )}
+                                  <button
+                                    onClick={() => handleUrlEdit(sid)}
+                                    className="text-[10px] text-[#444] hover:text-[#ecd987] leading-none"
+                                    title={url ? 'Editar URL' : 'Añadir URL'}
+                                  >✎</button>
+                                </span>
+                              )
                             })()}
                           </div>
                           <div className="text-[10px] text-[#444] uppercase tracking-wider">{ind.category}</div>
