@@ -111,7 +111,7 @@ export default function Navbar() {
   }
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 border-b-2 border-[#333] bg-black ${scrolled ? 'border-white' : ''}`}>
+    <nav data-app-navbar className={`fixed top-0 left-0 right-0 z-50 border-b-2 border-[#333] bg-black ${scrolled ? 'border-white' : ''}`}>
       <div className="max-w-6xl mx-auto px-4 h-12 grid grid-cols-3 items-center">
         <Link to="/" className="flex items-center">
           <span className="text-sm font-bold tracking-widest text-white">POLARIS</span>
