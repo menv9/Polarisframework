@@ -22,9 +22,10 @@ export const CONVICTION_MULTIPLIER = {
 }
 
 export const REGIME_VOL_MULTIPLIER = {
-  LOW:    1.2,
+  LOW:    1.0,
   NORMAL: 1.0,
-  HIGH:   0.6,
+  HIGH:   0.7,
+  EXTREME: 0.4,
 }
 
 export const ATR_STOP_MULTIPLIER = {

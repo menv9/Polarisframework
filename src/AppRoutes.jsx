@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
@@ -27,7 +27,7 @@ function Layout({ children }) {
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary antialiased">
       <Navbar />
-      {children}
+      {children ?? <Outlet />}
     </div>
   )
 }
@@ -35,67 +35,35 @@ function Layout({ children }) {
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* Ruta pública */}
       <Route path="/login" element={<LoginPage />} />
 
-      {/* Ruta solo admin */}
-      <Route
-        path="/admin"
-        element={
-          <AdminRoute>
-            <Layout>
-              <AdminPage />
-            </Layout>
-          </AdminRoute>
-        }
-      />
+      <Route element={<AdminRoute><Layout /></AdminRoute>}>
+        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/data" element={<DataHubPage />} />
+        <Route path="/data/raw" element={<DataPage />} />
+        <Route path="/data/coverage-matrix" element={<CoverageMatrixPage />} />
+        <Route path="/data/history" element={<HistoryPage />} />
+        <Route path="/data/history/:sourceId" element={<HistorySeriesPage />} />
+        <Route path="/data/economic-calendar" element={<EconomicCalendarPage />} />
+        <Route path="/data/notifications" element={<NotificationsPage />} />
+      </Route>
 
-      {/* Rutas solo admin — Data */}
-      <Route
-        path="/data/*"
-        element={
-          <AdminRoute>
-            <Layout>
-              <Routes>
-                <Route path="/" element={<DataHubPage />} />
-                <Route path="/raw" element={<DataPage />} />
-                <Route path="/coverage-matrix" element={<CoverageMatrixPage />} />
-                <Route path="/history" element={<HistoryPage />} />
-                <Route path="/history/:sourceId" element={<HistorySeriesPage />} />
-                <Route path="/economic-calendar" element={<EconomicCalendarPage />} />
-                <Route path="/notifications" element={<NotificationsPage />} />
-              </Routes>
-            </Layout>
-          </AdminRoute>
-        }
-      />
-
-      {/* Rutas protegidas */}
-      <Route
-        path="/*"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <Routes>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/world-view" element={<WorldViewTheoryPage />} />
-                <Route path="/world-view/operativa" element={<WorldViewOpsPage />} />
-                <Route path="/endogenous" element={<EndogenousOpsPage />} />
-                <Route path="/model-inputs" element={<ModelInputsPage />} />
-                <Route path="/endogenous/zscores" element={<ModelInputsPage />} />
-                <Route path="/endogenous/betas" element={<EndogenousBetasPage />} />
-                <Route path="/exogenous/operativa" element={<ExogenousOpsPage />} />
-                <Route path="/timing/operativa"   element={<TimingOpsPage />} />
-                <Route path="/risk/operativa"      element={<RiskOpsPage />} />
-                <Route path="/execution/operativa" element={<ExecutionOpsPage />} />
-                <Route path="/journal"             element={<JournalPage />} />
-                <Route path="/performance"         element={<PerformancePage />} />
-              </Routes>
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
+      <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/world-view" element={<WorldViewTheoryPage />} />
+        <Route path="/world-view/operativa" element={<WorldViewOpsPage />} />
+        <Route path="/endogenous" element={<EndogenousOpsPage />} />
+        <Route path="/model-inputs" element={<ModelInputsPage />} />
+        <Route path="/endogenous/zscores" element={<ModelInputsPage />} />
+        <Route path="/endogenous/betas" element={<EndogenousBetasPage />} />
+        <Route path="/exogenous/operativa" element={<ExogenousOpsPage />} />
+        <Route path="/timing/operativa" element={<TimingOpsPage />} />
+        <Route path="/risk/operativa" element={<RiskOpsPage />} />
+        <Route path="/execution/operativa" element={<ExecutionOpsPage />} />
+        <Route path="/journal" element={<JournalPage />} />
+        <Route path="/performance" element={<PerformancePage />} />
+      </Route>
     </Routes>
   )
 }

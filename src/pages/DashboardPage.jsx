@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useModelStore } from '../store/ModelDataContext'
 import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 import { detectRegime, getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
+import { computeExogenousCurrencyScores, combineEndogenousExogenous } from '../lib/scoring/exogenous'
 
 const EXO_CCYS = ['AUD','CAD','NOK','NZD','JPY','CHF','USD','EUR','GBP','SEK']
 
@@ -27,16 +28,16 @@ const EXO_DRIVERS = [
 ]
 
 const COUNTRIES = [
-  { label: 'USD', prefix: 'usa', cyclical: false },
-  { label: 'EUR', prefix: 'eur', cyclical: true  },
-  { label: 'JPY', prefix: 'jpn', cyclical: false },
-  { label: 'GBP', prefix: 'gbr', cyclical: true  },
-  { label: 'CHF', prefix: 'che', cyclical: false },
-  { label: 'CAD', prefix: 'can', cyclical: true  },
-  { label: 'AUD', prefix: 'aus', cyclical: true  },
-  { label: 'NZD', prefix: 'nzl', cyclical: true  },
-  { label: 'SEK', prefix: 'swe', cyclical: true  },
-  { label: 'NOK', prefix: 'nor', cyclical: true  },
+  { label: 'USD', prefix: 'usa', ccy: 'USD', cyclical: false },
+  { label: 'EUR', prefix: 'eur', ccy: 'EUR', cyclical: true  },
+  { label: 'JPY', prefix: 'jpn', ccy: 'JPY', cyclical: false },
+  { label: 'GBP', prefix: 'gbr', ccy: 'GBP', cyclical: true  },
+  { label: 'CHF', prefix: 'che', ccy: 'CHF', cyclical: false },
+  { label: 'CAD', prefix: 'can', ccy: 'CAD', cyclical: true  },
+  { label: 'AUD', prefix: 'aus', ccy: 'AUD', cyclical: true  },
+  { label: 'NZD', prefix: 'nzl', ccy: 'NZD', cyclical: true  },
+  { label: 'SEK', prefix: 'swe', ccy: 'SEK', cyclical: true  },
+  { label: 'NOK', prefix: 'nor', ccy: 'NOK', cyclical: true  },
 ]
 
 const DASHBOARD_PAIRS = [
@@ -75,7 +76,7 @@ function fmtScore(v) {
 }
 
 export default function DashboardPage() {
-  const { worldview: wv, dataSources: sources, zscores: zScores } = useModelStore()
+  const { worldview: wv, dataSources: sources, zscores: zScores, history } = useModelStore()
   const [betas] = useState(loadBetas)
   const navigate = useNavigate()
 
@@ -87,12 +88,23 @@ export default function DashboardPage() {
   const inflation = wv.cpiG7 > 3.0 || wv.breakevens > 2.5 ? 'INFLACIONARIO' : wv.cpiG7 < 2.0 && wv.breakevens < 2.0 ? 'DESINFLACIONARIO' : 'ESTABLE'
 
   // ── Scores G10 ───────────────────────────────────────────────────────────
+  const exogenousScores = useMemo(() =>
+    computeExogenousCurrencyScores(sources, history),
+    [sources, history]
+  )
+
   const countryScores = useMemo(() =>
-    COUNTRIES.map(c => ({
-      ...c,
-      score: computeCountryScore(c.prefix, c.cyclical, regime, zScores, betas),
-    })),
-    [regime, zScores, betas]
+    COUNTRIES.map(c => {
+      const endoScore = computeCountryScore(c.prefix, c.cyclical, regime, zScores, betas)
+      const exoScore = exogenousScores[c.ccy] ?? 0
+      return {
+        ...c,
+        endoScore,
+        exoScore,
+        score: combineEndogenousExogenous(endoScore, exoScore, c.ccy),
+      }
+    }),
+    [regime, zScores, betas, exogenousScores]
   )
 
   const hasZscores = useMemo(() =>
@@ -183,7 +195,7 @@ export default function DashboardPage() {
         {/* ===== FILA 2: SEÑALES FX ===== */}
         <div className="border-2 border-[#333] mb-3">
           <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333] flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">II — Señales FX Endogenous</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">II — Señales FX Total (Endo + Exo)</span>
             <Link to="/endogenous" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">OPERATIVA →</Link>
           </div>
           {!hasZscores ? (
@@ -242,7 +254,7 @@ export default function DashboardPage() {
         {/* ===== FILA 3: RANKING G10 ===== */}
         <div className="border-2 border-[#333] mb-3">
           <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333]">
-            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Ranking G10 — Fortaleza Endogenous</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Ranking G10 — Fortaleza Total</span>
           </div>
           <div className="grid grid-cols-5 sm:grid-cols-10 gap-0">
             {ranked.map((c, i) => {

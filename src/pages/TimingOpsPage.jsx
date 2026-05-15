@@ -4,6 +4,7 @@ import { useModelStore } from '../store/ModelDataContext'
 import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 import { TIMING_CHECKS, computeTimingVerdict } from '../lib/timing/score'
 import { detectRegime, getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
+import { computeExogenousCurrencyScores, combineEndogenousExogenous } from '../lib/scoring/exogenous'
 
 const PAIRS = [
   { label: 'EUR/USD', base: 'eur', quote: 'usa' },
@@ -18,16 +19,16 @@ const PAIRS = [
 ]
 
 const COUNTRIES = [
-  { label: 'USD', prefix: 'usa', cyclical: false },
-  { label: 'EUR', prefix: 'eur', cyclical: true  },
-  { label: 'JPY', prefix: 'jpn', cyclical: false },
-  { label: 'GBP', prefix: 'gbr', cyclical: true  },
-  { label: 'CHF', prefix: 'che', cyclical: false },
-  { label: 'CAD', prefix: 'can', cyclical: true  },
-  { label: 'AUD', prefix: 'aus', cyclical: true  },
-  { label: 'NZD', prefix: 'nzl', cyclical: true  },
-  { label: 'SEK', prefix: 'swe', cyclical: true  },
-  { label: 'NOK', prefix: 'nor', cyclical: true  },
+  { label: 'USD', prefix: 'usa', ccy: 'USD', cyclical: false },
+  { label: 'EUR', prefix: 'eur', ccy: 'EUR', cyclical: true  },
+  { label: 'JPY', prefix: 'jpn', ccy: 'JPY', cyclical: false },
+  { label: 'GBP', prefix: 'gbr', ccy: 'GBP', cyclical: true  },
+  { label: 'CHF', prefix: 'che', ccy: 'CHF', cyclical: false },
+  { label: 'CAD', prefix: 'can', ccy: 'CAD', cyclical: true  },
+  { label: 'AUD', prefix: 'aus', ccy: 'AUD', cyclical: true  },
+  { label: 'NZD', prefix: 'nzl', ccy: 'NZD', cyclical: true  },
+  { label: 'SEK', prefix: 'swe', ccy: 'SEK', cyclical: true  },
+  { label: 'NOK', prefix: 'nor', ccy: 'NOK', cyclical: true  },
 ]
 
 function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
@@ -48,7 +49,7 @@ function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
 const STATUS_VALUES = { true: true, false: false, null: null }
 
 export default function TimingOpsPage() {
-  const { worldview: wv, zscores: zScores } = useModelStore()
+  const { worldview: wv, zscores: zScores, dataSources, history } = useModelStore()
   const [betas] = useState(loadBetas)
   const [searchParams] = useSearchParams()
   const [selectedPair, setSelectedPair] = useState(() => {
@@ -59,12 +60,28 @@ export default function TimingOpsPage() {
 
   const regime    = detectRegime(wv)
 
+  const queryPair = searchParams.get('pair')
+  const querySignal = Number(searchParams.get('signal'))
+  const queryConviction = searchParams.get('conviction')
+  const hasSignalOverride = selectedPair === queryPair && Number.isFinite(querySignal)
+
+  const exogenousScores = useMemo(() =>
+    computeExogenousCurrencyScores(dataSources, history),
+    [dataSources, history]
+  )
+
   const countryScores = useMemo(() =>
-    COUNTRIES.map(c => ({
-      ...c,
-      score: computeCountryScore(c.prefix, c.cyclical, regime, zScores, betas),
-    })),
-    [regime, zScores, betas]
+    COUNTRIES.map(c => {
+      const endoScore = computeCountryScore(c.prefix, c.cyclical, regime, zScores, betas)
+      const exoScore = exogenousScores[c.ccy] ?? 0
+      return {
+        ...c,
+        endoScore,
+        exoScore,
+        score: combineEndogenousExogenous(endoScore, exoScore, c.ccy),
+      }
+    }),
+    [regime, zScores, betas, exogenousScores]
   )
 
   const pairInfo = useMemo(() => {
@@ -73,9 +90,12 @@ export default function TimingOpsPage() {
     const byPrefix = new Map(countryScores.map(c => [c.prefix, c]))
     const base  = byPrefix.get(pair.base)
     const quote = byPrefix.get(pair.quote)
-    const signal = base && quote ? base.score - quote.score : 0
-    return { signal, conv: getConviction(signal), direction: signal >= 0 ? 'LONG' : 'SHORT' }
-  }, [selectedPair, countryScores])
+    const signal = hasSignalOverride ? querySignal : base && quote ? base.score - quote.score : 0
+    const conv = hasSignalOverride && ['FULL', 'HALF', 'FLAT'].includes(queryConviction)
+      ? queryConviction
+      : getConviction(signal)
+    return { signal, conv, direction: signal >= 0 ? 'LONG' : 'SHORT' }
+  }, [selectedPair, countryScores, hasSignalOverride, querySignal, queryConviction])
 
   const { verdict, failing, score } = useMemo(() =>
     computeTimingVerdict(checks),

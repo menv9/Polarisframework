@@ -2,6 +2,7 @@ import { useState, Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import { INDICATORS as BASE_INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 import { detectRegime, getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
+import { computeExogenousCurrencyScores, combineEndogenousExogenous } from '../lib/scoring/exogenous'
 import { useModelStore } from '../store/ModelDataContext'
 import { getFreshness, FRESHNESS_DOT, FRESHNESS_TEXT } from '../lib/freshness'
 
@@ -13,16 +14,16 @@ const ENDO_FREQ = {
 }
 
 const COUNTRIES = [
-  { label: 'USD', prefix: 'usa', cyclical: false },
-  { label: 'EUR', prefix: 'eur', cyclical: true  },
-  { label: 'JPY', prefix: 'jpn', cyclical: false },
-  { label: 'GBP', prefix: 'gbr', cyclical: true  },
-  { label: 'CHF', prefix: 'che', cyclical: false },
-  { label: 'CAD', prefix: 'can', cyclical: true  },
-  { label: 'AUD', prefix: 'aus', cyclical: true  },
-  { label: 'NZD', prefix: 'nzl', cyclical: true  },
-  { label: 'SEK', prefix: 'swe', cyclical: true  },
-  { label: 'NOK', prefix: 'nor', cyclical: true  },
+  { label: 'USD', prefix: 'usa', ccy: 'USD', cyclical: false },
+  { label: 'EUR', prefix: 'eur', ccy: 'EUR', cyclical: true  },
+  { label: 'JPY', prefix: 'jpn', ccy: 'JPY', cyclical: false },
+  { label: 'GBP', prefix: 'gbr', ccy: 'GBP', cyclical: true  },
+  { label: 'CHF', prefix: 'che', ccy: 'CHF', cyclical: false },
+  { label: 'CAD', prefix: 'can', ccy: 'CAD', cyclical: true  },
+  { label: 'AUD', prefix: 'aus', ccy: 'AUD', cyclical: true  },
+  { label: 'NZD', prefix: 'nzl', ccy: 'NZD', cyclical: true  },
+  { label: 'SEK', prefix: 'swe', ccy: 'SEK', cyclical: true  },
+  { label: 'NOK', prefix: 'nor', ccy: 'NOK', cyclical: true  },
 ]
 
 const CATEGORY_MAP = {
@@ -192,7 +193,7 @@ function Tooltip({ text, align = 'center' }) {
 }
 
 export default function EndogenousOpsPage() {
-  const { zscores: zScores, worldview: wvData, history } = useModelStore()
+  const { zscores: zScores, worldview: wvData, history, dataSources } = useModelStore()
   const [betas]        = useState(loadBetas)
   const [sourceValues] = useState(loadSourceValues)
   const [pairA, setPairA]   = useState('usa')
@@ -201,7 +202,18 @@ export default function EndogenousOpsPage() {
 
   const regime    = detectRegime(wvData)
 
-  const countryScores  = COUNTRIES.map(c => ({ ...c, ...computeCountryScore(c.prefix, c.cyclical, regime, zScores, betas) }))
+  const exogenousScores = computeExogenousCurrencyScores(dataSources, history)
+  const countryScores  = COUNTRIES.map(c => {
+    const endo = computeCountryScore(c.prefix, c.cyclical, regime, zScores, betas)
+    const exoScore = exogenousScores[c.ccy] ?? 0
+    return {
+      ...c,
+      ...endo,
+      endoComposite: endo.composite,
+      exoScore,
+      composite: combineEndogenousExogenous(endo.composite, exoScore, c.ccy),
+    }
+  })
   const rankedCountries = [...countryScores].sort((a, b) => b.composite - a.composite)
   const maxAbsScore    = Math.max(...countryScores.map(c => Math.abs(c.composite)), 0.001)
 

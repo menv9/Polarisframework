@@ -10,10 +10,21 @@ const badgeColors = {
   violet: 'text-white border-white',
 }
 
+const moduleRoutes = {
+  worldview: '/world-view',
+  endogenous: '/endogenous',
+  exogenous: '/exogenous/operativa',
+  timing: '/timing/operativa',
+  risk: '/risk/operativa',
+  execution: '/execution/operativa',
+  selfawareness: '/journal',
+}
+
 export default function ModuleCard({ module }) {
   const activeModule = useAppStore((s) => s.activeModule)
   const isActive = activeModule === module.id
-  const hasPage = module.id === 'worldview'
+  const route = moduleRoutes[module.id]
+  const hasPage = Boolean(route)
 
   const card = (
     <article
@@ -72,7 +83,7 @@ export default function ModuleCard({ module }) {
 
   if (hasPage) {
     return (
-      <Link to="/world-view" className="block">
+      <Link to={route} className="block">
         {card}
       </Link>
     )
