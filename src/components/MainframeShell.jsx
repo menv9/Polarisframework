@@ -44,12 +44,6 @@ const TAB_GROUPS = [
   {
     key: '6', label: 'ADMIN', to: '/admin', adminOnly: true,
   },
-  {
-    key: '7', label: 'FRAMEWORK', to: '/world-view',
-    items: [
-      { to: '/world-view', label: 'DOCUMENTACIÓN', desc: 'Framework Docs' },
-    ],
-  },
 ]
 
 const DEFAULT_FKEYS = [

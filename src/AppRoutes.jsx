@@ -4,7 +4,6 @@ import MainframeShell from './components/MainframeShell'
 import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import AdminPage from './pages/AdminPage'
-import WorldViewTheoryPage from './pages/WorldViewTheoryPage'
 import WorldViewOpsPage from './pages/WorldViewOpsPage'
 import DataHubPage from './pages/DataHubPage'
 import DataPage from './pages/DataPage'
@@ -53,7 +52,7 @@ export default function AppRoutes() {
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/world-view" element={<WorldViewTheoryPage />} />
+        <Route path="/world-view" element={<Navigate to="/world-view/operativa" replace />} />
         <Route path="/world-view/operativa" element={<WorldViewOpsPage />} />
         <Route path="/endogenous" element={<EndogenousOpsPage />} />
         <Route path="/model-inputs" element={<ModelInputsPage />} />
