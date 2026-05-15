@@ -115,7 +115,6 @@ export default function Navbar() {
       <div className="max-w-6xl mx-auto px-4 h-12 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3">
           <span className="text-sm font-bold tracking-widest text-white">POLARIS</span>
-          <span className="text-sm text-[#777] border-l-2 border-[#333] pl-3 uppercase tracking-wider">Framework</span>
         </Link>
 
         <div className="hidden md:flex items-center gap-5">
