@@ -1,5 +1,24 @@
 import { create } from 'zustand'
 
+const THEME_KEY = 'polaris_theme'
+
+function loadTheme() {
+  try {
+    const t = localStorage.getItem(THEME_KEY)
+    if (t === 'mainframe' || t === 'default') return t
+  } catch { /* ignore */ }
+  return 'default'
+}
+
+function applyTheme(theme) {
+  if (typeof document !== 'undefined') {
+    document.documentElement.setAttribute('data-theme', theme)
+  }
+}
+
+const initialTheme = loadTheme()
+applyTheme(initialTheme)
+
 export const useAppStore = create((set, get) => ({
   activeModule: null,
   setActiveModule: (id) => set({ activeModule: id }),
@@ -12,4 +31,17 @@ export const useAppStore = create((set, get) => ({
   session: null,
   setUser: (user) => set({ user }),
   setSession: (session) => set({ session }),
+
+  theme: initialTheme,
+  setTheme: (theme) => {
+    try { localStorage.setItem(THEME_KEY, theme) } catch { /* ignore */ }
+    applyTheme(theme)
+    set({ theme })
+  },
+  toggleTheme: () => {
+    const next = get().theme === 'mainframe' ? 'default' : 'mainframe'
+    try { localStorage.setItem(THEME_KEY, next) } catch { /* ignore */ }
+    applyTheme(next)
+    set({ theme: next })
+  },
 }))

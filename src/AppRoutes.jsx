@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import Navbar from './components/Navbar'
+import MainframeShell from './components/MainframeShell'
 import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import AdminPage from './pages/AdminPage'
@@ -27,6 +28,7 @@ function Layout({ children }) {
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary antialiased">
       <Navbar />
+      <MainframeShell />
       {children ?? <Outlet />}
     </div>
   )

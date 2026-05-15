@@ -3,6 +3,20 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '../stores/appStore'
 import { supabase } from '../lib/supabase'
 
+function ThemeToggle() {
+  const toggleTheme = useAppStore((s) => s.toggleTheme)
+  return (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      className="theme-toggle-btn"
+      title="Switch to 1994 mainframe UI"
+    >
+      <span className="dot" />UI: MAINFRAME
+    </button>
+  )
+}
+
 const GROUPS = [
   {
     label: 'Análisis',
@@ -133,6 +147,8 @@ export default function Navbar() {
               </Link>
             </>
           )}
+
+          <ThemeToggle />
 
           {user && (
             <div className="flex items-center gap-3 border-l border-[#333] pl-4 ml-1">
