@@ -723,6 +723,47 @@ html[data-theme='mainframe'] blockquote { font-size: 13px !important; line-heigh
 html[data-theme='mainframe'] section#sources table td,
 html[data-theme='mainframe'] section#sources table th { padding: 4px 8px !important; font-size: 12px !important; }
 
+/* ── Endogenous / Exogenous / DataHub enhancements ── */
+
+/* Section sub-headers that use bg-[#0f0f0f] */
+html[data-theme='mainframe'] .bg-\[\#0f0f0f\] {
+  background-color: var(--mf-bg-elevated) !important;
+  border-left: 2px solid var(--mf-border-strong) !important;
+}
+
+/* Country tab bar */
+html[data-theme='mainframe'] .bg-\[\#0a0a0a\].border-b {
+  background-color: var(--mf-bg) !important;
+}
+
+/* Contribution bars: remove rounded */
+html[data-theme='mainframe'] .w-20.h-2.bg-\[\#1a1a1a\] {
+  border-radius: 0 !important;
+}
+html[data-theme='mainframe'] .w-20.h-2.bg-\[\#1a1a1a\] > div {
+  border-radius: 0 !important;
+}
+
+/* Z-score bar track */
+html[data-theme='mainframe'] .w-16.h-1\.5.bg-\[\#1a1a1a\] {
+  background: var(--mf-border-dim) !important;
+}
+
+/* DataHub subsystem table rows */
+html[data-theme='mainframe'] .border-2.border-\[\#333\] table tbody tr:hover td {
+  background: var(--mf-bg-hover) !important;
+}
+
+/* Exogenous coverage grid compact */
+html[data-theme='mainframe'] .grid.grid-cols-3 > div > .text-xl.font-mono {
+  font-size: 20px !important;
+}
+
+/* Category color rows in endogenous table */
+html[data-theme='mainframe'] .bg-\[\#0f0f0f\].border-y {
+  border-left: none !important;
+}
+
 /* Link hover underlines off */
 html[data-theme='mainframe'] a:hover { text-decoration: none !important; }
 

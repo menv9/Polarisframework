@@ -324,8 +324,8 @@ export default function EndogenousOpsPage() {
 
         {/* ── RANKING G10 ── */}
         <div className="border-2 border-[#333] mb-3">
-          <div className="px-3 py-1.5 bg-[#111] border-b border-[#333]">
-            <span className="text-xs font-bold uppercase tracking-widest text-[#a3a3a3]">Ranking de Fortaleza G10 — haz click para detallar</span>
+          <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333]">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Ranking G10 — Fortaleza Total</span>
           </div>
           <div className="grid grid-cols-5 sm:grid-cols-10">
             {rankedCountries.map((c, i) => {

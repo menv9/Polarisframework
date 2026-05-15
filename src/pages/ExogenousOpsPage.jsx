@@ -178,6 +178,9 @@ export default function ExogenousOpsPage() {
 
         {/* ── COBERTURA ── */}
         <div className="border-2 border-[#333] mb-3">
+          <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333]">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Cobertura de Datos</span>
+          </div>
           <div className="grid grid-cols-3">
             <div className="p-3 border-r border-[#222]">
               <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Con dato</div>
@@ -234,8 +237,8 @@ export default function ExogenousOpsPage() {
         {/* ── TABLAS POR SECCIÓN ── */}
         {SECTIONS.map(section => (
           <div key={section.id} className="border-2 border-[#333] mb-3 overflow-hidden">
-            <div className="px-3 py-1.5 bg-[#0f0f0f] border-b border-[#222] flex items-center justify-between">
-              <span className={`text-xs font-bold uppercase tracking-widest ${section.color}`}>{section.label}</span>
+            <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333] flex items-center justify-between">
+              <div className={`text-xs font-bold uppercase tracking-widest ${section.color}`}>{section.label}</div>
             </div>
             <table className="w-full text-sm table-fixed">
               <thead>
