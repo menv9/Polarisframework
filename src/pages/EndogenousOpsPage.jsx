@@ -135,7 +135,7 @@ function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
 
 function getConviction(signal) {
   const a = Math.abs(signal)
-  return a > 0.6 ? 'FULL' : a > 0.4 ? 'HALF' : 'FLAT'
+  return a > 0.25 ? 'FULL' : a > 0.10 ? 'HALF' : 'FLAT'
 }
 
 function scoreColor(v) {
@@ -300,7 +300,7 @@ export default function EndogenousOpsPage() {
             <div className="p-3 border-r border-[#222]">
               <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">
                 Convicción
-                <Tooltip text="FULL si |señal|>0.60 · HALF si |señal|>0.40 · FLAT si ≤0.40 → no operar." />
+                <Tooltip text="FULL si |señal|>0.25 · HALF si |señal|>0.10 · FLAT si ≤0.10 → no operar." />
               </div>
               <div className={`text-2xl font-mono font-bold ${convColor}`}>{conviction}</div>
             </div>
