@@ -33,3 +33,8 @@ beta_pipeline/output/
 # Windows temp files
 New Text Document.txt
 *.tmp
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
