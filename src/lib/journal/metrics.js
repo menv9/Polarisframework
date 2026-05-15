@@ -25,17 +25,19 @@ export function computeMetrics(closedTrades) {
     if (dd > mdd) mdd = dd
   }
 
-  // Sharpe (annualized, daily approximation)
+  // Sharpe per-trade (no annualized — input is per-trade P&L, not daily returns)
+  // mean/std gives a signal-to-noise ratio across trades
   let sharpe = null
   if (pnls.length >= 3) {
     const mean = totalPnl / pnls.length
     const std  = Math.sqrt(pnls.reduce((s, v) => s + (v - mean) ** 2, 0) / pnls.length)
-    sharpe = std > 0 ? (mean / std) * Math.sqrt(252) : null
+    sharpe = std > 0 ? mean / std : null
   }
 
-  // Calmar = annualized return / MDD
+  // Calmar = annualized P&L / MDD. mdd is decimal (0–1), not percentage.
+  // Annualization assumes avg P&L per trade × 252 (rough proxy, no date data).
   const cagr = pnls.length > 0 ? (totalPnl / pnls.length) * 252 : 0
-  const calmar = mdd > 0 ? cagr / (mdd * 100) : null
+  const calmar = mdd > 0 ? cagr / mdd : null
 
   return {
     totalTrades: closedTrades.length,

@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useModelStore } from '../store/ModelDataContext'
 import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
+import { detectRegime, getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
 
 const EXO_CCYS = ['AUD','CAD','NOK','NZD','JPY','CHF','USD','EUR','GBP','SEK']
 
@@ -50,12 +51,6 @@ const DASHBOARD_PAIRS = [
   { label: 'USD/SEK', base: 'usa', quote: 'swe' },
 ]
 
-function getRegimeMultiplier(regime, cyclical) {
-  if (regime === 'RISK-ON')  return cyclical ? 1.0 : 0.5
-  if (regime === 'RISK-OFF') return cyclical ? 0.5 : 1.0
-  return 0.75
-}
-
 function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
   const rm = getRegimeMultiplier(regime, cyclical)
   const betaTotal = computeBetaTotal(betas)
@@ -69,11 +64,6 @@ function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
     if (ind.horizon === 'LONG')   longScore += contrib
   }
   return 0.20 * short + 0.50 * medium + 0.30 * longScore
-}
-
-function getConviction(signal) {
-  const a = Math.abs(signal)
-  return a > 0.25 ? 'FULL' : a > 0.10 ? 'HALF' : 'FLAT'
 }
 
 function scoreColor(v) {
@@ -91,9 +81,7 @@ export default function DashboardPage() {
 
   // ── World View derivations ────────────────────────────────────────────────
   const scoreGDP  = wv.gdpUsa * 0.25 + wv.gdpEur * 0.18 + wv.gdpChn * 0.18 + wv.gdpJpn * 0.05 + wv.gdpResto * 0.34
-  const regimeOn  = wv.vix < 30 && wv.hyOas < 30 && wv.sp200dma === 1 && wv.embi < 40
-  const regimeOff = wv.vix > 70 || wv.hyOas > 70 || wv.sp200dma === 0 || wv.embi > 70
-  const regime    = regimeOn ? 'RISK-ON' : regimeOff ? 'RISK-OFF' : 'MIXTO'
+  const regime    = detectRegime(wv)
   const wocScore  = 0.7 * wv.smartZ - 0.3 * wv.retailZ
   const usdBias   = wv.dxyRising === 1 && wv.dxy > 100 ? 'BULLISH' : wv.dxyRising === 0 && wv.dxy < 95 ? 'BEARISH' : 'NEUTRAL'
   const inflation = wv.cpiG7 > 3.0 || wv.breakevens > 2.5 ? 'INFLACIONARIO' : wv.cpiG7 < 2.0 && wv.breakevens < 2.0 ? 'DESINFLACIONARIO' : 'ESTABLE'

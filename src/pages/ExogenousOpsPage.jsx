@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useModelStore } from '../store/ModelDataContext'
 import { getFreshness, FRESHNESS_DOT, FRESHNESS_TEXT } from '../lib/freshness'
+import { computeRollingZScore } from '../lib/scoring/zScore'
 
 // weight: relevancia relativa del driver (1=menor, 2=moderado, 3=mayor)
 const SECTIONS = [
@@ -89,8 +90,11 @@ function FreshDot({ lastUpdate, frequencyDays }) {
   )
 }
 
-// Score neto ponderado para una divisa: rango -1 a +1
-function weightedScore(ccy, allItems, sourceMap) {
+// Weighted average z-score per currency.
+// Uses z-score magnitude from historical series when available,
+// falls back to ±1 (direction only) when history is absent.
+// Output is a weighted average z-score; rendered bars scale to ±3.
+function weightedScore(ccy, allItems, sourceMap, history) {
   let num = 0, den = 0
   for (const item of allItems) {
     if (item.weight === 0) continue
@@ -101,20 +105,26 @@ function weightedScore(ccy, allItems, sourceMap) {
     const hasData = src?._value != null && src._value !== ''
     if (!hasData) continue
     const dir = bullDir ? 1 : -1
-    num += item.weight * dir
+    const hist = history?.[item.id]
+    // Use actual z-score when series history is available (≥3 points)
+    const mag = hist?.series?.length >= 3
+      ? computeRollingZScore(hist.series, { key: item.id }).z * dir
+      : dir
+    num += item.weight * mag
     den += item.weight
   }
   return den > 0 ? num / den : 0
 }
 
 function scoreBar(score) {
-  const pct = Math.abs(score) * 100
+  // Scale to ±3 (z-score range); clamp bar at 50% each side
+  const pct = Math.min(Math.abs(score) / 3, 1) * 50
   return (
     <div className="flex items-center gap-1.5 mt-0.5">
       <div className="w-16 h-1 bg-[#1a1a1a] relative flex-shrink-0">
         {score >= 0
-          ? <div className="absolute left-1/2 top-0 h-full bg-[#4ade80]" style={{ width: `${pct / 2}%` }} />
-          : <div className="absolute right-1/2 top-0 h-full bg-[#ef4444]" style={{ width: `${pct / 2}%` }} />
+          ? <div className="absolute left-1/2 top-0 h-full bg-[#4ade80]" style={{ width: `${pct}%` }} />
+          : <div className="absolute right-1/2 top-0 h-full bg-[#ef4444]" style={{ width: `${pct}%` }} />
         }
         <div className="absolute left-1/2 top-0 w-px h-full bg-[#333]" />
       </div>
@@ -123,7 +133,7 @@ function scoreBar(score) {
 }
 
 export default function ExogenousOpsPage() {
-  const { dataSources } = useModelStore()
+  const { dataSources, history } = useModelStore()
 
   const sourceMap = useMemo(() =>
     new Map(dataSources.map(s => [s.id, s])),
@@ -132,10 +142,10 @@ export default function ExogenousOpsPage() {
 
   const allItems = useMemo(() => SECTIONS.flatMap(s => s.items), [])
 
-  // Señal neta ponderada por divisa
+  // Señal neta ponderada por divisa (z-score promedio ponderado, escala ±3)
   const currencyScores = useMemo(() =>
-    Object.fromEntries(CCYS.map(ccy => [ccy, weightedScore(ccy, allItems, sourceMap)])),
-    [allItems, sourceMap]
+    Object.fromEntries(CCYS.map(ccy => [ccy, weightedScore(ccy, allItems, sourceMap, history)])),
+    [allItems, sourceMap, history]
   )
 
   const allExoIds = allItems.map(i => i.id)
@@ -209,7 +219,7 @@ export default function ExogenousOpsPage() {
           <div className="grid grid-cols-5 sm:grid-cols-10">
             {CCYS.map(ccy => {
               const score = currencyScores[ccy]
-              const color = score > 0.1 ? 'text-[#4ade80]' : score < -0.1 ? 'text-[#ef4444]' : 'text-[#555]'
+              const color = score > 0.3 ? 'text-[#4ade80]' : score < -0.3 ? 'text-[#ef4444]' : 'text-[#555]'
               const noSignal = score === 0
               return (
                 <div key={ccy} className="p-2.5 border-r border-b border-[#1a1a1a] text-center">

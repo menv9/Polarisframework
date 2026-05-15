@@ -71,14 +71,20 @@ export const TIMING_CHECKS = [
 ]
 
 // Returns { verdict: 'READY'|'WAIT'|'ABORT', failing, score }
+//
+// ABORT:  any required check explicitly marked false
+// WAIT:   any required check not yet marked true (pending), OR 2+ optional checks marked false
+// READY:  all required checks explicitly true AND ≤1 optional check false
 export function computeTimingVerdict(checks) {
-  const failing = TIMING_CHECKS.filter(c => checks[c.id] === false)
-  const requiredFailing = failing.filter(c => c.required)
+  const requiredAbort    = TIMING_CHECKS.filter(c => c.required  && checks[c.id] === false)
+  const requiredPending  = TIMING_CHECKS.filter(c => c.required  && checks[c.id] !== true)
+  const optionalFailing  = TIMING_CHECKS.filter(c => !c.required && checks[c.id] === false)
 
-  if (requiredFailing.length > 0) return { verdict: 'ABORT', failing: failing.length, score: 0 }
-  if (failing.length >= 2) return { verdict: 'WAIT', failing: failing.length, score: 0 }
+  if (requiredAbort.length > 0)   return { verdict: 'ABORT', failing: requiredAbort.length + optionalFailing.length, score: 0 }
+  if (requiredPending.length > 0) return { verdict: 'WAIT',  failing: requiredPending.length, score: 0 }
+  if (optionalFailing.length >= 2) return { verdict: 'WAIT', failing: optionalFailing.length, score: 0 }
 
   const passed = TIMING_CHECKS.filter(c => checks[c.id] === true).length
   const score = Math.round((passed / TIMING_CHECKS.length) * 100)
-  return { verdict: 'READY', failing: failing.length, score }
+  return { verdict: 'READY', failing: optionalFailing.length, score }
 }

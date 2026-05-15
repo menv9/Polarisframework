@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react'
 import { dataSources as defaultDataSources } from '../data/dataSources'
+import { computeRollingZScore } from '../lib/scoring/zScore'
 
 // ── Claves localStorage ───────────────────────────────────────────────────────
 export const STORAGE_KEY_HISTORY = 'polaris_endogenous_history'
@@ -59,23 +60,12 @@ function migrateEntry(entry) {
   return null
 }
 
-function computeStats(series) {
-  if (!series || series.length === 0) return null
-  const values = series.map(p => p.value)
-  const n = values.length
-  const mean = values.reduce((s, v) => s + v, 0) / n
-  const std  = Math.sqrt(values.reduce((s, v) => s + (v - mean) ** 2, 0) / n)
-  const last = values[values.length - 1]
-  const z    = std > 0 ? Math.max(-4, Math.min(4, (last - mean) / std)) : 0
-  return { n, mean, std, last, z }
-}
-
 function deriveZscores(history, current = {}) {
   const updated = { ...current }
   for (const [key, entry] of Object.entries(history)) {
     if (!entry?.series?.length) continue
-    const stats = computeStats(entry.series)
-    if (stats) updated[key] = stats.z
+    const { z } = computeRollingZScore(entry.series, { key })
+    updated[key] = z
   }
   return updated
 }

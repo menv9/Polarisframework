@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { motion } from 'motion/react'
 import { Calculator, RefreshCcw } from 'lucide-react'
+import { detectRegime } from '../../lib/scoring/regime'
 
 export default function WorldViewCalculator() {
   // Inputs GDP
@@ -34,21 +35,10 @@ export default function WorldViewCalculator() {
     return (gdpUsa * 0.25 + gdpEur * 0.18 + gdpChn * 0.18 + gdpJpn * 0.05 + gdpResto * 0.34)
   }, [gdpUsa, gdpEur, gdpChn, gdpJpn, gdpResto])
 
-  const regime = useMemo(() => {
-    const vixOff = vix > 70
-    const hyOff = hyOas > 70
-    const spOff = !spAbove200dma
-    const embiOff = embi > 70
-    const vixOn = vix < 30
-    const hyOn = hyOas < 30
-    const spOn = spAbove200dma
-    const embiOn = embi < 40
-    const onCount = [vixOn, hyOn, spOn, embiOn].filter(Boolean).length
-    const offCount = [vixOff, hyOff, spOff, embiOff].filter(Boolean).length
-    if (onCount === 4) return 'Risk-ON'
-    if (offCount >= 1) return 'Risk-OFF'
-    return 'Mixto'
-  }, [vix, hyOas, spAbove200dma, embi])
+  const regime = useMemo(() =>
+    detectRegime({ vix, hyOas, sp200dma: spAbove200dma ? 1 : 0, embi }),
+    [vix, hyOas, spAbove200dma, embi]
+  )
 
   const wocScore = useMemo(() => {
     return (0.7 * smartZ - 0.3 * retailZ)
@@ -75,9 +65,9 @@ export default function WorldViewCalculator() {
   }
 
   const regimeColor = {
-    'Risk-ON': 'text-accent-emerald bg-accent-emerald/10 border-accent-emerald/20',
-    'Risk-OFF': 'text-accent-rose bg-accent-rose/10 border-accent-rose/20',
-    'Mixto': 'text-text-muted bg-text-muted/10 border-text-muted/20',
+    'RISK-ON':  'text-accent-emerald bg-accent-emerald/10 border-accent-emerald/20',
+    'RISK-OFF': 'text-accent-rose bg-accent-rose/10 border-accent-rose/20',
+    'MIXTO':    'text-text-muted bg-text-muted/10 border-text-muted/20',
   }[regime]
 
   const InputNumber = ({ label, value, setValue, min, max, step, unit }) => (
@@ -296,24 +286,24 @@ export default function WorldViewCalculator() {
             <div className="mt-6 pt-4 border-t border-accent-violet/20">
               <h5 className="text-sm font-semibold text-accent-violet mb-2">Trades favorecidos</h5>
               <div className="text-sm text-text-secondary">
-                {regime === 'Risk-ON' && scoreCrecimiento > 0.5 && usdBias === 'Bearish' && inflationRegime === 'Inflacionario' && (
+                {regime === 'RISK-ON' && scoreCrecimiento > 0.5 && usdBias === 'Bearish' && inflationRegime === 'Inflacionario' && (
                   <span className="text-accent-emerald">Long pro-cíclicas vs USD, long EM vs USD</span>
                 )}
-                {regime === 'Risk-ON' && scoreCrecimiento > 0.5 && usdBias === 'Bullish' && inflationRegime === 'Inflacionario' && (
+                {regime === 'RISK-ON' && scoreCrecimiento > 0.5 && usdBias === 'Bullish' && inflationRegime === 'Inflacionario' && (
                   <span className="text-accent-emerald">Long commodity currencies (AUD, CAD, NOK), evitar pares vs USD</span>
                 )}
-                {regime === 'Risk-OFF' && scoreCrecimiento < -0.5 && usdBias === 'Bullish' && inflationRegime === 'Inflacionario' && (
+                {regime === 'RISK-OFF' && scoreCrecimiento < -0.5 && usdBias === 'Bullish' && inflationRegime === 'Inflacionario' && (
                   <span className="text-accent-rose">Long USD vs todo. Short EM. Short pro-cíclicas</span>
                 )}
-                {regime === 'Risk-OFF' && scoreCrecimiento < -0.5 && usdBias === 'Neutral' && inflationRegime === 'Desinflacionario' && (
+                {regime === 'RISK-OFF' && scoreCrecimiento < -0.5 && usdBias === 'Neutral' && inflationRegime === 'Desinflacionario' && (
                   <span className="text-accent-emerald">Long JPY/CHF vs pro-cíclicas</span>
                 )}
-                {regime === 'Mixto' && (
+                {regime === 'MIXTO' && (
                   <span className="text-text-muted">Trades fundamentales sin filtro régimen</span>
                 )}
-                {!((regime === 'Risk-ON' && scoreCrecimiento > 0.5 && (usdBias === 'Bearish' || usdBias === 'Bullish') && inflationRegime === 'Inflacionario') ||
-                   (regime === 'Risk-OFF' && scoreCrecimiento < -0.5 && (usdBias === 'Bullish' || usdBias === 'Neutral') && (inflationRegime === 'Inflacionario' || inflationRegime === 'Desinflacionario')) ||
-                   regime === 'Mixto') && (
+                {!((regime === 'RISK-ON' && scoreCrecimiento > 0.5 && (usdBias === 'Bearish' || usdBias === 'Bullish') && inflationRegime === 'Inflacionario') ||
+                   (regime === 'RISK-OFF' && scoreCrecimiento < -0.5 && (usdBias === 'Bullish' || usdBias === 'Neutral') && (inflationRegime === 'Inflacionario' || inflationRegime === 'Desinflacionario')) ||
+                   regime === 'MIXTO') && (
                   <span className="text-text-muted">Configuración no estándar — evaluar caso por caso</span>
                 )}
               </div>
@@ -322,13 +312,13 @@ export default function WorldViewCalculator() {
             <div className="mt-4 p-3 rounded-lg bg-bg-card border border-accent-rose/20">
               <h5 className="text-sm font-semibold text-accent-rose mb-1">¿Vetar trades?</h5>
               <div className="text-sm text-text-secondary">
-                {regime === 'Risk-OFF' && (
+                {regime === 'RISK-OFF' && (
                   <div className="text-accent-rose">⚠️ Risk-OFF activo: vetar trades pro-cíclicas vs refugios</div>
                 )}
                 {usdBias === 'Bullish' && dxy > 105 && (
                   <div className="text-accent-rose">⚠️ USD muy fuerte: vetar shorts USD</div>
                 )}
-                {regime === 'Risk-ON' && (
+                {regime === 'RISK-ON' && (
                   <div className="text-accent-emerald">✓ Régimen favorable para pro-cíclicas</div>
                 )}
                 {regime !== 'Risk-OFF' && !(usdBias === 'Bullish' && dxy > 105) && (

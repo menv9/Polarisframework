@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { generateTradeId, PAIRS, HORIZONS, CONVICTIONS, REGIMES, VOL_REGIMES, CLOSE_REASONS } from '../lib/journal/metrics'
+import { PIP_VALUES } from '../lib/risk/sizing'
 
 const STORAGE_KEY = 'polaris_journal_trades'
 
@@ -35,6 +36,7 @@ const EMPTY_FORM = {
   tpLevel: '',
   rMultipleTarget: '1.5',
   sizePercent: '',
+  lotSize: '1',
   thesis: '',
   openDate: new Date().toISOString().split('T')[0],
 }
@@ -92,9 +94,12 @@ export default function JournalPage() {
       (parseFloat(closeForm.costSpread) || 0) -
       (parseFloat(closeForm.costSwap) || 0) -
       (parseFloat(closeForm.costCommission) || 0)
-    const rMultiple = closeForm.stopPips > 0
-      ? pnlNet / (closeForm.stopPips * 10)
-      : null
+    const trade      = trades.find(t => t.id === tradeId)
+    const stopPips   = parseFloat(trade?.stopPips) || 0
+    const lotSize    = parseFloat(trade?.lotSize) || 1
+    const pipVal     = PIP_VALUES[trade?.pair] ?? 10
+    const riskAmount = stopPips * pipVal * lotSize
+    const rMultiple  = riskAmount > 0 ? pnlNet / riskAmount : null
     persist(trades.map(t =>
       t.id === tradeId
         ? { ...t, ...closeForm, pnlNet: +pnlNet.toFixed(2), rMultiple: rMultiple ? +rMultiple.toFixed(2) : null, status: 'CLOSED' }
@@ -180,6 +185,7 @@ export default function JournalPage() {
               <Field label="Nivel target"  value={form.tpLevel}   onChange={v => setForm(f => ({...f, tpLevel: v}))} />
               <Field label="R objetivo"    value={form.rMultipleTarget} onChange={v => setForm(f => ({...f, rMultipleTarget: v}))} />
               <Field label="Tamaño (% cap)" value={form.sizePercent} onChange={v => setForm(f => ({...f, sizePercent: v}))} />
+              <Field label="Lotes ejecutados" value={form.lotSize} onChange={v => setForm(f => ({...f, lotSize: v}))} />
             </div>
             <div className="p-3 border-t border-[#222]">
               <div className="text-[9px] text-[#555] uppercase tracking-wider mb-1">Tesis (200 palabras máx)</div>

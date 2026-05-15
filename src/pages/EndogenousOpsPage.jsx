@@ -1,6 +1,7 @@
 import { useState, Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import { INDICATORS as BASE_INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
+import { detectRegime, getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
 import { useModelStore } from '../store/ModelDataContext'
 import { getFreshness, FRESHNESS_DOT, FRESHNESS_TEXT } from '../lib/freshness'
 
@@ -112,12 +113,6 @@ function getSourceId(prefix, key) {
   return `endo_${prefix}_${suffix}`
 }
 
-function getRegimeMultiplier(regime, cyclical) {
-  if (regime === 'RISK-ON')  return cyclical ? 1.0 : 0.5
-  if (regime === 'RISK-OFF') return cyclical ? 0.5 : 1.0
-  return 0.75
-}
-
 function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
   const rm = getRegimeMultiplier(regime, cyclical)
   const betaTotal = computeBetaTotal(betas)
@@ -131,11 +126,6 @@ function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
     if (ind.horizon === 'LONG')   longScore += contrib
   }
   return { composite: 0.20 * short + 0.50 * medium + 0.30 * longScore, short, medium, long: longScore }
-}
-
-function getConviction(signal) {
-  const a = Math.abs(signal)
-  return a > 0.25 ? 'FULL' : a > 0.10 ? 'HALF' : 'FLAT'
 }
 
 function scoreColor(v) {
@@ -209,9 +199,7 @@ export default function EndogenousOpsPage() {
   const [pairB, setPairB]   = useState('eur')
   const [activeTab, setActiveTab] = useState('usa')
 
-  const regimeOn  = wvData.vix < 30 && wvData.hyOas < 30 && wvData.sp200dma === 1 && wvData.embi < 40
-  const regimeOff = wvData.vix > 70 || wvData.hyOas > 70 || wvData.sp200dma === 0 || wvData.embi > 70
-  const regime    = regimeOn ? 'RISK-ON' : regimeOff ? 'RISK-OFF' : 'MIXTO'
+  const regime    = detectRegime(wvData)
 
   const countryScores  = COUNTRIES.map(c => ({ ...c, ...computeCountryScore(c.prefix, c.cyclical, regime, zScores, betas) }))
   const rankedCountries = [...countryScores].sort((a, b) => b.composite - a.composite)

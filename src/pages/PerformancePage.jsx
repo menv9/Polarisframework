@@ -23,14 +23,15 @@ function MetricCard({ label, value, sub, color = 'text-[#e5e5e5]', target, verdi
   )
 }
 
+// Per-trade Sharpe (mean/std, no annualization). Typical range: −0.2 to +0.5.
 function sharpeVerdict(v) {
   if (v == null) return null
-  if (v < 0.5)  return { label: 'No operable', color: 'text-[#ef4444]' }
-  if (v < 1.0)  return { label: 'Marginal', color: 'text-[#f59e0b]' }
-  if (v < 1.5)  return { label: 'Bueno', color: 'text-[#a3a3a3]' }
-  if (v < 2.0)  return { label: 'Muy bueno', color: 'text-[#4ade80]' }
-  if (v <= 3.0) return { label: 'Excelente', color: 'text-[#4ade80]' }
-  return { label: 'AUDITAR', color: 'text-[#ef4444]' }
+  if (v <= 0)   return { label: 'Negativo', color: 'text-[#ef4444]' }
+  if (v < 0.05) return { label: 'Sin edge claro', color: 'text-[#ef4444]' }
+  if (v < 0.15) return { label: 'Marginal', color: 'text-[#f59e0b]' }
+  if (v < 0.30) return { label: 'Bueno', color: 'text-[#a3a3a3]' }
+  if (v < 0.50) return { label: 'Muy bueno', color: 'text-[#4ade80]' }
+  return { label: 'Excelente — verificar', color: 'text-[#4ade80]' }
 }
 
 function calmarVerdict(v) {
@@ -161,9 +162,9 @@ export default function PerformancePage() {
                   target=">1.5R" />
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-[#222]">
-                <MetricCard label="Sharpe (anual.)"
-                  value={metrics?.sharpe != null ? metrics.sharpe.toFixed(2) : '—'}
-                  target=">0.5 operable, >1.0 bueno"
+                <MetricCard label="Sharpe (per-trade)"
+                  value={metrics?.sharpe != null ? metrics.sharpe.toFixed(3) : '—'}
+                  target=">0.15 bueno, >0.30 muy bueno"
                   verdict={sharpeVerdict(metrics?.sharpe)}
                   color="text-[#e5e5e5]" />
                 <MetricCard label="Calmar Ratio"

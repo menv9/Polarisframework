@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import WorldViewSidebar from '../components/worldview/WorldViewSidebar'
 import { useModelStore, WV_DATA_MAP, DEFAULT_WV_DATA } from '../store/ModelDataContext'
 import { getFreshness, FRESHNESS_DOT, FRESHNESS_TEXT } from '../lib/freshness'
+import { detectRegime } from '../lib/scoring/regime'
 
 const WV_FREQ = {
   gdpUsa: 90, gdpEur: 90, gdpChn: 90, gdpJpn: 90, gdpResto: 30,
@@ -32,9 +33,7 @@ export default function WorldViewOpsPage() {
   const sourceMap = new Map(dataSources.map(s => [s.id, s]))
 
   const scoreGDP  = data.gdpUsa * 0.25 + data.gdpEur * 0.18 + data.gdpChn * 0.18 + data.gdpJpn * 0.05 + data.gdpResto * 0.34
-  const regimeOn  = data.vix < 30 && data.hyOas < 30 && data.sp200dma === 1 && data.embi < 40
-  const regimeOff = data.vix > 70 || data.hyOas > 70 || data.sp200dma === 0 || data.embi > 70
-  const regime    = regimeOn ? 'RISK-ON' : regimeOff ? 'RISK-OFF' : 'MIXTO'
+  const regime    = detectRegime(data)
   const wocScore  = 0.7 * data.smartZ - 0.3 * data.retailZ
   const usdBias   = data.dxyRising === 1 && data.dxy > 100 ? 'BULLISH' : data.dxyRising === 0 && data.dxy < 95 ? 'BEARISH' : 'NEUTRAL'
   const inflation = data.cpiG7 > 3.0 || data.breakevens > 2.5 ? 'INFLACIONARIO' : data.cpiG7 < 2.0 && data.breakevens < 2.0 ? 'DESINFLACIONARIO' : 'ESTABLE'

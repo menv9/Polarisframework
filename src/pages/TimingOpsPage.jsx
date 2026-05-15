@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useModelStore } from '../store/ModelDataContext'
 import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 import { TIMING_CHECKS, computeTimingVerdict } from '../lib/timing/score'
+import { detectRegime, getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
 
 const PAIRS = [
   { label: 'EUR/USD', base: 'eur', quote: 'usa' },
@@ -29,12 +30,6 @@ const COUNTRIES = [
   { label: 'NOK', prefix: 'nor', cyclical: true  },
 ]
 
-function getRegimeMultiplier(regime, cyclical) {
-  if (regime === 'RISK-ON')  return cyclical ? 1.0 : 0.5
-  if (regime === 'RISK-OFF') return cyclical ? 0.5 : 1.0
-  return 0.75
-}
-
 function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
   const rm = getRegimeMultiplier(regime, cyclical)
   const betaTotal = computeBetaTotal(betas)
@@ -50,11 +45,6 @@ function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
   return 0.20 * short + 0.50 * medium + 0.30 * longScore
 }
 
-function getConviction(signal) {
-  const a = Math.abs(signal)
-  return a > 0.25 ? 'FULL' : a > 0.10 ? 'HALF' : 'FLAT'
-}
-
 const STATUS_VALUES = { true: true, false: false, null: null }
 
 export default function TimingOpsPage() {
@@ -67,9 +57,7 @@ export default function TimingOpsPage() {
   })
   const [checks, setChecks] = useState({})
 
-  const regimeOn  = wv.vix < 30 && wv.hyOas < 30 && wv.sp200dma === 1 && wv.embi < 40
-  const regimeOff = wv.vix > 70 || wv.hyOas > 70 || wv.sp200dma === 0 || wv.embi > 70
-  const regime    = regimeOn ? 'RISK-ON' : regimeOff ? 'RISK-OFF' : 'MIXTO'
+  const regime    = detectRegime(wv)
 
   const countryScores = useMemo(() =>
     COUNTRIES.map(c => ({

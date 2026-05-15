@@ -1,5 +1,6 @@
-// Position sizing — 3 métodos combinados
+// Position sizing — 3 métodos combinados + drawdown multiplier
 // Based on: Documentation/03_CAPA_1_FX_Macro/FX_Risk_Management_Module/03_3._Position_Sizing.md
+import { getDrawdownLevel } from './drawdown.js'
 
 // Pip values (USD per pip per standard lot 100k)
 export const PIP_VALUES = {
@@ -32,6 +33,7 @@ export const ATR_STOP_MULTIPLIER = {
   LONG:   3.0,
 }
 
+
 // Method 1: Risk per trade
 // Returns position size in standard lots
 export function sizeByRiskPerTrade({ capital, riskPct, stopPips, pair }) {
@@ -60,15 +62,15 @@ export function sizeByVolTarget({ capital, volTargetPct, annualVolPct }) {
   return capital * (volTargetPct / 100) / (annualVolPct / 100)
 }
 
-// Convert units to lots for a specific pair/price
-function unitsToLots(units, pair, price = 1) {
-  if (['USD/JPY','USD/CHF','USD/CAD','USD/NOK','USD/SEK'].includes(pair)) {
-    return units / (price * 100000)
-  }
+// Convert USD-denominated units (from Kelly/VolTarget) to standard lots.
+// 1 standard lot = 100,000 base currency units; Kelly/VolTarget both return USD amounts.
+// For USD-base pairs (USD/JPY etc.) the base IS USD so no price conversion needed.
+function unitsToLots(units) {
   return units / 100000
 }
 
 // Main function: compute all 3 methods + final position
+// ddPct: current drawdown from peak as a percentage (0–100). Default 0 = no drawdown.
 export function computePositionSize({
   capital,
   riskPct = 1,
@@ -84,12 +86,13 @@ export function computePositionSize({
   annualVolPct = 8,
   price = 1,
   atrPips,
+  ddPct = 0,
 }) {
   const convMult = CONVICTION_MULTIPLIER[conviction] ?? 1
   const regMult  = REGIME_VOL_MULTIPLIER[regimeVol] ?? 1
 
   // If FLAT conviction → no trade
-  if (convMult === 0) return { verdict: 'NO OPERAR', lots1: 0, lots2: 0, lots3: 0, lotsMin: 0, lotsAdjusted: 0, stopPips: 0, tpPips: 0, stopLoss: 0, takeProfit: 0 }
+  if (convMult === 0) return { verdict: 'NO OPERAR', lots1: 0, lots2: 0, lots3: 0, lotsMin: 0, lotsAdjusted: 0, stopPips: 0, tpPips: 0, stopLoss: 0, takeProfit: 0, ddMult: 1 }
 
   // Use ATR stop if no manual stop given
   const atrMult = ATR_STOP_MULTIPLIER[horizon] ?? 2.5
@@ -98,10 +101,10 @@ export function computePositionSize({
   const lots1 = sizeByRiskPerTrade({ capital, riskPct, stopPips: effectiveStop, pair })
 
   const kellyUnits = sizeByKelly({ capital, winRate, avgWinLoss, kellyFraction })
-  const lots2 = unitsToLots(kellyUnits, pair, price)
+  const lots2 = unitsToLots(kellyUnits)
 
   const volUnits = sizeByVolTarget({ capital, volTargetPct, annualVolPct })
-  const lots3 = unitsToLots(volUnits, pair, price)
+  const lots3 = unitsToLots(volUnits)
 
   const lotsMin = Math.min(
     lots1 > 0 ? lots1 : Infinity,
@@ -109,13 +112,18 @@ export function computePositionSize({
     lots3 > 0 ? lots3 : Infinity,
   )
   const finalMin = lotsMin === Infinity ? 0 : lotsMin
-  const lotsAdjusted = finalMin * convMult * regMult
+
+  // Drawdown multiplier from §19 protocol
+  const ddMult = getDrawdownLevel(ddPct).mult
+
+  const lotsAdjusted = finalMin * convMult * regMult * ddMult
 
   // Take profit at 1.5R (minimum per doc)
   const tpPips = effectiveStop * 1.5
-  const pip = PIP_VALUES[pair] ?? 0.0001
-  const stopLoss = effectiveStop * (pip / 10000)
-  const takeProfit = tpPips * (pip / 10000)
+  // Pip size in price units: JPY pairs quote in 2 decimals (1 pip = 0.01), all others 4 decimals (0.0001)
+  const pipSize = pair?.includes('JPY') ? 0.01 : 0.0001
+  const stopLoss   = +(effectiveStop * pipSize).toFixed(5)
+  const takeProfit = +(tpPips * pipSize).toFixed(5)
 
   return {
     lots1: +lots1.toFixed(3),
@@ -123,9 +131,10 @@ export function computePositionSize({
     lots3: +lots3.toFixed(3),
     lotsMin: +finalMin.toFixed(3),
     lotsAdjusted: +lotsAdjusted.toFixed(3),
+    ddMult,
     stopPips: Math.round(effectiveStop),
     tpPips: Math.round(tpPips),
-    riskUsd: +(capital * (riskPct / 100) * convMult * regMult).toFixed(2),
+    riskUsd: +(capital * (riskPct / 100) * convMult * regMult * ddMult).toFixed(2),
     verdict: lotsAdjusted > 0 ? 'OPERAR' : 'NO OPERAR',
   }
 }
