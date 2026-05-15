@@ -4,6 +4,7 @@ import { useModelStore } from '../store/ModelDataContext'
 import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 import { detectInflationRegime, getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
 import { computeExogenousCurrencyScores, combineEndogenousExogenous } from '../lib/scoring/exogenous'
+import { loadPairBetas, computeCountryScoreForPair, pairLabelToId } from '../lib/pairBetas'
 
 const EXO_CCYS = ['AUD','CAD','NOK','NZD','JPY','CHF','USD','EUR','GBP','SEK']
 
@@ -78,6 +79,7 @@ function fmtScore(v) {
 export default function DashboardPage() {
   const { worldview: wv, regime, dataSources: sources, zscores: zScores, history, features, signalHistory, recordSignalSample } = useModelStore()
   const [betas] = useState(loadBetas)
+  const [pairBetaData] = useState(loadPairBetas)
   const navigate = useNavigate()
 
   // ── World View derivations ────────────────────────────────────────────────
@@ -115,9 +117,14 @@ export default function DashboardPage() {
   const dashboardPairs = useMemo(() => {
     const byPrefix = new Map(countryScores.map((country) => [country.prefix, country]))
     return DASHBOARD_PAIRS.map((pair) => {
-      const base = byPrefix.get(pair.base)
+      const base  = byPrefix.get(pair.base)
       const quote = byPrefix.get(pair.quote)
-      const signal = base && quote ? base.score - quote.score : 0
+      if (!base || !quote) return { ...pair, signal: 0, conv: 'FLAT', direction: 'LONG' }
+      const pairId    = pairLabelToId(pair.label)
+      const baseEndo  = computeCountryScoreForPair(pair.base,  base.cyclical,  regime, zScores, betas, pairBetaData, pairId)
+      const quoteEndo = computeCountryScoreForPair(pair.quote, quote.cyclical, regime, zScores, betas, pairBetaData, pairId)
+      const signal    = combineEndogenousExogenous(baseEndo,  base.exoScore,  base.ccy)
+                      - combineEndogenousExogenous(quoteEndo, quote.exoScore, quote.ccy)
       return {
         ...pair,
         signal,
@@ -125,7 +132,7 @@ export default function DashboardPage() {
         direction: signal >= 0 ? 'LONG' : 'SHORT',
       }
     })
-  }, [countryScores, signalHistory])
+  }, [countryScores, regime, zScores, betas, pairBetaData, signalHistory])
 
   useEffect(() => {
     for (const pair of dashboardPairs) recordSignalSample(pair.label, pair.signal)

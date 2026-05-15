@@ -5,6 +5,7 @@ import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 import { TIMING_CHECKS, TECH_SETUP_DEFAULTS, computeTimingVerdict, evaluateTechnicalSetup } from '../lib/timing/score'
 import { getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
 import { computeExogenousCurrencyScores, combineEndogenousExogenous } from '../lib/scoring/exogenous'
+import { loadPairBetas, computeCountryScoreForPair, pairLabelToId } from '../lib/pairBetas'
 
 const PAIRS = [
   { label: 'EUR/USD', base: 'eur', quote: 'usa' },
@@ -51,6 +52,7 @@ const STATUS_VALUES = { true: true, false: false, null: null }
 export default function TimingOpsPage() {
   const { regime, zscores: zScores, dataSources, history, signalHistory, recordSignalSample } = useModelStore()
   const [betas] = useState(loadBetas)
+  const [pairBetaData] = useState(loadPairBetas)
   const [searchParams] = useSearchParams()
   const [selectedPair, setSelectedPair] = useState(() => {
     const p = searchParams.get('pair')
@@ -89,12 +91,23 @@ export default function TimingOpsPage() {
     const byPrefix = new Map(countryScores.map(c => [c.prefix, c]))
     const base  = byPrefix.get(pair.base)
     const quote = byPrefix.get(pair.quote)
-    const signal = hasSignalOverride ? querySignal : base && quote ? base.score - quote.score : 0
+    let signal
+    if (hasSignalOverride) {
+      signal = querySignal
+    } else if (base && quote) {
+      const pairId    = pairLabelToId(pair.label)
+      const baseEndo  = computeCountryScoreForPair(pair.base,  base.cyclical,  regime, zScores, betas, pairBetaData, pairId)
+      const quoteEndo = computeCountryScoreForPair(pair.quote, quote.cyclical, regime, zScores, betas, pairBetaData, pairId)
+      signal = combineEndogenousExogenous(baseEndo,  base.exoScore,  base.ccy)
+             - combineEndogenousExogenous(quoteEndo, quote.exoScore, quote.ccy)
+    } else {
+      signal = 0
+    }
     const conv = hasSignalOverride && ['FULL', 'HALF', 'FLAT'].includes(queryConviction)
       ? queryConviction
       : getConviction(signal, signalHistory[selectedPair])
     return { signal, conv, direction: signal >= 0 ? 'LONG' : 'SHORT' }
-  }, [selectedPair, countryScores, hasSignalOverride, querySignal, queryConviction, signalHistory])
+  }, [selectedPair, countryScores, regime, zScores, betas, pairBetaData, hasSignalOverride, querySignal, queryConviction, signalHistory])
 
   useEffect(() => {
     if (pairInfo) recordSignalSample(selectedPair, pairInfo.signal)

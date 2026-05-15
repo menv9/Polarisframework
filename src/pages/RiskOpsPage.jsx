@@ -4,6 +4,7 @@ import { useModelStore } from '../store/ModelDataContext'
 import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 import { computePositionSize, PIP_VALUES, CONVICTION_MULTIPLIER, REGIME_VOL_MULTIPLIER } from '../lib/risk/sizing'
 import { getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
+import { loadPairBetas, computeCountryScoreForPair, pairLabelToId } from '../lib/pairBetas'
 import { DRAWDOWN_LEVELS, getDrawdownLevel, getRampupStage, computeCircuitBreakers, computePortfolioExposure } from '../lib/risk/drawdown'
 
 const PAIRS = Object.keys(PIP_VALUES)
@@ -50,6 +51,7 @@ function fmtLots(v) {
 export default function RiskOpsPage() {
   const { regime, zscores: zScores, signalHistory } = useModelStore()
   const [betas] = useState(loadBetas)
+  const [pairBetaData] = useState(loadPairBetas)
   const [searchParams] = useSearchParams()
 
   // Config — initialize from URL params if present (passed from Dashboard/Timing flow)
@@ -86,7 +88,7 @@ export default function RiskOpsPage() {
     { pair: 'EUR/USD', lots: 0, direction: 'LONG' },
   ])
 
-  // Auto-populate conviction from endogenous signal
+  // Auto-populate conviction from endogenous signal (pair-specific betas cuando disponibles)
   const autoConviction = useMemo(() => {
     const ccys = PAIR_TO_COUNTRIES[pair]
     if (!ccys) return 'HALF'
@@ -94,10 +96,11 @@ export default function RiskOpsPage() {
     const base  = byPrefix.get(ccys[0])
     const quote = byPrefix.get(ccys[1])
     if (!base || !quote) return 'HALF'
-    const scoreBase  = computeCountryScore(base.prefix,  base.cyclical,  regime, zScores, betas)
-    const scoreQuote = computeCountryScore(quote.prefix, quote.cyclical, regime, zScores, betas)
+    const pairId     = pairLabelToId(pair)
+    const scoreBase  = computeCountryScoreForPair(base.prefix,  base.cyclical,  regime, zScores, betas, pairBetaData, pairId)
+    const scoreQuote = computeCountryScoreForPair(quote.prefix, quote.cyclical, regime, zScores, betas, pairBetaData, pairId)
     return getConviction(scoreBase - scoreQuote, signalHistory[pair])
-  }, [pair, regime, zScores, betas, signalHistory])
+  }, [pair, regime, zScores, betas, pairBetaData, signalHistory])
 
   const ddPct = peakCapital > 0
     ? Math.max(0, (peakCapital - currentCapital) / peakCapital * 100)

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ALL_INDICATORS, DEFAULT_BETAS, loadBetas, saveBetas } from '../lib/endogenousBetas'
+import { parsePairBetaCSV, savePairBetas, clearPairBetas, loadPairBetasMeta } from '../lib/pairBetas'
 
 const CATEGORY_MAP = {
   real_2y: 'CARRY', ca_gdp: 'ESTRUCTURAL', reer: 'VALUATION', tot: 'ESTRUCTURAL',
@@ -48,6 +49,35 @@ export default function EndogenousBetasPage() {
   const [betas,    setBetas]    = useState(loadBetas)
   const [confirm,  setConfirm]  = useState(false)
   const [flashMsg, setFlashMsg] = useState(null)
+  const [pairMeta, setPairMeta] = useState(loadPairBetasMeta)
+
+  function handleCSVUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = evt => {
+      const data = parsePairBetaCSV(evt.target.result)
+      const pairs = Object.keys(data)
+      if (pairs.length === 0) {
+        setFlashMsg('CSV inválido — sin pares reconocidos')
+        setTimeout(() => setFlashMsg(null), 4000)
+        return
+      }
+      savePairBetas(data)
+      setPairMeta(loadPairBetasMeta())
+      setFlashMsg(`CSV cargado — ${pairs.length} pares`)
+      setTimeout(() => setFlashMsg(null), 4000)
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  function handleClearPairBetas() {
+    clearPairBetas()
+    setPairMeta(null)
+    setFlashMsg('Betas por par eliminadas')
+    setTimeout(() => setFlashMsg(null), 3000)
+  }
 
   useEffect(() => { saveBetas(betas) }, [betas])
 
@@ -236,6 +266,47 @@ export default function EndogenousBetasPage() {
             </table>
           </div>
         ))}
+
+        {/* ── BETAS POR PAR — PIPELINE CSV ── */}
+        <div className="border-2 border-[#333] mb-2">
+          <div className="px-3 py-1.5 bg-[#0f0f0f] border-b border-[#222] flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#60a5fa]">Betas por Par — Pipeline CSV</span>
+            {pairMeta && (
+              <span className="text-[10px] font-mono text-[#444]">
+                {pairMeta.pairs} pares · {pairMeta.totalRows} regresiones
+              </span>
+            )}
+          </div>
+          <div className="px-3 py-3 flex flex-col gap-2">
+            {pairMeta ? (
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs text-[#4ade80]">
+                  ✓ Cargado — {new Date(pairMeta.loadedAt).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </span>
+                <span className="text-[10px] text-[#444] font-mono">
+                  {pairMeta.pairList?.join(' · ')}
+                </span>
+                <button onClick={handleClearPairBetas}
+                  className="ml-auto text-[10px] uppercase tracking-wider border border-[#ef4444] text-[#ef4444] hover:text-white hover:border-white px-2 py-0.5 transition-colors">
+                  Borrar
+                </button>
+              </div>
+            ) : (
+              <p className="text-[10px] text-[#444]">
+                Sin CSV cargado. El scoring usa los valores doc §15.2 para todos los pares.
+              </p>
+            )}
+            <div className="flex items-center gap-3">
+              <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-[#333] text-[#555] hover:text-white hover:border-white transition-colors">
+                <input type="file" accept=".csv" onChange={handleCSVUpload} className="hidden" />
+                {pairMeta ? 'Actualizar CSV' : 'Cargar beta_matrix_full.csv'}
+              </label>
+              <span className="text-[10px] text-[#333]">
+                Genera con: <span className="font-mono text-[#3a3a3a]">beta_pipeline/run.py</span>
+              </span>
+            </div>
+          </div>
+        </div>
 
         {/* Footer total */}
         <div className="border border-[#222] px-3 py-2 flex items-center justify-between text-xs">
