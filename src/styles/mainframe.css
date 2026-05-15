@@ -778,6 +778,12 @@ html[data-theme='mainframe'] aside.fixed {
   width: 220px !important;
 }
 
+/* Dashboard sidebars: correct top/height for 32px topbar + 28px footer */
+html[data-theme='mainframe'] .dash-sidebar {
+  top: 32px !important;
+  height: calc(100vh - 32px - 28px) !important;
+}
+
 /* Mobile menu toggle hidden in mainframe (desktop only aesthetic) */
 html[data-theme='mainframe'] .fixed.bottom-6.right-6.z-50 { display: none !important; }
 

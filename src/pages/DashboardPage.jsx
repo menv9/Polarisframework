@@ -185,19 +185,19 @@ export default function DashboardPage() {
             if (!raw) return false
             const t = new Date(raw).getTime()
             if (!Number.isFinite(t)) return false
-            const imp = (e.impact || '').toLowerCase()
-            return t >= now && t <= week && imp.includes('high')
+            return t >= now && t <= week
           })
           .sort((a, b) => {
             const ta = new Date(a.date || a.datetime || a.timestamp || a.time).getTime()
             const tb = new Date(b.date || b.datetime || b.timestamp || b.time).getTime()
             return ta - tb
           })
-          .slice(0, 10)
+          .slice(0, 30)
           .map(e => ({
             title:    e.title || e.event || e.name || '—',
             currency: (e.currency || e.country || '').toUpperCase(),
             date:     new Date(e.date || e.datetime || e.timestamp || e.time),
+            impact:   (e.impact || '').toLowerCase(),
           }))
         setUpcomingEvents(upcoming)
       })
@@ -274,7 +274,7 @@ export default function DashboardPage() {
 
   return (
     <div className="pt-12 min-h-screen">
-      <div className="flex items-start max-w-[1560px] mx-auto">
+      <div className="flex items-start w-full">
 
         {/* ===== LEFT SIDEBAR — BETAS ===== */}
         <aside className="dash-sidebar hidden xl:flex flex-col w-[200px] shrink-0 sticky top-12 h-[calc(100vh-48px)] border-r border-[#222] overflow-y-auto">
@@ -501,16 +501,21 @@ export default function DashboardPage() {
           <div className="flex-1 overflow-y-auto">
             {upcomingEvents.length === 0 ? (
               <div className="px-3 py-4">
-                <p className="text-[10px] text-[#333] uppercase tracking-wider">Sin eventos de alta importancia esta semana</p>
+                <p className="text-[10px] text-[#333] uppercase tracking-wider">Sin eventos esta semana</p>
               </div>
             ) : (
               <div className="divide-y divide-[#1a1a1a]">
                 {upcomingEvents.map((ev, i) => (
                   <div key={i} className="px-3 py-2">
-                    <div className="text-[9px] font-mono text-[#444] mb-0.5">
-                      {ev.date.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}
-                      {' · '}
-                      {ev.date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[9px] font-mono text-[#444]">
+                        {ev.date.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}
+                        {' '}
+                        {ev.date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <span className={`text-[8px] font-bold uppercase ${ev.impact.includes('high') ? 'text-[#ef4444]' : ev.impact.includes('medium') ? 'text-[#f59e0b]' : 'text-[#444]'}`}>
+                        {ev.impact.includes('high') ? '●' : ev.impact.includes('medium') ? '●' : '○'}
+                      </span>
                     </div>
                     <div className="flex items-start gap-1.5">
                       <span className="text-[9px] font-bold text-[#f59e0b] shrink-0 w-7">{ev.currency}</span>
@@ -522,7 +527,7 @@ export default function DashboardPage() {
             )}
           </div>
           <div className="px-3 py-2 border-t border-[#222] shrink-0">
-            <span className="text-[9px] text-[#333] uppercase tracking-wider">7 días · Alta importancia</span>
+            <span className="text-[9px] text-[#333] uppercase tracking-wider">Próximos 7 días</span>
           </div>
         </aside>
 
