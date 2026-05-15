@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import WorldViewSidebar from '../components/worldview/WorldViewSidebar'
-import { useModelStore, WV_DATA_MAP, DEFAULT_WV_DATA } from '../store/ModelDataContext'
+import { useModelStore, WV_DATA_MAP, WV_GDP_GAP_MAP, DEFAULT_WV_DATA } from '../store/ModelDataContext'
 import { getFreshness, FRESHNESS_DOT, FRESHNESS_TEXT } from '../lib/freshness'
 import { detectRegime } from '../lib/scoring/regime'
 
@@ -52,11 +52,11 @@ export default function WorldViewOpsPage() {
 
   const ROWS = [
     { section: 'GDP Gap por region (pp)', items: [
-      { key: 'gdpUsa',   label: 'USA' },
-      { key: 'gdpEur',   label: 'EUR' },
-      { key: 'gdpChn',   label: 'CHN' },
-      { key: 'gdpJpn',   label: 'JPN' },
-      { key: 'gdpResto', label: 'Resto (CESI)' },
+      { key: 'gdpUsa',   label: 'USA Nowcast - Consensus' },
+      { key: 'gdpEur',   label: 'EUR Nowcast - Consensus' },
+      { key: 'gdpChn',   label: 'CHN Nowcast - Consensus' },
+      { key: 'gdpJpn',   label: 'JPN Nowcast - Consensus' },
+      { key: 'gdpResto', label: 'Resto Nowcast - Consensus' },
     ]},
     { section: 'Regimen (percentil 5Y)', items: [
       { key: 'vix',      label: 'VIX' },
@@ -156,7 +156,7 @@ export default function WorldViewOpsPage() {
                         </td>
                       </tr>
                       {items.map(({ key, label }) => {
-                        const sourceId = WV_DATA_MAP[key]
+                        const sourceId = WV_GDP_GAP_MAP[key]?.nowcast || WV_DATA_MAP[key]
                         const source   = sourceMap.get(sourceId)
                         const val = data[key]
                         const hasValue = val != null && val !== DEFAULT_WV_DATA[key]
@@ -174,7 +174,7 @@ export default function WorldViewOpsPage() {
                               )}
                             </td>
                             <td className="px-2 py-1.5">
-                              <FreshDot lastUpdate={source?.lastUpdate} frequencyDays={WV_FREQ[key]} />
+                              <FreshDot lastUpdate={source?.lastUpdate} frequencyDays={source?.frequencyDays || WV_FREQ[key]} />
                             </td>
                             <td className="px-2 py-1.5">
                               <Link

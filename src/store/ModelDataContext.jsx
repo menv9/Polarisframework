@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react'
 import { dataSources as defaultDataSources } from '../data/dataSources'
 import { computeRollingZScore } from '../lib/scoring/zScore'
+import { deriveFeatureStore } from '../lib/scoring/features'
 
 // ── Claves localStorage ───────────────────────────────────────────────────────
 export const STORAGE_KEY_HISTORY = 'polaris_endogenous_history'
@@ -38,6 +39,14 @@ export const WV_DATA_MAP = {
   breakevens: 'wv_breakevens',
 }
 
+export const WV_GDP_GAP_MAP = {
+  gdpUsa:   { nowcast: 'wv_gdp_usa_nowcast',   consensus: 'wv_gdp_usa_consensus',   legacy: 'wv_gdp_usa' },
+  gdpEur:   { nowcast: 'wv_gdp_eur_nowcast',   consensus: 'wv_gdp_eur_consensus',   legacy: 'wv_gdp_eur' },
+  gdpChn:   { nowcast: 'wv_gdp_chn_nowcast',   consensus: 'wv_gdp_chn_consensus',   legacy: 'wv_gdp_chn' },
+  gdpJpn:   { nowcast: 'wv_gdp_jpn_nowcast',   consensus: 'wv_gdp_jpn_consensus',   legacy: 'wv_gdp_jpn' },
+  gdpResto: { nowcast: 'wv_gdp_resto_nowcast', consensus: 'wv_gdp_resto_consensus', legacy: 'wv_cesi' },
+}
+
 // ── Utilidades ────────────────────────────────────────────────────────────────
 function autoMonthlyDates(n) {
   const today = new Date()
@@ -71,15 +80,21 @@ function deriveZscores(history, current = {}) {
 }
 
 // Deriva el objeto worldview desde el array de dataSources
-function deriveWorldview(sources) {
-  const sourceMap = new Map(sources.map(s => [s.id, s]))
+function deriveWorldview(features) {
+  const values = features.valuesBySourceId
   const derived = {}
-  for (const [key, id] of Object.entries(WV_DATA_MAP)) {
-    const source = sourceMap.get(id)
-    if (source?._value != null && source._value !== '') {
-      const num = Number(source._value)
-      if (!isNaN(num)) derived[key] = num
+  for (const [key, ids] of Object.entries(WV_GDP_GAP_MAP)) {
+    const nowcast = values[ids.nowcast]
+    const consensus = values[ids.consensus]
+    if (Number.isFinite(nowcast) && Number.isFinite(consensus)) {
+      derived[key] = nowcast - consensus
+      continue
     }
+    if (Number.isFinite(values[ids.legacy])) derived[key] = values[ids.legacy]
+  }
+  for (const [key, id] of Object.entries(WV_DATA_MAP)) {
+    if (key in WV_GDP_GAP_MAP) continue
+    if (Number.isFinite(values[id])) derived[key] = values[id]
   }
   return { ...DEFAULT_WV_DATA, ...derived }
 }
@@ -134,8 +149,9 @@ export function ModelDataProvider({ children }) {
   const [zscores,     setZscores]     = useState(loadZscores)
   const [dataSources, setDataSources] = useState(loadDataSources)
 
-  // worldview se deriva reactivamente de dataSources — sin estado propio
-  const worldview = useMemo(() => deriveWorldview(dataSources), [dataSources])
+  // Source -> History -> Features -> Framework.
+  const features = useMemo(() => deriveFeatureStore(dataSources, history), [dataSources, history])
+  const worldview = useMemo(() => deriveWorldview(features), [features])
 
   // Cuando cambia history, re-deriva z-scores automáticamente
   useEffect(() => {
@@ -162,6 +178,7 @@ export function ModelDataProvider({ children }) {
       history, setHistory,
       zscores, setZscores,
       dataSources, setDataSources,
+      features,
       worldview,
     }}>
       {children}

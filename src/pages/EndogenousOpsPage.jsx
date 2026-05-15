@@ -93,22 +93,6 @@ const IND_TIPS = {
   umcsi:      'UMCSI (USA) / OCDE (resto). Anticipa gasto privado y perspectivas económicas.',
 }
 
-function loadSourceValues() {
-  try {
-    const saved = localStorage.getItem('polaris_data_sources')
-    if (!saved) return {}
-    const sources = JSON.parse(saved)
-    const map = {}
-    for (const s of sources) {
-      if (s.id && s._value != null && s._value !== '') {
-        const num = Number(s._value)
-        if (!isNaN(num)) map[s.id] = num
-      }
-    }
-    return map
-  } catch { return {} }
-}
-
 function getSourceId(prefix, key) {
   const suffix = key === 'nfp' && prefix !== 'usa' ? 'empl' : key
   return `endo_${prefix}_${suffix}`
@@ -193,9 +177,8 @@ function Tooltip({ text, align = 'center' }) {
 }
 
 export default function EndogenousOpsPage() {
-  const { zscores: zScores, worldview: wvData, history, dataSources } = useModelStore()
+  const { zscores: zScores, worldview: wvData, history, dataSources, features } = useModelStore()
   const [betas]        = useState(loadBetas)
-  const [sourceValues] = useState(loadSourceValues)
   const [pairA, setPairA]   = useState('usa')
   const [pairB, setPairB]   = useState('eur')
   const [activeTab, setActiveTab] = useState('usa')
@@ -468,7 +451,7 @@ export default function EndogenousOpsPage() {
                         const z        = zScores[`${activeCountry.prefix}_${ind.key}`] ?? 0
                         const beta     = betas[ind.key] ?? ind.betaDoc
                         const contrib  = (beta / betaTotal) * z * ind.sign * activeRegimeMult
-                        const rawVal   = sourceValues[getSourceId(activeCountry.prefix, ind.key)]
+                        const rawVal   = features.valuesBySourceId[getSourceId(activeCountry.prefix, ind.key)]
                         const hasData  = z !== 0 || rawVal != null
                         const entry    = history[`${activeCountry.prefix}_${ind.key}`]
                         const fresh    = getFreshness(entry?.lastImported, ENDO_FREQ[ind.key])

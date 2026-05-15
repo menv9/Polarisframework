@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { classifyCalendarEvent } from '../data/calendarMapping'
 
@@ -136,6 +136,8 @@ export default function EconomicCalendarPage() {
   const [lastSync, setLastSync] = useState(null)
   const [syncResult, setSyncResult] = useState(null)
   const [activeView, setActiveView] = useState('month')
+  const syncAbortRef = useRef(null)
+  const syncInFlightRef = useRef(false)
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const today = new Date()
     return new Date(today.getFullYear(), today.getMonth(), 1)
@@ -153,8 +155,8 @@ export default function EconomicCalendarPage() {
     }, { total: 0, released: 0, saved: 0, blackout: 0 })
   }, [events, savedKeys])
 
-  const loadCalendar = useCallback(async () => {
-    const res = await fetch('/api/calendar')
+  const loadCalendar = useCallback(async (signal) => {
+    const res = await fetch('/api/calendar', { signal })
     const body = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(body.message || body.error || 'Calendar fetch failed')
     setEvents(Array.isArray(body.events) ? body.events : [])
@@ -163,18 +165,24 @@ export default function EconomicCalendarPage() {
     }
   }, [])
 
-  const loadReleases = useCallback(async () => {
-    const res = await fetch('/api/calendar/releases')
+  const loadReleases = useCallback(async (signal) => {
+    const res = await fetch('/api/calendar/releases', { signal })
     const body = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(body.message || body.error || 'Calendar releases failed')
     setReleases(Array.isArray(body.releases) ? body.releases : [])
   }, [])
 
   const syncCalendar = useCallback(async () => {
+    if (syncInFlightRef.current) {
+      syncAbortRef.current?.abort()
+    }
+    const controller = new AbortController()
+    syncAbortRef.current = controller
+    syncInFlightRef.current = true
     setSyncing(true)
     setError(null)
     try {
-      const res = await fetch('/api/calendar/sync', { method: 'POST' })
+      const res = await fetch('/api/calendar/sync', { method: 'POST', signal: controller.signal })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body.message || body.error || 'Calendar sync failed')
       setReleases(Array.isArray(body.releases) ? body.releases : [])
@@ -187,25 +195,39 @@ export default function EconomicCalendarPage() {
         warnings: Array.isArray(body.warnings) ? body.warnings : [],
       })
       setLastSync(new Date().toLocaleTimeString('en-US', { hour12: false }))
-      await loadCalendar()
+      await loadCalendar(controller.signal)
     } catch (err) {
+      if (err.name === 'AbortError') return
       setError(err.message || 'Calendar sync failed')
     } finally {
-      setSyncing(false)
-      setLoading(false)
+      if (syncAbortRef.current === controller) {
+        syncAbortRef.current = null
+        syncInFlightRef.current = false
+        setSyncing(false)
+        setLoading(false)
+      }
     }
   }, [loadCalendar])
 
   useEffect(() => {
-    Promise.all([loadCalendar(), loadReleases()])
-      .catch((err) => setError(err.message || 'Calendar load failed'))
+    const controller = new AbortController()
+
+    Promise.all([loadCalendar(controller.signal), loadReleases(controller.signal)])
+      .catch((err) => {
+        if (err.name !== 'AbortError') setError(err.message || 'Calendar load failed')
+      })
       .finally(() => {
+        if (controller.signal.aborted) return
         setLoading(false)
         syncCalendar()
       })
 
     const timer = setInterval(syncCalendar, SYNC_INTERVAL_MS)
-    return () => clearInterval(timer)
+    return () => {
+      controller.abort()
+      syncAbortRef.current?.abort()
+      clearInterval(timer)
+    }
   }, [loadCalendar, loadReleases, syncCalendar])
 
   const sortedEvents = useMemo(() => {

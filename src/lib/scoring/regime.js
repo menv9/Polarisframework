@@ -1,12 +1,8 @@
 // ── Centralized regime detection, conviction, and regime multipliers ──────────
 //
-// #2 NOTE: Thresholds should be based on 5Y rolling percentiles of each indicator
-// (e.g. vix < P30(5Y)). This requires storing historical worldview series.
-// Until that infrastructure exists, the same absolute thresholds used across
-// all ops pages are centralized here so changes propagate from one place.
-//
-// WorldViewCalculator accepts percentile inputs (0–100), so its thresholds
-// coincide numerically with the raw thresholds below — both compare against 30/70.
+// Regime inputs are feature values, not raw registry values.
+// vix/hyOas/embi are rolling 5Y percentiles (0-100) from
+// Source -> History -> Features. sp200dma is a derived 1/0 feature.
 
 const REGIME_ON_THRESHOLDS  = { vix: 30, hyOas: 30, embi: 40 }
 const REGIME_OFF_THRESHOLDS = { vix: 70, hyOas: 70, embi: 70 }

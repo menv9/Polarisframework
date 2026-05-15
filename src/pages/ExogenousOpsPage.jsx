@@ -94,16 +94,14 @@ function FreshDot({ lastUpdate, frequencyDays }) {
 // Uses z-score magnitude from historical series when available,
 // falls back to ±1 (direction only) when history is absent.
 // Output is a weighted average z-score; rendered bars scale to ±3.
-function weightedScore(ccy, allItems, sourceMap, history) {
+function weightedScore(ccy, allItems, featureValues, history) {
   let num = 0, den = 0
   for (const item of allItems) {
     if (item.weight === 0) continue
     const bullDir = item.bullCcy.includes(ccy) ? 1 : 0
     const bearDir = item.bearCcy.includes(ccy) ? 1 : 0
     if (bullDir === 0 && bearDir === 0) continue
-    const src = sourceMap.get(item.id)
-    const hasData = src?._value != null && src._value !== ''
-    if (!hasData) continue
+    if (!Number.isFinite(featureValues[item.id])) continue
     const dir = bullDir ? 1 : -1
     const hist = history?.[item.id]
     // Use actual z-score when series history is available (≥3 points)
@@ -133,7 +131,7 @@ function scoreBar(score) {
 }
 
 export default function ExogenousOpsPage() {
-  const { dataSources, history } = useModelStore()
+  const { dataSources, history, features } = useModelStore()
 
   const sourceMap = useMemo(() =>
     new Map(dataSources.map(s => [s.id, s])),
@@ -144,14 +142,13 @@ export default function ExogenousOpsPage() {
 
   // Señal neta ponderada por divisa (z-score promedio ponderado, escala ±3)
   const currencyScores = useMemo(() =>
-    Object.fromEntries(CCYS.map(ccy => [ccy, weightedScore(ccy, allItems, sourceMap, history)])),
-    [allItems, sourceMap, history]
+    Object.fromEntries(CCYS.map(ccy => [ccy, weightedScore(ccy, allItems, features.valuesBySourceId, history)])),
+    [allItems, features, history]
   )
 
   const allExoIds = allItems.map(i => i.id)
   const withData  = allExoIds.filter(id => {
-    const src = sourceMap.get(id)
-    return src?._value != null && src._value !== ''
+    return Number.isFinite(features.valuesBySourceId[id])
   }).length
 
   // Staleness summary
@@ -253,8 +250,8 @@ export default function ExogenousOpsPage() {
               <tbody>
                 {section.items.map(item => {
                   const src      = sourceMap.get(item.id)
-                  const val      = src?._value
-                  const hasValue = val != null && val !== ''
+                  const val      = features.valuesBySourceId[item.id]
+                  const hasValue = Number.isFinite(val)
                   const freq     = SECTION_FREQ[section.id] ?? 7
                   const fresh    = getFreshness(src?.lastUpdate, freq)
 

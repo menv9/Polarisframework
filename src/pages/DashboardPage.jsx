@@ -76,7 +76,7 @@ function fmtScore(v) {
 }
 
 export default function DashboardPage() {
-  const { worldview: wv, dataSources: sources, zscores: zScores, history } = useModelStore()
+  const { worldview: wv, dataSources: sources, zscores: zScores, history, features } = useModelStore()
   const [betas] = useState(loadBetas)
   const navigate = useNavigate()
 
@@ -142,15 +142,13 @@ export default function DashboardPage() {
   // ── Sesgo exógeno por divisa ─────────────────────────────────────────────
   const exoBias = useMemo(() => {
     const bias = Object.fromEntries(EXO_CCYS.map(c => [c, { bull: 0, bear: 0 }]))
-    const sourceMap = new Map(sources.map(s => [s.id, s]))
     for (const { id, bullCcy, bearCcy } of EXO_DRIVERS) {
-      const src = sourceMap.get(id)
-      if (src?._value == null || src._value === '') continue
+      if (!Number.isFinite(features.valuesBySourceId[id])) continue
       for (const c of bullCcy) if (bias[c]) bias[c].bull++
       for (const c of bearCcy) if (bias[c]) bias[c].bear++
     }
     return bias
-  }, [sources])
+  }, [features])
 
   const convColor = (conv) =>
     conv === 'FULL' ? 'text-[#4ade80]' : conv === 'HALF' ? 'text-[#f59e0b]' : 'text-[#555]'

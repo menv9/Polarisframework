@@ -1,4 +1,5 @@
 import { computeRollingZScore } from './zScore'
+import { deriveFeatureStore } from './features'
 
 export const EXO_CCYS = ['AUD', 'CAD', 'NOK', 'NZD', 'JPY', 'CHF', 'USD', 'EUR', 'GBP', 'SEK']
 
@@ -78,7 +79,7 @@ export function getAllExogenousItems() {
   return EXO_SECTIONS.flatMap(section => section.items)
 }
 
-export function computeExogenousCurrencyScore(ccy, items, sourceMap, history) {
+export function computeExogenousCurrencyScore(ccy, items, featureValues, history) {
   let num = 0
   let den = 0
   for (const item of items) {
@@ -86,8 +87,7 @@ export function computeExogenousCurrencyScore(ccy, items, sourceMap, history) {
     const bullDir = item.bullCcy.includes(ccy) ? 1 : 0
     const bearDir = item.bearCcy.includes(ccy) ? 1 : 0
     if (bullDir === 0 && bearDir === 0) continue
-    const src = sourceMap.get(item.id)
-    if (src?._value == null || src._value === '') continue
+    if (!Number.isFinite(featureValues[item.id])) continue
     const dir = bullDir ? 1 : -1
     const hist = history?.[item.id]
     const mag = hist?.series?.length >= 3
@@ -100,9 +100,9 @@ export function computeExogenousCurrencyScore(ccy, items, sourceMap, history) {
 }
 
 export function computeExogenousCurrencyScores(dataSources, history, items = getAllExogenousItems()) {
-  const sourceMap = new Map(dataSources.map(source => [source.id, source]))
+  const featureValues = deriveFeatureStore(dataSources, history).valuesBySourceId
   return Object.fromEntries(
-    EXO_CCYS.map(ccy => [ccy, computeExogenousCurrencyScore(ccy, items, sourceMap, history)])
+    EXO_CCYS.map(ccy => [ccy, computeExogenousCurrencyScore(ccy, items, featureValues, history)])
   )
 }
 
