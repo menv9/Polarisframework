@@ -64,7 +64,42 @@ function fmtScore(v) {
 export default function DashboardPage() {
   const { worldview: wv, regime, dataSources: sources, zscores: zScores, history, features, signalHistory, recordSignalSample } = useModelStore()
   const [pairBetaData] = useState(loadPairBetas)
+  const [upcomingEvents, setUpcomingEvents] = useState([])
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const ctrl = new AbortController()
+    fetch('/api/calendar', { signal: ctrl.signal })
+      .then(r => r.ok ? r.json() : null)
+      .then(body => {
+        if (!body?.events) return
+        const now = Date.now()
+        const week = now + 7 * 86400_000
+        const upcoming = body.events
+          .filter(e => {
+            const raw = e.date || e.datetime || e.timestamp || e.time
+            if (!raw) return false
+            const t = new Date(raw).getTime()
+            if (!Number.isFinite(t)) return false
+            const imp = (e.impact || '').toLowerCase()
+            return t >= now && t <= week && imp.includes('high')
+          })
+          .sort((a, b) => {
+            const ta = new Date(a.date || a.datetime || a.timestamp || a.time).getTime()
+            const tb = new Date(b.date || b.datetime || b.timestamp || b.time).getTime()
+            return ta - tb
+          })
+          .slice(0, 5)
+          .map(e => ({
+            title:    e.title || e.event || e.name || '—',
+            currency: (e.currency || e.country || '').toUpperCase(),
+            date:     new Date(e.date || e.datetime || e.timestamp || e.time),
+          }))
+        setUpcomingEvents(upcoming)
+      })
+      .catch(() => {})
+    return () => ctrl.abort()
+  }, [])
 
   // ── World View derivations ────────────────────────────────────────────────
   const scoreGDP  = wv.gdpUsa * 0.25 + wv.gdpEur * 0.18 + wv.gdpChn * 0.18 + wv.gdpJpn * 0.05 + wv.gdpResto * 0.34
@@ -109,9 +144,13 @@ export default function DashboardPage() {
       const quoteEndo = computeCountryScoreForPair(pair.quote, quote.cyclical, regime, zScores, pairBetaData, pairId)
       const signal    = combineEndogenousExogenous(baseEndo,  base.exoScore,  base.ccy)
                       - combineEndogenousExogenous(quoteEndo, quote.exoScore, quote.ccy)
+      const endoDiff  = baseEndo - quoteEndo
+      const exoDiff   = signal - endoDiff
       return {
         ...pair,
         signal,
+        endoDiff,
+        exoDiff,
         conv: getConviction(signal, signalHistory[pair.label]),
         direction: signal >= 0 ? 'LONG' : 'SHORT',
       }
@@ -167,18 +206,20 @@ export default function DashboardPage() {
             <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">I — World View</span>
             <Link to="/world-view/operativa" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">OPERATIVA →</Link>
           </div>
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-0">
+          <div className="grid grid-cols-4 sm:grid-cols-8 gap-0">
             {[
               { label: 'REGIMEN',   value: regime,              color: regimeColor },
               { label: 'MOMENTUM',  value: scoreGDP.toFixed(2), color: scoreGDP > 0 ? 'text-[#4ade80]' : scoreGDP < 0 ? 'text-[#ef4444]' : 'text-[#e5e5e5]' },
               { label: 'WOC',       value: wocScore.toFixed(2), color: wocScore > 0 ? 'text-[#4ade80]' : wocScore < 0 ? 'text-[#ef4444]' : 'text-[#e5e5e5]' },
               { label: 'USD BIAS',  value: usdBias,             color: usdBias === 'BULLISH' ? 'text-[#4ade80]' : usdBias === 'BEARISH' ? 'text-[#ef4444]' : 'text-[#e5e5e5]' },
+              { label: 'VIX',       value: Number.isFinite(wv.vix) ? wv.vix.toFixed(1) : '—',  color: wv.vix > 30 ? 'text-[#ef4444]' : wv.vix > 20 ? 'text-[#f59e0b]' : 'text-[#4ade80]' },
+              { label: 'DXY',       value: Number.isFinite(wv.dxy) ? wv.dxy.toFixed(1) : '—',  color: wv.dxyRising === 1 ? 'text-[#4ade80]' : wv.dxyRising === 0 ? 'text-[#ef4444]' : 'text-[#e5e5e5]' },
               { label: 'INFLACION', value: inflation,           color: inflation === 'INFLACIONARIO' ? 'text-[#f59e0b]' : inflation === 'DESINFLACIONARIO' ? 'text-[#60a5fa]' : 'text-[#e5e5e5]' },
               { label: 'Z-SCORES',  value: hasZscores ? `${Object.keys(zScores).length}v` : 'SIN DATOS', color: hasZscores ? 'text-[#4ade80]' : 'text-[#ef4444]' },
             ].map(item => (
               <div key={item.label} className="p-3 border-r border-b border-[#222]">
                 <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">{item.label}</div>
-                <div className={`text-lg font-mono font-bold ${item.color}`}>{item.value}</div>
+                <div className={`text-base font-mono font-bold ${item.color}`}>{item.value}</div>
               </div>
             ))}
           </div>
@@ -201,19 +242,23 @@ export default function DashboardPage() {
             <table className="w-full text-sm table-fixed">
               <thead>
                 <tr className="bg-[#111] border-b border-[#222] text-left text-[#555]">
-                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[15%]">Par</th>
-                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[14%]">Señal</th>
-                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[11%]">Conv</th>
-                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[24%]">Dirección</th>
-                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[36%]"></th>
+                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[13%]">Par</th>
+                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[11%]">Endo</th>
+                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[11%]">Exo</th>
+                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[11%]">Señal</th>
+                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[9%]">Conv</th>
+                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[20%]">Dirección</th>
+                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[25%]"></th>
                 </tr>
               </thead>
               <tbody>
-                {dashboardPairs.map(({ label, signal, conv, direction }) => {
+                {dashboardPairs.map(({ label, signal, endoDiff, exoDiff, conv, direction }) => {
                   const timingUrl = `/timing/operativa?pair=${encodeURIComponent(label)}&signal=${signal.toFixed(3)}&conviction=${conv}`
                   return (
                     <tr key={label} className="border-b border-[#1a1a1a] hover:bg-[#0a0a0a] group">
                       <td className="px-3 py-1.5 font-mono font-bold text-[#a3a3a3] text-xs">{label}</td>
+                      <td className={`px-3 py-1.5 font-mono text-xs ${scoreColor(endoDiff)}`}>{fmtScore(endoDiff)}</td>
+                      <td className={`px-3 py-1.5 font-mono text-xs ${scoreColor(exoDiff)}`}>{fmtScore(exoDiff)}</td>
                       <td className={`px-3 py-1.5 font-mono font-bold text-sm ${scoreColor(signal)}`}>{fmtScore(signal)}</td>
                       <td className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider ${convColor(conv)}`}>{conv}</td>
                       <td className={`px-3 py-1.5 text-sm font-bold uppercase tracking-wide ${direction === 'LONG' ? 'text-[#4ade80]' : 'text-[#ef4444]'}`}>
@@ -256,6 +301,10 @@ export default function DashboardPage() {
                   <div className="text-[10px] text-[#555] uppercase tracking-widest mb-0.5">#{i + 1}</div>
                   <div className="text-xs font-bold text-[#a3a3a3] uppercase mb-1">{c.label}</div>
                   <div className={`text-sm font-mono font-bold ${scoreColor(c.score)}`}>{fmtScore(c.score)}</div>
+                  <div className="mt-1 flex justify-center gap-1">
+                    <span className={`text-[9px] font-mono ${scoreColor(c.endoScore)}`}>E:{c.endoScore.toFixed(1)}</span>
+                    <span className={`text-[9px] font-mono ${scoreColor(c.exoScore)}`}>X:{c.exoScore.toFixed(1)}</span>
+                  </div>
                   <div className="mt-1 h-1 bg-[#1a1a1a] rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full ${c.score > 0 ? 'bg-[#4ade80]' : c.score < 0 ? 'bg-[#ef4444]' : 'bg-[#333]'}`}
@@ -293,7 +342,30 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ===== FILA 5: PIPELINE DE EJECUCIÓN ===== */}
+        {/* ===== FILA 5: PRÓXIMOS EVENTOS ===== */}
+        {upcomingEvents.length > 0 && (
+          <div className="border-2 border-[#333] mb-3">
+            <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333] flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Próximos Eventos — 7 días · Alta importancia</span>
+              <Link to="/calendar" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">CALENDARIO →</Link>
+            </div>
+            <div className="divide-y divide-[#1a1a1a]">
+              {upcomingEvents.map((ev, i) => (
+                <div key={i} className="flex items-center gap-4 px-4 py-2">
+                  <span className="text-[10px] font-mono text-[#555] w-24 shrink-0">
+                    {ev.date.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}
+                    {' '}
+                    {ev.date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#f59e0b] w-10 shrink-0">{ev.currency}</span>
+                  <span className="text-xs text-[#a3a3a3] truncate">{ev.title}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ===== PIPELINE DE EJECUCIÓN ===== */}
         <div className="border-2 border-[#333] mb-3">
           <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333]">
             <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Pipeline de Ejecución — Capa 1 Completa</span>
