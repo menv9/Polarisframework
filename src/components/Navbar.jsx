@@ -112,12 +112,12 @@ export default function Navbar() {
 
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 border-b-2 border-[#333] bg-black ${scrolled ? 'border-white' : ''}`}>
-      <div className="max-w-6xl mx-auto px-4 h-12 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-3">
+      <div className="max-w-6xl mx-auto px-4 h-12 grid grid-cols-3 items-center">
+        <Link to="/" className="flex items-center">
           <span className="text-sm font-bold tracking-widest text-white">POLARIS</span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-5">
+        <div className="hidden md:flex items-center justify-center gap-5">
           {GROUPS.map(group => (
             <NavDropdown key={group.label} group={group} location={location} />
           ))}
@@ -146,11 +146,13 @@ export default function Navbar() {
               </Link>
             </>
           )}
+        </div>
 
+        <div className="hidden md:flex items-center justify-end gap-3">
           <ThemeToggle />
 
           {user && (
-            <div className="flex items-center gap-3 border-l border-[#333] pl-4 ml-1">
+            <div className="flex items-center gap-3 border-l border-[#333] pl-3">
               <span className="text-xs text-[#555] max-w-[140px] truncate">{user.email}</span>
               <button
                 onClick={handleLogout}
