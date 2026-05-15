@@ -228,7 +228,6 @@ export default function MainframeShell() {
 
         <div className="mf-topbar__right">
           <span className="mf-topbar__cell">{stamp}<span className="mf-blink">_</span></span>
-          <span className="mf-topbar__cell">TERM:<strong>{termId}</strong></span>
           <span className="mf-topbar__cell">USER:<strong>{userLabel}</strong></span>
           <button className="mf-tabs__toggle" onClick={toggleTheme} title="Switch UI">
             UI: MAINFRAME &nbsp;//&nbsp; SWITCH
