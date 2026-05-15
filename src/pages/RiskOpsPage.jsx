@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useModelStore } from '../store/ModelDataContext'
 import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 import { computePositionSize, PIP_VALUES, CONVICTION_MULTIPLIER, REGIME_VOL_MULTIPLIER } from '../lib/risk/sizing'
@@ -59,15 +59,22 @@ function fmtLots(v) {
 export default function RiskOpsPage() {
   const { worldview: wv, zscores: zScores } = useModelStore()
   const [betas] = useState(loadBetas)
+  const [searchParams] = useSearchParams()
 
-  // Config
+  // Config — initialize from URL params if present (passed from Dashboard/Timing flow)
   const [capital,      setCapital]      = useState(100000)
   const [riskPct,      setRiskPct]      = useState(1.0)
-  const [pair,         setPair]         = useState('EUR/USD')
+  const [pair,         setPair]         = useState(() => {
+    const p = searchParams.get('pair')
+    return p && PAIRS.includes(p) ? p : 'EUR/USD'
+  })
   const [stopPips,     setStopPips]     = useState(80)
   const [atrPips,      setAtrPips]      = useState(0)
   const [horizon,      setHorizon]      = useState('MEDIUM')
-  const [conviction,   setConviction]   = useState('FULL')
+  const [conviction,   setConviction]   = useState(() => {
+    const c = searchParams.get('conviction')
+    return ['FULL', 'HALF', 'FLAT'].includes(c) ? c : 'FULL'
+  })
   const [regimeVol,    setRegimeVol]    = useState('NORMAL')
   const [winRate,      setWinRate]      = useState(0.50)
   const [avgWinLoss,   setAvgWinLoss]   = useState(1.5)

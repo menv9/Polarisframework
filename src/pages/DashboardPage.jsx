@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useModelStore } from '../store/ModelDataContext'
 import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 
@@ -87,6 +87,7 @@ function fmtScore(v) {
 export default function DashboardPage() {
   const { worldview: wv, dataSources: sources, zscores: zScores } = useModelStore()
   const [betas] = useState(loadBetas)
+  const navigate = useNavigate()
 
   // ── World View derivations ────────────────────────────────────────────────
   const scoreGDP  = wv.gdpUsa * 0.25 + wv.gdpEur * 0.18 + wv.gdpChn * 0.18 + wv.gdpJpn * 0.05 + wv.gdpResto * 0.34
@@ -208,21 +209,39 @@ export default function DashboardPage() {
             <table className="w-full text-sm table-fixed">
               <thead>
                 <tr className="bg-[#111] border-b border-[#222] text-left text-[#555]">
-                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[18%]">Par</th>
-                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[15%]">Señal</th>
-                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[14%]">Conv</th>
-                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[53%]">Dirección</th>
+                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[15%]">Par</th>
+                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[14%]">Señal</th>
+                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[11%]">Conv</th>
+                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[24%]">Dirección</th>
+                  <th className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest w-[36%]"></th>
                 </tr>
               </thead>
               <tbody>
                 {dashboardPairs.map(({ label, signal, conv, direction }) => {
+                  const timingUrl = `/timing/operativa?pair=${encodeURIComponent(label)}&signal=${signal.toFixed(3)}&conviction=${conv}`
                   return (
-                    <tr key={label} className="border-b border-[#1a1a1a] hover:bg-[#0a0a0a]">
+                    <tr key={label} className="border-b border-[#1a1a1a] hover:bg-[#0a0a0a] group">
                       <td className="px-3 py-1.5 font-mono font-bold text-[#a3a3a3] text-xs">{label}</td>
                       <td className={`px-3 py-1.5 font-mono font-bold text-sm ${scoreColor(signal)}`}>{fmtScore(signal)}</td>
                       <td className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider ${convColor(conv)}`}>{conv}</td>
                       <td className={`px-3 py-1.5 text-sm font-bold uppercase tracking-wide ${direction === 'LONG' ? 'text-[#4ade80]' : 'text-[#ef4444]'}`}>
                         {direction}
+                      </td>
+                      <td className="px-3 py-1.5">
+                        {conv !== 'FLAT' ? (
+                          <button
+                            onClick={() => navigate(timingUrl)}
+                            className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border transition-colors ${
+                              conv === 'FULL'
+                                ? 'border-[#4ade80] text-[#4ade80] hover:bg-[#4ade80] hover:text-black'
+                                : 'border-[#f59e0b] text-[#f59e0b] hover:bg-[#f59e0b] hover:text-black'
+                            }`}
+                          >
+                            Analizar trade →
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-[#333] uppercase tracking-wider">señal débil</span>
+                        )}
                       </td>
                     </tr>
                   )

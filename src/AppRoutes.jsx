@@ -1,9 +1,8 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import AdminPage from './pages/AdminPage'
-import HomePage from './pages/HomePage'
 import WorldViewTheoryPage from './pages/WorldViewTheoryPage'
 import WorldViewOpsPage from './pages/WorldViewOpsPage'
 import DataHubPage from './pages/DataHubPage'
@@ -78,7 +77,7 @@ export default function AppRoutes() {
           <ProtectedRoute>
             <Layout>
               <Routes>
-                <Route path="/" element={<HomePage />} />
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/world-view" element={<WorldViewTheoryPage />} />
                 <Route path="/world-view/operativa" element={<WorldViewOpsPage />} />

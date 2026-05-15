@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useModelStore } from '../store/ModelDataContext'
 import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 import { TIMING_CHECKS, computeTimingVerdict } from '../lib/timing/score'
@@ -60,7 +60,11 @@ const STATUS_VALUES = { true: true, false: false, null: null }
 export default function TimingOpsPage() {
   const { worldview: wv, zscores: zScores } = useModelStore()
   const [betas] = useState(loadBetas)
-  const [selectedPair, setSelectedPair] = useState('EUR/USD')
+  const [searchParams] = useSearchParams()
+  const [selectedPair, setSelectedPair] = useState(() => {
+    const p = searchParams.get('pair')
+    return PAIRS.some(x => x.label === p) ? p : 'EUR/USD'
+  })
   const [checks, setChecks] = useState({})
 
   const regimeOn  = wv.vix < 30 && wv.hyOas < 30 && wv.sp200dma === 1 && wv.embi < 40
@@ -239,7 +243,7 @@ export default function TimingOpsPage() {
           {verdict === 'READY' && (
             <div className="mt-3 pt-3 border-t border-[#333] flex gap-3">
               <Link
-                to="/risk/operativa"
+                to={`/risk/operativa?pair=${encodeURIComponent(selectedPair)}&conviction=${pairInfo?.conv ?? 'FULL'}&signal=${pairInfo?.signal?.toFixed(3) ?? '0'}`}
                 className="px-4 py-2 text-xs font-bold uppercase tracking-wider bg-[#4ade80] text-black hover:bg-[#22c55e] transition-colors"
               >
                 → Risk Management

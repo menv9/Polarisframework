@@ -255,10 +255,34 @@ export default function ModelInputsPage() {
   const [urlEditKey, setUrlEditKey]     = useState(null)
   const [urlEditValue, setUrlEditValue] = useState('')
   const fileInputRef                    = useRef(null)
+  const [isDragging, setIsDragging]     = useState(false)
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_URLS, JSON.stringify(customUrls))
   }, [customUrls])
+
+  function handleDragEnter(e) {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+  function handleDragOver(e) {
+    e.preventDefault()
+  }
+  function handleDragLeave(e) {
+    if (!e.currentTarget.contains(e.relatedTarget)) setIsDragging(false)
+  }
+  function handleDropFile(e) {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      setImportText(ev.target.result)
+      setImportError('')
+    }
+    reader.readAsText(file)
+  }
 
   // URL efectiva: override manual > dataSources
   const getEffectiveUrl = (sourceId) => customUrls[sourceId] || sourceUrls[sourceId] || ''
@@ -701,14 +725,27 @@ export default function ModelInputsPage() {
                                 <div className="text-xs text-[#777] uppercase tracking-wider mb-1.5">
                                   Histórico de <span className="text-white">{ind.label}</span> — de más antiguo a más reciente
                                 </div>
-                                <textarea
-                                  autoFocus
-                                  value={importText}
-                                  onChange={e => { setImportText(e.target.value); setImportError('') }}
-                                  placeholder={"2016-01,1.2\n2016-02,1.5\n2016-03,2.0\n...\n\n— o solo valores —\n\n1.2\n1.5\n2.0\n..."}
-                                  rows={8}
-                                  className="w-full bg-[#111] border border-[#333] focus:border-[#ecd987] text-sm font-mono text-white px-3 py-2 outline-none resize-y"
-                                />
+                                <div
+                                  onDragEnter={handleDragEnter}
+                                  onDragOver={handleDragOver}
+                                  onDragLeave={handleDragLeave}
+                                  onDrop={handleDropFile}
+                                  className="relative"
+                                >
+                                  {isDragging && (
+                                    <div className="absolute inset-0 z-10 border-2 border-dashed border-[#ecd987] bg-[#0d0d0d]/90 flex items-center justify-center pointer-events-none">
+                                      <span className="text-sm font-bold text-[#ecd987] uppercase tracking-widest">Soltar CSV aquí</span>
+                                    </div>
+                                  )}
+                                  <textarea
+                                    autoFocus
+                                    value={importText}
+                                    onChange={e => { setImportText(e.target.value); setImportError('') }}
+                                    placeholder={"Arrastra un CSV aquí, o pega valores:\n\n2016-01,1.2\n2016-02,1.5\n...\n\n— o solo valores —\n1.2\n1.5\n..."}
+                                    rows={8}
+                                    className="w-full bg-[#111] border border-[#333] focus:border-[#ecd987] text-sm font-mono text-white px-3 py-2 outline-none resize-y"
+                                  />
+                                </div>
                                 {importError && (
                                   <div className="text-xs text-[#ef4444] mt-1">{importError}</div>
                                 )}
