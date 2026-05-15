@@ -1,6 +1,8 @@
 // Todos los indicadores del modelo Endogenous v2 — §15.2 documentación
-// Suma total de betas (todos 24): 1.00
-// Suma de betas implementados (15): 0.76
+// betaDoc: peso de referencia del modelo completo (24 indicadores, suma = 1.00)
+// betaEff: peso efectivo en scoring (solo implementados, renormalizado a suma = 1.00)
+//          betaEff = betaDoc / sum(betaDoc de implementados) = betaDoc / 0.76
+// El scoring siempre usa betaEff implícitamente (divide por total); betaEff lo hace explícito.
 
 export const ALL_INDICATORS = [
   { num:  1, key: 'pmi',          label: 'ISM Manufacturing',          betaDoc: 0.04, sign:  1, horizon: 'MEDIUM', implemented: true  },
@@ -30,7 +32,10 @@ export const ALL_INDICATORS = [
 ]
 
 // Solo los 15 implementados — los que tienen datos en dataSources
-export const INDICATORS = ALL_INDICATORS.filter(i => i.implemented)
+// betaEff se calcula dinámicamente para que siempre sume 1.00 aunque cambie el conjunto implementado.
+const _impl    = ALL_INDICATORS.filter(i => i.implemented)
+const _betaSum = _impl.reduce((s, i) => s + i.betaDoc, 0)
+export const INDICATORS = _impl.map(i => ({ ...i, betaEff: +(i.betaDoc / _betaSum).toFixed(4) }))
 
 export const STORAGE_KEY_BETAS = 'polaris_endogenous_betas'
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ALL_INDICATORS } from '../lib/endogenousBetas'
+import { ALL_INDICATORS, INDICATORS } from '../lib/endogenousBetas'
 import {
   parsePairBetaCSV, savePairBetas, clearPairBetas,
   loadPairBetasMeta, loadPairBetas, getPairEntry, pairLabelToId,
@@ -33,14 +33,12 @@ const VIEW_PAIRS = [
   { label: 'GBP/JPY', base: 'gbr', quote: 'jpn' },
 ]
 
-const IMPL_INDICATORS = ALL_INDICATORS.filter(i => i.implemented)
-
-function BetaCell({ entry, docBeta }) {
+function BetaCell({ entry, ind }) {
   if (!entry) {
     return (
-      <div className="flex flex-col items-end">
-        <span className="font-mono text-xs text-[#2a2a2a]">{docBeta.toFixed(4)}</span>
-        <span className="text-[9px] text-[#222]">doc</span>
+      <div className="flex flex-col items-end gap-0.5">
+        <span className="font-mono text-xs text-[#2a2a2a]">{ind.betaDoc.toFixed(4)}</span>
+        <span className="text-[9px] text-[#1e1e1e]">doc · eff {(ind.betaEff * 100).toFixed(1)}%</span>
       </div>
     )
   }
@@ -187,7 +185,7 @@ export default function EndogenousBetasPage() {
               </tr>
             </thead>
             <tbody>
-              {IMPL_INDICATORS.map(ind => {
+              {INDICATORS.map(ind => {
                 const baseEntry  = getPairEntry(pairBetaData, pairId, vp.base,  ind.key)
                 const quoteEntry = getPairEntry(pairBetaData, pairId, vp.quote, ind.key)
                 const hasSig     = baseEntry?.significant || quoteEntry?.significant
@@ -204,10 +202,10 @@ export default function EndogenousBetasPage() {
                       <div className="text-[9px] font-mono text-[#333]">{ind.key}</div>
                     </td>
                     <td className="px-3 py-1.5 text-right">
-                      <BetaCell entry={baseEntry}  docBeta={ind.betaDoc} />
+                      <BetaCell entry={baseEntry}  ind={ind} />
                     </td>
                     <td className="px-3 py-1.5 text-right">
-                      <BetaCell entry={quoteEntry} docBeta={ind.betaDoc} />
+                      <BetaCell entry={quoteEntry} ind={ind} />
                     </td>
                     <td className="px-3 py-1.5 text-center">
                       <span className={`text-[9px] font-bold uppercase ${
@@ -223,10 +221,13 @@ export default function EndogenousBetasPage() {
             </tbody>
           </table>
 
-          <div className="px-3 py-2 border-t border-[#0d0d1a] text-[10px] text-[#333]">
+          <div className="px-3 py-2 border-t border-[#0d0d1a] text-[10px] text-[#333] leading-relaxed">
             {pairBetaData
               ? 'Beta con signo del pipeline OLS. Verde = positivo, Rojo = negativo. Atenuado = p≥0.05. Sin CSV → se muestra betaDoc §15.2 como fallback.'
-              : 'Sin CSV cargado — mostrando betaDoc §15.2 como referencia. El scoring usará estos valores hasta que cargues un CSV del pipeline.'}
+              : 'Sin CSV cargado — mostrando betaDoc §15.2 como referencia.'}
+            <span className="ml-2 text-[#2a2a2a]">
+              doc = peso bruto del modelo completo (24 ind., suma 1.00) · eff = peso efectivo en scoring (15 implementados, renormalizado a 1.00)
+            </span>
           </div>
         </div>
 
