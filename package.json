@@ -10,6 +10,8 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "coverage": "vitest run --coverage",
+    "beta": "python beta_pipeline/run.py",
+    "beta:static": "python beta_pipeline/run.py --no-rolling",
     "proxy": "node api/index.js",
     "proxy:dev": "node --watch api/index.js"
   },

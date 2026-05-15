@@ -12,6 +12,8 @@ dist
 dist-ssr
 *.local
 data/history/
+beta_pipeline/cache/
+beta_pipeline/output/
 
 # Environment variables
 .env
