@@ -24,9 +24,8 @@ const TAB_GROUPS = [
     ],
   },
   {
-    key: '4', label: 'APRENDIZAJE', to: '/world-view',
+    key: '4', label: 'APRENDIZAJE', to: '/journal',
     items: [
-      { to: '/world-view',  label: 'TEORÍA',     desc: 'World View Theory' },
       { to: '/journal',     label: 'JOURNAL',    desc: 'Trade Journal' },
       { to: '/performance', label: 'PERFORMANCE',desc: 'Performance' },
     ],
@@ -148,7 +147,6 @@ function TabDropdown({ group, location }) {
         onClick={() => setOpen(o => !o)}
         className={`mf-tab-btn ${isGroupActive ? 'is-active' : ''}`}
       >
-        <span className="mf-tab-key">[{group.key}]</span>
         {group.label}
         <span className={`mf-tab-arrow ${open ? 'open' : ''}`}>▼</span>
       </button>
@@ -234,7 +232,6 @@ export default function MainframeShell() {
             (t.to !== '/' && location.pathname.startsWith(t.to))
           return (
             <Link key={t.key} to={t.to} className={`mf-tab-btn ${active ? 'is-active' : ''}`}>
-              <span className="mf-tab-key">[{t.key}]</span>
               {t.label}
             </Link>
           )

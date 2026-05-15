@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import WorldViewSidebar from '../components/worldview/WorldViewSidebar'
 import { useModelStore, WV_DATA_MAP, WV_GDP_GAP_MAP, WV_CPI_G7_SOURCE_IDS, DEFAULT_WV_DATA } from '../store/ModelDataContext'
 import { getFreshness, FRESHNESS_DOT, FRESHNESS_TEXT } from '../lib/freshness'
 import { detectInflationRegime } from '../lib/scoring/regime'
@@ -112,9 +111,7 @@ export default function WorldViewOpsPage() {
 
   return (
     <div className="pt-12 min-h-screen">
-      <div className="flex">
-        <WorldViewSidebar mode="ops" />
-        <main className="flex-1">
+      <main>
           <div className="max-w-4xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-[#333]">
               <h1 className="text-2xl font-bold uppercase tracking-widest">OPERATIVA — WORLD VIEW</h1>
@@ -233,8 +230,7 @@ export default function WorldViewOpsPage() {
               </table>
             </div>
           </div>
-        </main>
-      </div>
+      </main>
     </div>
   )
 }

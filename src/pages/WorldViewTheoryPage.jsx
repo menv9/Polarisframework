@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import WorldViewSidebar from '../components/worldview/WorldViewSidebar'
 import WorldViewSources from '../components/worldview/WorldViewSources'
 
 export default function WorldViewTheoryPage() {
@@ -19,9 +18,7 @@ export default function WorldViewTheoryPage() {
 
   return (
     <div className="pt-12 min-h-screen">
-      <div className="flex">
-        <WorldViewSidebar mode="theory" />
-        <main className="flex-1">
+      <main>
           <div className="max-w-4xl mx-auto px-4 py-6">
             {/* Header */}
             <div className="mb-6 pb-4 border-b-2 border-[#333]">
@@ -166,8 +163,7 @@ export default function WorldViewTheoryPage() {
               </p>
             </div>
           </div>
-        </main>
-      </div>
+      </main>
     </div>
   )
 }
