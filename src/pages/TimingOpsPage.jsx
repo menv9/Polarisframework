@@ -52,7 +52,7 @@ function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
 
 function getConviction(signal) {
   const a = Math.abs(signal)
-  return a > 0.6 ? 'FULL' : a > 0.4 ? 'HALF' : 'FLAT'
+  return a > 0.25 ? 'FULL' : a > 0.10 ? 'HALF' : 'FLAT'
 }
 
 const STATUS_VALUES = { true: true, false: false, null: null }
