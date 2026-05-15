@@ -38,3 +38,13 @@ New Text Document.txt
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Analysis / scratch files
+beta_pipeline/beta_analysis.png
+
+# Docs work in progress
+Documentation/05_Implementacion/pendientes_de_arreglar.md
