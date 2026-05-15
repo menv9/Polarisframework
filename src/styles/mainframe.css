@@ -232,18 +232,34 @@ html[data-theme='mainframe'] .mf-chrome { display: block; }
   height: 32px;
   background: var(--mf-bg-panel);
   border-bottom: 1px solid var(--mf-border);
-  display: flex;
-  align-items: center;
-  padding: 0 14px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: stretch;
   font-size: 13px;
   color: var(--mf-text-soft);
   letter-spacing: 0.04em;
   z-index: 60;
-  gap: 24px;
+}
+.mf-topbar__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+}
+.mf-topbar__nav {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+.mf-topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 14px;
+  border-left: 1px solid var(--mf-border);
 }
 .mf-topbar__title { color: var(--mf-text-bright); font-weight: 600; letter-spacing: 0.08em; }
 .mf-topbar__version { color: var(--mf-text-dim); }
-.mf-topbar__spacer { flex: 1; }
 .mf-topbar__cell { color: var(--mf-text-soft); }
 .mf-topbar__cell strong { color: var(--mf-text); font-weight: 500; margin-left: 4px; }
 .mf-topbar__logout {
@@ -258,40 +274,12 @@ html[data-theme='mainframe'] .mf-chrome { display: block; }
 }
 .mf-topbar__logout:hover { background: var(--mf-amber); color: var(--mf-bg); }
 
-.mf-tabs {
-  position: fixed;
-  top: 32px; left: 0; right: 0;
-  height: 30px;
-  background: var(--mf-bg);
-  border-bottom: 1px solid var(--mf-border);
-  display: flex;
-  align-items: stretch;
-  padding: 0 14px;
-  font-size: 13px;
-  z-index: 60;
-  gap: 0;
-}
-.mf-tabs a {
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  color: var(--mf-text-dim);
-  text-decoration: none;
-  letter-spacing: 0.06em;
-  border-right: 1px solid var(--mf-border-dim);
-  font-size: 11px;
-}
-.mf-tabs a:first-child { border-left: 1px solid var(--mf-border-dim); }
-.mf-tabs a .mf-tab-key { color: var(--mf-text-faint); margin-right: 4px; }
-.mf-tabs a:hover { color: var(--mf-text); background: var(--mf-bg-hover); }
-.mf-tabs a.is-active,
 .mf-tab-btn.is-active {
   background: var(--mf-bg-elevated);
   color: var(--mf-cyan-bright);
   border-bottom: 1px solid var(--mf-cyan);
   box-shadow: inset 0 0 0 1px rgba(100, 160, 220, 0.15), 0 0 8px rgba(100, 160, 220, 0.08);
 }
-.mf-tabs a.is-active .mf-tab-key,
 .mf-tab-btn.is-active .mf-tab-key { color: var(--mf-cyan); }
 
 /* ── Tab dropdowns ── */
@@ -410,8 +398,8 @@ html[data-theme='mainframe'] .mf-chrome { display: block; }
   margin-right: 3px;
 }
 
-/* Push page content below the 62px header and above 28px footer */
-html[data-theme='mainframe'] body { padding-top: 62px; padding-bottom: 28px; }
+/* Push page content below the 32px header and above 28px footer */
+html[data-theme='mainframe'] body { padding-top: 32px; padding-bottom: 28px; }
 html[data-theme='mainframe'] .pt-12 { padding-top: 0 !important; }
 
 /* Hide original Navbar when mainframe is on */
@@ -585,8 +573,8 @@ html[data-theme='mainframe'] a:hover { color: var(--mf-cyan-bright) !important; 
   50%      { opacity: 0.5; box-shadow: 0 0 2px var(--mf-green); }
 }
 
-/* Topbar divider pipes */
-.mf-topbar__cell + .mf-topbar__cell { border-left: 1px solid var(--mf-border); padding-left: 14px; }
+/* Topbar right cell dividers */
+.mf-topbar__right .mf-topbar__cell + .mf-topbar__cell { border-left: 1px solid var(--mf-border); padding-left: 14px; }
 
 /* Footer F-key styling */
 html[data-theme='mainframe'] .mf-footer span { white-space: nowrap; }
@@ -744,8 +732,8 @@ html[data-theme='mainframe'] .scroll-mt-16 { scroll-margin-top: 60px !important;
 /* Sidebar stays visible in mainframe — reference shows it */
 html[data-theme='mainframe'] aside.fixed.lg\:sticky,
 html[data-theme='mainframe'] aside.fixed {
-  top: 62px !important;
-  height: calc(100vh - 62px - 28px) !important;
+  top: 32px !important;
+  height: calc(100vh - 32px - 28px) !important;
   background: var(--mf-bg-panel) !important;
   border-right: 1px solid var(--mf-border) !important;
   width: 220px !important;

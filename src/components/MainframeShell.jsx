@@ -201,40 +201,43 @@ export default function MainframeShell() {
   return (
     <div className="mf-chrome">
       <div className="mf-topbar" role="banner">
-        <span className="mf-led" aria-hidden />
-        <span className="mf-topbar__title">POLARIS FINANCIAL SYSTEM</span>
-        <span className="mf-topbar__version">v4.7.2</span>
-        <span className="mf-topbar__spacer" />
-        <span className="mf-topbar__cell">{stamp}<span className="mf-blink">_</span></span>
-        <span className="mf-topbar__cell">TERM:<strong>{termId}</strong></span>
-        <span className="mf-topbar__cell">USER:<strong>{userLabel}</strong></span>
-        <button className="mf-topbar__logout" onClick={toggleTheme} title="Return to default UI">
-          LOGOUT
-        </button>
+        <div className="mf-topbar__left">
+          <span className="mf-led" aria-hidden />
+          <span className="mf-topbar__title">POLARIS FINANCIAL SYSTEM</span>
+          <span className="mf-topbar__version">v4.7.2</span>
+        </div>
+
+        <nav className="mf-topbar__nav" aria-label="primary">
+          {TAB_GROUPS.map((t) => {
+            if (t.adminOnly && !isAdmin) return null
+
+            if (t.items) {
+              return <TabDropdown key={t.key} group={t} location={location} />
+            }
+
+            const active =
+              (t.to === '/' && location.pathname === '/') ||
+              (t.to !== '/' && location.pathname.startsWith(t.to))
+            return (
+              <Link key={t.key} to={t.to} className={`mf-tab-btn ${active ? 'is-active' : ''}`}>
+                {t.label}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="mf-topbar__right">
+          <span className="mf-topbar__cell">{stamp}<span className="mf-blink">_</span></span>
+          <span className="mf-topbar__cell">TERM:<strong>{termId}</strong></span>
+          <span className="mf-topbar__cell">USER:<strong>{userLabel}</strong></span>
+          <button className="mf-tabs__toggle" onClick={toggleTheme} title="Switch UI">
+            UI: MAINFRAME &nbsp;//&nbsp; SWITCH
+          </button>
+          <button className="mf-topbar__logout" onClick={toggleTheme} title="Return to default UI">
+            LOGOUT
+          </button>
+        </div>
       </div>
-
-      <nav className="mf-tabs" aria-label="primary">
-        {TAB_GROUPS.map((t) => {
-          if (t.adminOnly && !isAdmin) return null
-
-          if (t.items) {
-            return <TabDropdown key={t.key} group={t} location={location} />
-          }
-
-          const active =
-            (t.to === '/' && location.pathname === '/') ||
-            (t.to !== '/' && location.pathname.startsWith(t.to))
-          return (
-            <Link key={t.key} to={t.to} className={`mf-tab-btn ${active ? 'is-active' : ''}`}>
-              {t.label}
-            </Link>
-          )
-        })}
-        <span className="mf-tabs__spacer" />
-        <button className="mf-tabs__toggle" onClick={toggleTheme} title="Switch UI">
-          UI: MAINFRAME &nbsp;//&nbsp; SWITCH
-        </button>
-      </nav>
 
       <footer className="mf-footer" role="contentinfo">
         {fkeys.map(([k, label]) => (
