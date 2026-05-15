@@ -164,7 +164,8 @@ function Tooltip({ text, align = 'center' }) {
 }
 
 export default function EndogenousOpsPage() {
-  const { zscores: zScores, regime, history, dataSources, features, signalHistory, recordSignalSample } = useModelStore()
+  const { zscores: zScores, regime, history, dataSources, features, worldview: wv, signalHistory, recordSignalSample } = useModelStore()
+  const vixRaw = wv.vixRaw
   const [pairBetaData] = useState(loadPairBetas)
   const [pairA, setPairA]   = useState('usa')
   const [pairB, setPairB]   = useState('eur')
@@ -172,7 +173,7 @@ export default function EndogenousOpsPage() {
 
   const exogenousScores = computeExogenousCurrencyScores(dataSources, history)
   const countryScores  = COUNTRIES.map(c => {
-    const endo     = computeCountryScoreDetailed(c.prefix, c.cyclical, regime, zScores, pairBetaData)
+    const endo     = computeCountryScoreDetailed(c.prefix, c.cyclical, regime, zScores, pairBetaData, vixRaw)
     const exoScore = exogenousScores[c.ccy] ?? 0
     return {
       ...c,

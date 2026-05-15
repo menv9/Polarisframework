@@ -18,6 +18,7 @@ const USER_EDITABLE_FIELDS = ['lastUpdate', '_lastScrape', '_scrapedValue', '_va
 export const DEFAULT_WV_DATA = {
   gdpUsa: 0.3, gdpEur: -0.2, gdpChn: 0.5, gdpJpn: 0.1, gdpResto: 0.0,
   vix: 15, hyOas: 45, sp200dma: 1, embi: 55,
+  vixRaw: 15,
   smartZ: 0.5, retailZ: -0.8,
   dxy: 103.5, dxyRising: 1,
   cpiG7: 2.8, breakevens: 2.3, cbPolicyStance: 0,
@@ -120,6 +121,9 @@ function deriveWorldview(features) {
   }
   const cpiG7 = median(WV_CPI_G7_SOURCE_IDS.map(id => values[id]))
   if (cpiG7 !== null) derived.cpiG7 = cpiG7
+  // Raw VIX (pre-percentile) for shock detection in scoring functions
+  const vixRaw = features.rawBySourceId?.['wv_vix']
+  if (Number.isFinite(vixRaw)) derived.vixRaw = vixRaw
   return { ...DEFAULT_WV_DATA, ...derived }
 }
 

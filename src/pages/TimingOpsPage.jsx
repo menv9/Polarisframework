@@ -35,7 +35,8 @@ const COUNTRIES = [
 const STATUS_VALUES = { true: true, false: false, null: null }
 
 export default function TimingOpsPage() {
-  const { regime, zscores: zScores, dataSources, history, signalHistory, recordSignalSample } = useModelStore()
+  const { regime, zscores: zScores, dataSources, history, worldview: wv, signalHistory, recordSignalSample } = useModelStore()
+  const vixRaw = wv.vixRaw
   const [pairBetaData] = useState(loadPairBetas)
   const [searchParams] = useSearchParams()
   const [selectedPair, setSelectedPair] = useState(() => {
@@ -57,7 +58,7 @@ export default function TimingOpsPage() {
 
   const countryScores = useMemo(() =>
     COUNTRIES.map(c => {
-      const endoScore = computeCountryScore(c.prefix, c.cyclical, regime, zScores, pairBetaData)
+      const endoScore = computeCountryScore(c.prefix, c.cyclical, regime, zScores, pairBetaData, vixRaw)
       const exoScore  = exogenousScores[c.ccy] ?? 0
       return {
         ...c,
@@ -80,8 +81,8 @@ export default function TimingOpsPage() {
       signal = querySignal
     } else if (base && quote) {
       const pairId    = pairLabelToId(pair.label)
-      const baseEndo  = computeCountryScoreForPair(pair.base,  base.cyclical,  regime, zScores, pairBetaData, pairId)
-      const quoteEndo = computeCountryScoreForPair(pair.quote, quote.cyclical, regime, zScores, pairBetaData, pairId)
+      const baseEndo  = computeCountryScoreForPair(pair.base,  base.cyclical,  regime, zScores, pairBetaData, pairId, vixRaw)
+      const quoteEndo = computeCountryScoreForPair(pair.quote, quote.cyclical, regime, zScores, pairBetaData, pairId, vixRaw)
       signal = combineEndogenousExogenous(baseEndo,  base.exoScore,  base.ccy)
              - combineEndogenousExogenous(quoteEndo, quote.exoScore, quote.ccy)
     } else {

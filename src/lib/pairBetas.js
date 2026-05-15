@@ -144,8 +144,8 @@ export function buildCountryBetaArr(pairData, appPrefix) {
 
 // Score endógeno de país usando betas promediadas del pipeline (o betaDoc fallback).
 // Para scores individuales: ranking G10, EndogenousOps.
-export function computeCountryScore(prefix, cyclical, regime, zScores, pairData) {
-  const rm      = getRegimeMultiplier(regime, cyclical)
+export function computeCountryScore(prefix, cyclical, regime, zScores, pairData, vixRaw = null) {
+  const rm      = getRegimeMultiplier(regime, cyclical, vixRaw)
   const betaArr = buildCountryBetaArr(pairData, prefix)
   const total   = betaArr.reduce((s, b) => s + b, 0) || 1
   let short = 0, medium = 0, longScore = 0
@@ -163,8 +163,8 @@ export function computeCountryScore(prefix, cyclical, regime, zScores, pairData)
 
 // Igual que computeCountryScore pero devuelve el desglose por horizonte.
 // Para EndogenousOpsPage que necesita short/medium/long por separado.
-export function computeCountryScoreDetailed(prefix, cyclical, regime, zScores, pairData) {
-  const rm      = getRegimeMultiplier(regime, cyclical)
+export function computeCountryScoreDetailed(prefix, cyclical, regime, zScores, pairData, vixRaw = null) {
+  const rm      = getRegimeMultiplier(regime, cyclical, vixRaw)
   const betaArr = buildCountryBetaArr(pairData, prefix)
   const total   = betaArr.reduce((s, b) => s + b, 0) || 1
   let short = 0, medium = 0, longScore = 0
@@ -188,8 +188,8 @@ export function computeCountryScoreDetailed(prefix, cyclical, regime, zScores, p
 
 // Score endógeno de un país en el contexto de un par concreto.
 // Usa betas específicas del par; fallback a betaDoc si el indicador no está en el CSV.
-export function computeCountryScoreForPair(prefix, cyclical, regime, zScores, pairData, fxPairId) {
-  const rm = getRegimeMultiplier(regime, cyclical)
+export function computeCountryScoreForPair(prefix, cyclical, regime, zScores, pairData, fxPairId, vixRaw = null) {
+  const rm = getRegimeMultiplier(regime, cyclical, vixRaw)
 
   const betaArr = INDICATORS.map(ind => {
     const pb = getPairBeta(pairData, fxPairId, prefix, ind.key)

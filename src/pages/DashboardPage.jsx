@@ -131,6 +131,7 @@ function exportDashboardCsv({ regime, wv, inflation, usdBias, scoreGDP, wocScore
 
 export default function DashboardPage() {
   const { worldview: wv, regime, dataSources: sources, zscores: zScores, history, features, signalHistory, recordSignalSample } = useModelStore()
+  const vixRaw = wv.vixRaw
   const [pairBetaData] = useState(loadPairBetas)
   const [upcomingEvents, setUpcomingEvents] = useState([])
   const navigate = useNavigate()
@@ -183,7 +184,7 @@ export default function DashboardPage() {
 
   const countryScores = useMemo(() =>
     COUNTRIES.map(c => {
-      const endoScore = computeCountryScore(c.prefix, c.cyclical, regime, zScores, pairBetaData)
+      const endoScore = computeCountryScore(c.prefix, c.cyclical, regime, zScores, pairBetaData, vixRaw)
       const exoScore  = exogenousScores[c.ccy] ?? 0
       return {
         ...c,
@@ -208,8 +209,8 @@ export default function DashboardPage() {
       const quote = byPrefix.get(pair.quote)
       if (!base || !quote) return { ...pair, signal: 0, conv: 'FLAT', direction: 'LONG' }
       const pairId    = pairLabelToId(pair.label)
-      const baseEndo  = computeCountryScoreForPair(pair.base,  base.cyclical,  regime, zScores, pairBetaData, pairId)
-      const quoteEndo = computeCountryScoreForPair(pair.quote, quote.cyclical, regime, zScores, pairBetaData, pairId)
+      const baseEndo  = computeCountryScoreForPair(pair.base,  base.cyclical,  regime, zScores, pairBetaData, pairId, vixRaw)
+      const quoteEndo = computeCountryScoreForPair(pair.quote, quote.cyclical, regime, zScores, pairBetaData, pairId, vixRaw)
       const signal    = combineEndogenousExogenous(baseEndo,  base.exoScore,  base.ccy)
                       - combineEndogenousExogenous(quoteEndo, quote.exoScore, quote.ccy)
       const endoDiff  = baseEndo - quoteEndo

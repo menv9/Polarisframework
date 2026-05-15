@@ -34,7 +34,8 @@ function fmtLots(v) {
 }
 
 export default function RiskOpsPage() {
-  const { regime, zscores: zScores, signalHistory } = useModelStore()
+  const { regime, zscores: zScores, worldview: wv, signalHistory } = useModelStore()
+  const vixRaw = wv.vixRaw
   const [pairBetaData] = useState(loadPairBetas)
   const [searchParams] = useSearchParams()
 
@@ -81,8 +82,8 @@ export default function RiskOpsPage() {
     const quote = byPrefix.get(ccys[1])
     if (!base || !quote) return 'HALF'
     const pairId     = pairLabelToId(pair)
-    const scoreBase  = computeCountryScoreForPair(base.prefix,  base.cyclical,  regime, zScores, pairBetaData, pairId)
-    const scoreQuote = computeCountryScoreForPair(quote.prefix, quote.cyclical, regime, zScores, pairBetaData, pairId)
+    const scoreBase  = computeCountryScoreForPair(base.prefix,  base.cyclical,  regime, zScores, pairBetaData, pairId, vixRaw)
+    const scoreQuote = computeCountryScoreForPair(quote.prefix, quote.cyclical, regime, zScores, pairBetaData, pairId, vixRaw)
     return getConviction(scoreBase - scoreQuote, signalHistory[pair])
   }, [pair, regime, zScores, pairBetaData, signalHistory])
 

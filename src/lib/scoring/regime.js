@@ -126,11 +126,21 @@ export function detectInflationRegime(wv) {
  * Position multiplier based on regime and whether the currency is cyclical.
  * Cyclical (AUD, CAD, NOK, NZD, EUR, GBP, SEK): benefit from risk-on environments.
  * Defensive (USD, JPY, CHF): benefit from risk-off environments.
+ *
+ * vixRaw: raw VIX level (not percentile). When >= 30, applies a shock cap that
+ * overrides the regime-based multiplier for cyclical currencies, independent of
+ * whether the percentile-based regime detection has caught up.
  */
-export function getRegimeMultiplier(regime, cyclical) {
-  if (regime === 'RISK-ON')  return cyclical ? 1.0 : 0.5
-  if (regime === 'RISK-OFF') return cyclical ? 0.5 : 1.0
-  return 0.75
+export function getRegimeMultiplier(regime, cyclical, vixRaw = null) {
+  const base = regime === 'RISK-ON'  ? (cyclical ? 1.0 : 0.5)
+             : regime === 'RISK-OFF' ? (cyclical ? 0.5 : 1.0)
+             : 0.75
+
+  if (cyclical && Number.isFinite(vixRaw)) {
+    if (vixRaw >= 40) return Math.min(base, 0.10)
+    if (vixRaw >= 30) return Math.min(base, 0.30)
+  }
+  return base
 }
 
 /**
