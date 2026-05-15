@@ -1,12 +1,15 @@
-import { createContext, useContext, useState, useEffect, useMemo } from 'react'
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react'
 import { dataSources as defaultDataSources } from '../data/dataSources'
 import { computeRollingZScore } from '../lib/scoring/zScore'
 import { deriveFeatureStore } from '../lib/scoring/features'
+import { detectRegime, resolvePersistentRegime } from '../lib/scoring/regime'
 
 // ── Claves localStorage ───────────────────────────────────────────────────────
 export const STORAGE_KEY_HISTORY = 'polaris_endogenous_history'
 export const STORAGE_KEY_ZSCORES = 'polaris_endogenous_zscores'
 export const STORAGE_KEY_SOURCES = 'polaris_data_sources'
+export const STORAGE_KEY_REGIME_STATE = 'polaris_worldview_regime_state'
+export const STORAGE_KEY_SIGNAL_HISTORY = 'polaris_signal_history'
 
 // Campos que el usuario puede editar en DataPage (se preservan al hacer merge)
 const USER_EDITABLE_FIELDS = ['lastUpdate', '_lastScrape', '_scrapedValue', '_value', '_refreshError']
@@ -17,7 +20,7 @@ export const DEFAULT_WV_DATA = {
   vix: 15, hyOas: 45, sp200dma: 1, embi: 55,
   smartZ: 0.5, retailZ: -0.8,
   dxy: 103.5, dxyRising: 1,
-  cpiG7: 2.8, breakevens: 2.3,
+  cpiG7: 2.8, breakevens: 2.3, cbPolicyStance: 0,
 }
 
 // Mapa worldview key → source ID en dataSources
@@ -37,6 +40,7 @@ export const WV_DATA_MAP = {
   dxyRising:  'wv_dxy_200dma',
   cpiG7:      'wv_cpi_usa',
   breakevens: 'wv_breakevens',
+  cbPolicyStance: 'wv_cb_policy_stance',
 }
 
 export const WV_GDP_GAP_MAP = {
@@ -46,6 +50,16 @@ export const WV_GDP_GAP_MAP = {
   gdpJpn:   { nowcast: 'wv_gdp_jpn_nowcast',   consensus: 'wv_gdp_jpn_consensus',   legacy: 'wv_gdp_jpn' },
   gdpResto: { nowcast: 'wv_gdp_resto_nowcast', consensus: 'wv_gdp_resto_consensus', legacy: 'wv_cesi' },
 }
+
+export const WV_CPI_G7_SOURCE_IDS = [
+  'wv_cpi_usa',
+  'wv_cpi_can',
+  'wv_cpi_fra',
+  'wv_cpi_deu',
+  'wv_cpi_ita',
+  'wv_cpi_jpn',
+  'wv_cpi_gbr',
+]
 
 // ── Utilidades ────────────────────────────────────────────────────────────────
 function autoMonthlyDates(n) {
@@ -79,6 +93,13 @@ function deriveZscores(history, current = {}) {
   return updated
 }
 
+function median(values) {
+  const nums = values.filter(Number.isFinite).sort((a, b) => a - b)
+  if (nums.length === 0) return null
+  const mid = Math.floor(nums.length / 2)
+  return nums.length % 2 === 1 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2
+}
+
 // Deriva el objeto worldview desde el array de dataSources
 function deriveWorldview(features) {
   const values = features.valuesBySourceId
@@ -94,8 +115,11 @@ function deriveWorldview(features) {
   }
   for (const [key, id] of Object.entries(WV_DATA_MAP)) {
     if (key in WV_GDP_GAP_MAP) continue
+    if (key === 'cpiG7') continue
     if (Number.isFinite(values[id])) derived[key] = values[id]
   }
+  const cpiG7 = median(WV_CPI_G7_SOURCE_IDS.map(id => values[id]))
+  if (cpiG7 !== null) derived.cpiG7 = cpiG7
   return { ...DEFAULT_WV_DATA, ...derived }
 }
 
@@ -141,6 +165,26 @@ function loadDataSources() {
   return defaultDataSources
 }
 
+function loadRegimeState() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_REGIME_STATE)
+    if (saved) return JSON.parse(saved)
+  } catch { /* ignore */ }
+  return null
+}
+
+function loadSignalHistory() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_SIGNAL_HISTORY)
+    if (saved) return JSON.parse(saved)
+  } catch { /* ignore */ }
+  return {}
+}
+
+function normalizeSignalKey(key) {
+  return String(key || '').trim().toUpperCase()
+}
+
 // ── Context ───────────────────────────────────────────────────────────────────
 const ModelDataContext = createContext(null)
 
@@ -148,10 +192,13 @@ export function ModelDataProvider({ children }) {
   const [history,     setHistory]     = useState(loadHistory)
   const [zscores,     setZscores]     = useState(loadZscores)
   const [dataSources, setDataSources] = useState(loadDataSources)
+  const [regimeState, setRegimeState] = useState(loadRegimeState)
+  const [signalHistory, setSignalHistory] = useState(loadSignalHistory)
 
   // Source -> History -> Features -> Framework.
   const features = useMemo(() => deriveFeatureStore(dataSources, history), [dataSources, history])
   const worldview = useMemo(() => deriveWorldview(features), [features])
+  const rawRegime = useMemo(() => detectRegime(worldview), [worldview])
 
   // Cuando cambia history, re-deriva z-scores automáticamente
   useEffect(() => {
@@ -173,6 +220,34 @@ export function ModelDataProvider({ children }) {
     localStorage.setItem(STORAGE_KEY_SOURCES, JSON.stringify(dataSources))
   }, [dataSources])
 
+  useEffect(() => {
+    setRegimeState(prev => {
+      const updated = resolvePersistentRegime(rawRegime, worldview, prev)
+      localStorage.setItem(STORAGE_KEY_REGIME_STATE, JSON.stringify(updated))
+      return updated
+    })
+  }, [rawRegime, worldview])
+
+  const recordSignalSample = useCallback((key, value) => {
+    const signal = Number(value)
+    const signalKey = normalizeSignalKey(key)
+    if (!signalKey || !Number.isFinite(signal)) return
+
+    setSignalHistory(prev => {
+      const current = Array.isArray(prev[signalKey]) ? prev[signalKey] : []
+      const rounded = Number(signal.toFixed(4))
+      const last = current[current.length - 1]
+      if (last && Math.abs(Number(last.value) - rounded) < 0.0001) return prev
+
+      const updated = {
+        ...prev,
+        [signalKey]: [...current, { at: new Date().toISOString(), value: rounded }].slice(-260),
+      }
+      localStorage.setItem(STORAGE_KEY_SIGNAL_HISTORY, JSON.stringify(updated))
+      return updated
+    })
+  }, [])
+
   return (
     <ModelDataContext.Provider value={{
       history, setHistory,
@@ -180,6 +255,11 @@ export function ModelDataProvider({ children }) {
       dataSources, setDataSources,
       features,
       worldview,
+      rawRegime,
+      regime: regimeState?.current ?? rawRegime,
+      regimeState,
+      signalHistory,
+      recordSignalSample,
     }}>
       {children}
     </ModelDataContext.Provider>

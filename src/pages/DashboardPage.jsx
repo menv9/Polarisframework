@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useModelStore } from '../store/ModelDataContext'
 import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
-import { detectRegime, getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
+import { detectInflationRegime, getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
 import { computeExogenousCurrencyScores, combineEndogenousExogenous } from '../lib/scoring/exogenous'
 
 const EXO_CCYS = ['AUD','CAD','NOK','NZD','JPY','CHF','USD','EUR','GBP','SEK']
@@ -76,16 +76,15 @@ function fmtScore(v) {
 }
 
 export default function DashboardPage() {
-  const { worldview: wv, dataSources: sources, zscores: zScores, history, features } = useModelStore()
+  const { worldview: wv, regime, dataSources: sources, zscores: zScores, history, features, signalHistory, recordSignalSample } = useModelStore()
   const [betas] = useState(loadBetas)
   const navigate = useNavigate()
 
   // ── World View derivations ────────────────────────────────────────────────
   const scoreGDP  = wv.gdpUsa * 0.25 + wv.gdpEur * 0.18 + wv.gdpChn * 0.18 + wv.gdpJpn * 0.05 + wv.gdpResto * 0.34
-  const regime    = detectRegime(wv)
   const wocScore  = 0.7 * wv.smartZ - 0.3 * wv.retailZ
   const usdBias   = wv.dxyRising === 1 && wv.dxy > 100 ? 'BULLISH' : wv.dxyRising === 0 && wv.dxy < 95 ? 'BEARISH' : 'NEUTRAL'
-  const inflation = wv.cpiG7 > 3.0 || wv.breakevens > 2.5 ? 'INFLACIONARIO' : wv.cpiG7 < 2.0 && wv.breakevens < 2.0 ? 'DESINFLACIONARIO' : 'ESTABLE'
+  const inflation = detectInflationRegime(wv)
 
   // ── Scores G10 ───────────────────────────────────────────────────────────
   const exogenousScores = useMemo(() =>
@@ -122,11 +121,15 @@ export default function DashboardPage() {
       return {
         ...pair,
         signal,
-        conv: getConviction(signal),
+        conv: getConviction(signal, signalHistory[pair.label]),
         direction: signal >= 0 ? 'LONG' : 'SHORT',
       }
     })
-  }, [countryScores])
+  }, [countryScores, signalHistory])
+
+  useEffect(() => {
+    for (const pair of dashboardPairs) recordSignalSample(pair.label, pair.signal)
+  }, [dashboardPairs, recordSignalSample])
 
   // ── Ranking G10 ──────────────────────────────────────────────────────────
   const ranked = useMemo(() =>

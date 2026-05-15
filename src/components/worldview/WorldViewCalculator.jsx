@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { motion } from 'motion/react'
 import { Calculator, RefreshCcw } from 'lucide-react'
-import { detectRegime } from '../../lib/scoring/regime'
+import { detectInflationRegime, detectRegime } from '../../lib/scoring/regime'
 
 export default function WorldViewCalculator() {
   // Inputs GDP
@@ -29,6 +29,7 @@ export default function WorldViewCalculator() {
   // Inputs Inflación
   const [cpiG7, setCpiG7] = useState(2.8)
   const [breakevens5y5y, setBreakevens5y5y] = useState(2.3)
+  const [cbPolicyStance, setCbPolicyStance] = useState(0)
 
   // Cálculos
   const scoreCrecimiento = useMemo(() => {
@@ -51,17 +52,16 @@ export default function WorldViewCalculator() {
   }, [dxy, dxyRising])
 
   const inflationRegime = useMemo(() => {
-    if (cpiG7 > 3.0 || breakevens5y5y > 2.5) return 'Inflacionario'
-    if (cpiG7 < 2.0 && breakevens5y5y < 2.0) return 'Desinflacionario'
-    return 'Estable'
-  }, [cpiG7, breakevens5y5y])
+    const regime = detectInflationRegime({ cpiG7, breakevens: breakevens5y5y, cbPolicyStance })
+    return regime === 'INFLACIONARIO' ? 'Inflacionario' : regime === 'DESINFLACIONARIO' ? 'Desinflacionario' : 'Estable'
+  }, [cpiG7, breakevens5y5y, cbPolicyStance])
 
   const reset = () => {
     setGdpUsa(0.3); setGdpEur(-0.2); setGdpChn(0.5); setGdpJpn(0.1); setGdpResto(0.0)
     setVix(45); setHyOas(55); setSpAbove200dma(true); setEmbi(60)
     setSmartZ(0.5); setRetailZ(-0.8)
     setDxy(103.5); setDxy200dma(101.0); setDxyRising(true)
-    setCpiG7(2.8); setBreakevens5y5y(2.3)
+    setCpiG7(2.8); setBreakevens5y5y(2.3); setCbPolicyStance(0)
   }
 
   const regimeColor = {
@@ -212,8 +212,20 @@ export default function WorldViewCalculator() {
           <div className="p-5 rounded-xl border border-white/10 bg-bg-card">
             <h4 className="text-sm font-semibold text-text-primary mb-4">Inflación Global</h4>
             <div className="space-y-4">
-              <InputNumber label="CPI USA YoY" value={cpiG7} setValue={setCpiG7} min={0} max={10} step={0.1} unit="%" />
+              <InputNumber label="CPI G7 mediana YoY" value={cpiG7} setValue={setCpiG7} min={0} max={10} step={0.1} unit="%" />
               <InputNumber label="5Y5Y Inflation Expectations" value={breakevens5y5y} setValue={setBreakevens5y5y} min={0} max={5} step={0.1} unit="%" />
+              <div className="flex items-center justify-between p-3 rounded-lg bg-bg-secondary border border-white/5">
+                <span className="text-sm text-text-muted">Bancos centrales</span>
+                <select
+                  value={cbPolicyStance}
+                  onChange={(e) => setCbPolicyStance(Number(e.target.value))}
+                  className="bg-bg-card border border-white/10 rounded px-2 py-1 text-sm text-text-primary outline-none"
+                >
+                  <option value={1}>Hawkish</option>
+                  <option value={0}>Neutral</option>
+                  <option value={-1}>Dovish</option>
+                </select>
+              </div>
             </div>
             <div className="mt-4 p-3 rounded-lg bg-bg-secondary border border-white/5">
               <div className="text-sm text-text-muted">Régimen inflación</div>
@@ -332,8 +344,6 @@ export default function WorldViewCalculator() {
     </section>
   )
 }
-
-
 
 
 

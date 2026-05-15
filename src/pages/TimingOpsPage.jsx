@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useModelStore } from '../store/ModelDataContext'
 import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
-import { TIMING_CHECKS, computeTimingVerdict } from '../lib/timing/score'
-import { detectRegime, getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
+import { TIMING_CHECKS, TECH_SETUP_DEFAULTS, computeTimingVerdict, evaluateTechnicalSetup } from '../lib/timing/score'
+import { getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
 import { computeExogenousCurrencyScores, combineEndogenousExogenous } from '../lib/scoring/exogenous'
 
 const PAIRS = [
@@ -49,7 +49,7 @@ function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
 const STATUS_VALUES = { true: true, false: false, null: null }
 
 export default function TimingOpsPage() {
-  const { worldview: wv, zscores: zScores, dataSources, history } = useModelStore()
+  const { regime, zscores: zScores, dataSources, history, signalHistory, recordSignalSample } = useModelStore()
   const [betas] = useState(loadBetas)
   const [searchParams] = useSearchParams()
   const [selectedPair, setSelectedPair] = useState(() => {
@@ -57,8 +57,7 @@ export default function TimingOpsPage() {
     return PAIRS.some(x => x.label === p) ? p : 'EUR/USD'
   })
   const [checks, setChecks] = useState({})
-
-  const regime    = detectRegime(wv)
+  const [techSetup, setTechSetup] = useState(TECH_SETUP_DEFAULTS)
 
   const queryPair = searchParams.get('pair')
   const querySignal = Number(searchParams.get('signal'))
@@ -93,14 +92,27 @@ export default function TimingOpsPage() {
     const signal = hasSignalOverride ? querySignal : base && quote ? base.score - quote.score : 0
     const conv = hasSignalOverride && ['FULL', 'HALF', 'FLAT'].includes(queryConviction)
       ? queryConviction
-      : getConviction(signal)
+      : getConviction(signal, signalHistory[selectedPair])
     return { signal, conv, direction: signal >= 0 ? 'LONG' : 'SHORT' }
-  }, [selectedPair, countryScores, hasSignalOverride, querySignal, queryConviction])
+  }, [selectedPair, countryScores, hasSignalOverride, querySignal, queryConviction, signalHistory])
+
+  useEffect(() => {
+    if (pairInfo) recordSignalSample(selectedPair, pairInfo.signal)
+  }, [selectedPair, pairInfo, recordSignalSample])
 
   const { verdict, failing, score } = useMemo(() =>
     computeTimingVerdict(checks),
     [checks]
   )
+  const setupVerdict = useMemo(() =>
+    evaluateTechnicalSetup(techSetup, pairInfo?.direction),
+    [techSetup, pairInfo?.direction]
+  )
+
+  useEffect(() => {
+    const verdict = evaluateTechnicalSetup(techSetup, pairInfo?.direction)
+    setChecks(prev => ({ ...prev, ...verdict.checkUpdates }))
+  }, [techSetup, pairInfo?.direction])
 
   function toggle(id) {
     setChecks(prev => {
@@ -113,6 +125,7 @@ export default function TimingOpsPage() {
 
   function resetChecks() {
     setChecks({})
+    setTechSetup(TECH_SETUP_DEFAULTS)
   }
 
   const verdictColor = verdict === 'READY' ? 'text-[#4ade80]' : verdict === 'WAIT' ? 'text-[#f59e0b]' : 'text-[#ef4444]'
@@ -172,6 +185,69 @@ export default function TimingOpsPage() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Setup técnico */}
+        <div className="border-2 border-[#333] mb-3">
+          <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333] flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Validación Setup A+</span>
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${setupVerdict.aPlus ? 'text-[#4ade80]' : 'text-[#f59e0b]'}`}>
+              {setupVerdict.aPlus ? 'A+ VALIDADO' : 'PENDIENTE'}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-[#222]">
+            <div className="p-3 border-r border-b border-[#222]">
+              <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Tipo</div>
+              <select
+                value={techSetup.tradeType}
+                onChange={e => setTechSetup(s => ({ ...s, tradeType: e.target.value }))}
+                className="bg-[#111] border border-[#333] text-[#e5e5e5] font-mono text-sm px-2 py-1 w-full focus:outline-none focus:border-[#ecd987]"
+              >
+                <option value="MOMENTUM">Momentum</option>
+                <option value="MEAN_REVERSION">Mean-reversion</option>
+              </select>
+            </div>
+            <div className="p-3 border-r border-b border-[#222]">
+              <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">RSI</div>
+              <input type="number" value={techSetup.rsi} min={0} max={100} step={1}
+                onChange={e => setTechSetup(s => ({ ...s, rsi: Number(e.target.value) }))}
+                className="bg-[#111] border border-[#333] text-[#e5e5e5] font-mono text-sm px-2 py-1 w-full focus:outline-none focus:border-[#ecd987]" />
+            </div>
+            <div className="p-3 border-r border-b border-[#222]">
+              <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">ADX</div>
+              <input type="number" value={techSetup.adx} min={0} max={100} step={1}
+                onChange={e => setTechSetup(s => ({ ...s, adx: Number(e.target.value) }))}
+                className="bg-[#111] border border-[#333] text-[#e5e5e5] font-mono text-sm px-2 py-1 w-full focus:outline-none focus:border-[#ecd987]" />
+            </div>
+            <div className="p-3 border-r border-b border-[#222]">
+              <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Confluencias</div>
+              <input type="number" value={techSetup.confluences} min={0} max={6} step={1}
+                onChange={e => setTechSetup(s => ({ ...s, confluences: Number(e.target.value) }))}
+                className="bg-[#111] border border-[#333] text-[#e5e5e5] font-mono text-sm px-2 py-1 w-full focus:outline-none focus:border-[#ecd987]" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5">
+            {[
+              ['pullback', 'Pullback 50/100dma'],
+              ['retest', 'Ruptura + retest'],
+              ['candlePattern', 'Pin/engulfing'],
+              ['divergence', 'Divergencia'],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setTechSetup(s => ({ ...s, [key]: !s[key] }))}
+                className={`p-3 border-r border-b border-[#222] text-left transition-colors ${techSetup[key] ? 'bg-[#0a1a0a] text-[#4ade80]' : 'text-[#555] hover:text-[#a3a3a3]'}`}
+              >
+                <div className="text-[10px] font-bold uppercase tracking-wider">{label}</div>
+              </button>
+            ))}
+            <button
+              onClick={() => setTechSetup(s => ({ ...s, mtfAligned: s.mtfAligned === true ? false : s.mtfAligned === false ? null : true }))}
+              className={`p-3 border-r border-b border-[#222] text-left transition-colors ${techSetup.mtfAligned === true ? 'bg-[#0a1a0a] text-[#4ade80]' : techSetup.mtfAligned === false ? 'bg-[#1a0a0a] text-[#ef4444]' : 'text-[#555] hover:text-[#a3a3a3]'}`}
+            >
+              <div className="text-[10px] font-bold uppercase tracking-wider">MTF {techSetup.mtfAligned === true ? 'OK' : techSetup.mtfAligned === false ? 'FAIL' : 'N/A'}</div>
+            </button>
+          </div>
         </div>
 
         {/* Checklist */}

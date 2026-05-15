@@ -1,7 +1,7 @@
-import { useState, Fragment } from 'react'
+import { useState, Fragment, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { INDICATORS as BASE_INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
-import { detectRegime, getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
+import { getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
 import { computeExogenousCurrencyScores, combineEndogenousExogenous } from '../lib/scoring/exogenous'
 import { useModelStore } from '../store/ModelDataContext'
 import { getFreshness, FRESHNESS_DOT, FRESHNESS_TEXT } from '../lib/freshness'
@@ -177,13 +177,11 @@ function Tooltip({ text, align = 'center' }) {
 }
 
 export default function EndogenousOpsPage() {
-  const { zscores: zScores, worldview: wvData, history, dataSources, features } = useModelStore()
+  const { zscores: zScores, regime, history, dataSources, features, signalHistory, recordSignalSample } = useModelStore()
   const [betas]        = useState(loadBetas)
   const [pairA, setPairA]   = useState('usa')
   const [pairB, setPairB]   = useState('eur')
   const [activeTab, setActiveTab] = useState('usa')
-
-  const regime    = detectRegime(wvData)
 
   const exogenousScores = computeExogenousCurrencyScores(dataSources, history)
   const countryScores  = COUNTRIES.map(c => {
@@ -203,7 +201,8 @@ export default function EndogenousOpsPage() {
   const scoreA     = countryScores.find(c => c.prefix === pairA)
   const scoreB     = countryScores.find(c => c.prefix === pairB)
   const signal     = scoreA && scoreB ? scoreA.composite - scoreB.composite : 0
-  const conviction = getConviction(signal)
+  const pairLabel  = scoreA && scoreB ? `${scoreA.label}/${scoreB.label}` : ''
+  const conviction = getConviction(signal, signalHistory[pairLabel])
   const direction  = signal > 0
     ? `LONG ${pairA.toUpperCase()}/${pairB.toUpperCase()}`
     : signal < 0
@@ -213,6 +212,10 @@ export default function EndogenousOpsPage() {
   const activeCountry     = COUNTRIES.find(c => c.prefix === activeTab)
   const activeScore       = countryScores.find(c => c.prefix === activeTab)
   const activeRegimeMult  = getRegimeMultiplier(regime, activeCountry?.cyclical ?? true)
+
+  useEffect(() => {
+    if (pairLabel) recordSignalSample(pairLabel, signal)
+  }, [pairLabel, signal, recordSignalSample])
 
   // Max contribution for bar scaling
   const betaTotal = computeBetaTotal(betas)

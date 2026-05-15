@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useModelStore } from '../store/ModelDataContext'
 import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 import { computePositionSize, PIP_VALUES, CONVICTION_MULTIPLIER, REGIME_VOL_MULTIPLIER } from '../lib/risk/sizing'
-import { detectRegime, getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
+import { getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
 import { DRAWDOWN_LEVELS, getDrawdownLevel, getRampupStage, computeCircuitBreakers, computePortfolioExposure } from '../lib/risk/drawdown'
 
 const PAIRS = Object.keys(PIP_VALUES)
@@ -48,7 +48,7 @@ function fmtLots(v) {
 }
 
 export default function RiskOpsPage() {
-  const { worldview: wv, zscores: zScores } = useModelStore()
+  const { regime, zscores: zScores, signalHistory } = useModelStore()
   const [betas] = useState(loadBetas)
   const [searchParams] = useSearchParams()
 
@@ -86,8 +86,6 @@ export default function RiskOpsPage() {
     { pair: 'EUR/USD', lots: 0, direction: 'LONG' },
   ])
 
-  const regime    = detectRegime(wv)
-
   // Auto-populate conviction from endogenous signal
   const autoConviction = useMemo(() => {
     const ccys = PAIR_TO_COUNTRIES[pair]
@@ -98,8 +96,8 @@ export default function RiskOpsPage() {
     if (!base || !quote) return 'HALF'
     const scoreBase  = computeCountryScore(base.prefix,  base.cyclical,  regime, zScores, betas)
     const scoreQuote = computeCountryScore(quote.prefix, quote.cyclical, regime, zScores, betas)
-    return getConviction(scoreBase - scoreQuote)
-  }, [pair, regime, zScores, betas])
+    return getConviction(scoreBase - scoreQuote, signalHistory[pair])
+  }, [pair, regime, zScores, betas, signalHistory])
 
   const ddPct = peakCapital > 0
     ? Math.max(0, (peakCapital - currentCapital) / peakCapital * 100)
@@ -203,7 +201,7 @@ export default function RiskOpsPage() {
               </div>
             </div>
             <SelectInput label="Régimen Volat." value={regimeVol} onChange={setRegimeVol}
-              options={[{value:'LOW',label:'Low (×1.2)'},{value:'NORMAL',label:'Normal (×1.0)'},{value:'HIGH',label:'High (×0.6)'}]} />
+              options={[{value:'LOW',label:'Low (×1.0)'},{value:'NORMAL',label:'Normal (×1.0)'},{value:'HIGH',label:'High (×0.7)'},{value:'EXTREME',label:'Extreme (×0.4)'}]} />
           </div>
 
           {/* Kelly / Vol-target params (collapsible) */}

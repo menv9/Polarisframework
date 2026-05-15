@@ -70,6 +70,51 @@ export const TIMING_CHECKS = [
   },
 ]
 
+export const TECH_SETUP_DEFAULTS = {
+  tradeType: 'MOMENTUM',
+  rsi: 50,
+  adx: 20,
+  pullback: false,
+  retest: false,
+  candlePattern: false,
+  divergence: false,
+  confluences: 0,
+  mtfAligned: null,
+}
+
+export function evaluateTechnicalSetup(input, direction = 'LONG') {
+  const setup = { ...TECH_SETUP_DEFAULTS, ...input }
+  const rsi = Number(setup.rsi)
+  const adx = Number(setup.adx)
+  const confluences = Number(setup.confluences)
+  const isLong = direction !== 'SHORT'
+
+  const rsiOk = Number.isFinite(rsi) && (isLong ? rsi < 75 : rsi > 25)
+  const adxOk = Number.isFinite(adx) && (
+    setup.tradeType === 'MOMENTUM' ? adx >= 25 : adx < 25
+  )
+  const structureOk = Boolean(setup.pullback || setup.retest || setup.candlePattern || setup.divergence)
+  const confluenceOk = Number.isFinite(confluences) && confluences >= 2
+  const mtfOk = setup.mtfAligned === true ? true : setup.mtfAligned === false ? false : null
+  const aPlus = rsiOk && adxOk && structureOk && confluenceOk
+
+  return {
+    aPlus,
+    rsiOk,
+    adxOk,
+    structureOk,
+    confluenceOk,
+    mtfOk,
+    checkUpdates: {
+      technical_setup: aPlus,
+      rsi_not_extreme: rsiOk,
+      adx_coherent: adxOk,
+      confluence: confluenceOk,
+      ...(mtfOk === null ? {} : { mtf_alignment: mtfOk }),
+    },
+  }
+}
+
 // Returns { verdict: 'READY'|'WAIT'|'ABORT', failing, score }
 //
 // ABORT:  any required check explicitly marked false
