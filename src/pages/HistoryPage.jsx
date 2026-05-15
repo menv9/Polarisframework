@@ -244,18 +244,18 @@ export default function HistoryPage() {
           ))}
         </div>
 
-        <div className="border-2 border-[#333] overflow-x-auto">
-          <table className="w-full min-w-[1320px] text-sm table-fixed">
+        <div className="border-2 border-[#333]">
+          <table className="w-full text-sm table-fixed">
             <thead>
               <tr className="bg-[#111] border-b-2 border-[#333] text-left text-[#777]">
-                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[230px]">Fuente</th>
-                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[90px]">Estado</th>
-                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[150px]">Fit</th>
-                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[95px]">Obs</th>
-                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[110px]">Start</th>
-                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[110px]">End</th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[18%]">Fuente</th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[7%]">Estado</th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[12%]">Fit</th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[6%]">Obs</th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[9%]">Start</th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[9%]">End</th>
                 <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest">Endpoint / error</th>
-                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[170px]">Accion</th>
+                <th className="px-2 py-2 text-xs font-bold uppercase tracking-widest w-[13%]">Accion</th>
               </tr>
             </thead>
             <tbody>
