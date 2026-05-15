@@ -61,6 +61,74 @@ function fmtScore(v) {
   return (v >= 0 ? '+' : '') + v.toFixed(3)
 }
 
+function exportDashboardCsv({ regime, wv, inflation, usdBias, scoreGDP, wocScore, dashboardPairs, ranked, exoBias, upcomingEvents }) {
+  const esc = v => {
+    if (v === null || v === undefined) return ''
+    const s = String(v).replace(/"/g, '""')
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s}"` : s
+  }
+  const row  = cols => cols.map(esc).join(',')
+  const date = new Date().toISOString().slice(0, 16).replace('T', ' ')
+
+  const sections = []
+
+  // 1 — Snapshot
+  sections.push('# SNAPSHOT')
+  sections.push(row(['date', 'regime', 'vix', 'dxy', 'dxy_rising', 'inflation', 'usd_bias', 'gdp_momentum', 'woc']))
+  sections.push(row([
+    date, regime,
+    Number.isFinite(wv.vix) ? wv.vix.toFixed(1) : '',
+    Number.isFinite(wv.dxy) ? wv.dxy.toFixed(1) : '',
+    wv.dxyRising,
+    inflation, usdBias,
+    scoreGDP.toFixed(4),
+    wocScore.toFixed(4),
+  ]))
+  sections.push('')
+
+  // 2 — Señales de par
+  sections.push('# SEÑALES FX')
+  sections.push(row(['pair', 'endo', 'exo', 'signal', 'conviction', 'direction']))
+  for (const { label, endoDiff, exoDiff, signal, conv, direction } of dashboardPairs) {
+    sections.push(row([label, endoDiff.toFixed(4), exoDiff.toFixed(4), signal.toFixed(4), conv, direction]))
+  }
+  sections.push('')
+
+  // 3 — Ranking G10
+  sections.push('# RANKING G10')
+  sections.push(row(['rank', 'currency', 'endo', 'exo', 'total']))
+  ranked.forEach((c, i) => {
+    sections.push(row([i + 1, c.label, c.endoScore.toFixed(4), c.exoScore.toFixed(4), c.score.toFixed(4)]))
+  })
+  sections.push('')
+
+  // 4 — Sesgo exógeno
+  sections.push('# SESGO EXÓGENO')
+  sections.push(row(['currency', 'bull_drivers', 'bear_drivers', 'net']))
+  for (const ccy of EXO_CCYS) {
+    const { bull, bear } = exoBias[ccy]
+    sections.push(row([ccy, bull, bear, bull - bear]))
+  }
+
+  if (upcomingEvents.length > 0) {
+    sections.push('')
+    sections.push('# PRÓXIMOS EVENTOS')
+    sections.push(row(['date', 'currency', 'title']))
+    for (const ev of upcomingEvents) {
+      sections.push(row([ev.date.toISOString().slice(0, 16).replace('T', ' '), ev.currency, ev.title]))
+    }
+  }
+
+  const csv  = sections.join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href     = url
+  link.download = `polaris_dashboard_${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function DashboardPage() {
   const { worldview: wv, regime, dataSources: sources, zscores: zScores, history, features, signalHistory, recordSignalSample } = useModelStore()
   const [pairBetaData] = useState(loadPairBetas)
@@ -195,8 +263,16 @@ export default function DashboardPage() {
         {/* ===== HEADER ===== */}
         <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-[#333]">
           <h1 className="text-2xl font-bold uppercase tracking-widest">DASHBOARD</h1>
-          <div className="text-xs text-[#777] uppercase tracking-wider">
-            {new Date().toLocaleDateString('en-GB')} · {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => exportDashboardCsv({ regime, wv, inflation, usdBias, scoreGDP, wocScore, dashboardPairs, ranked, exoBias, upcomingEvents })}
+              className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider border border-[#333] text-[#555] hover:text-white hover:border-white transition-colors"
+            >
+              Export CSV
+            </button>
+            <div className="text-xs text-[#777] uppercase tracking-wider">
+              {new Date().toLocaleDateString('en-GB')} · {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            </div>
           </div>
         </div>
 
