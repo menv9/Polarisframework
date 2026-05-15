@@ -90,9 +90,8 @@ export function computeExogenousCurrencyScore(ccy, items, featureValues, history
     if (!Number.isFinite(featureValues[item.id])) continue
     const dir = bullDir ? 1 : -1
     const hist = history?.[item.id]
-    const mag = hist?.series?.length >= 3
-      ? computeRollingZScore(hist.series, { key: item.id }).z * dir
-      : dir
+    if (!hist?.series?.length || hist.series.length < 3) continue
+    const mag = computeRollingZScore(hist.series, { key: item.id }).z * dir
     num += item.weight * mag
     den += item.weight
   }
