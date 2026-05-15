@@ -109,7 +109,7 @@ def save_endogenous_history(run_path: Path, df_aligned: pd.DataFrame) -> None:
     out = run_path / "endogenous_history.json"
     with out.open("w", encoding="utf-8") as f:
         _json.dump(history, f, separators=(",", ":"))
-    print(f"  Exported {len(history)} endogenous series → endogenous_history.json")
+    print(f"  Exported {len(history)} endogenous series -> endogenous_history.json")
 
 
 def save_tables(

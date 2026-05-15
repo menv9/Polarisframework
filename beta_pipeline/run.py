@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 import pandas as pd
 
+import backtest_engine as bt
 import beta as beta_mod
 import fetch as fetcher
 import output as outputter
@@ -185,6 +186,15 @@ def run(
     )
     print(f"  Phase 6 time: {_elapsed(phase_start)}")
 
+    # Phase 7: Backtest
+    backtest_result = bt.run_backtest(
+        df_aligned=df_aligned,
+        df_trans=df_trans,
+        beta_static=beta_static,
+        run_path=run_path,
+        verbose=verbose,
+    )
+
     print("=" * 72)
     print(f"Completed in {_elapsed(total_start)}")
     print(f"Output: {run_path}")
@@ -201,6 +211,7 @@ def run(
         "rolling_betas": rolling_betas,
         "regime_flags": regime_flags,
         "fetch_report": fetch_report,
+        "backtest": backtest_result,
     }
 
 
