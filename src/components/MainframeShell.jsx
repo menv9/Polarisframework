@@ -7,10 +7,10 @@ const TAB_GROUPS = [
     key: '1', label: 'DASHBOARD', to: '/dashboard',
   },
   {
-    key: '2', label: 'ANÁLISIS', to: '/world-view/operativa',
+    key: '2', label: 'ANÁLISIS', to: '/world-view',
     items: [
       { to: '/dashboard',           label: 'HUB',        desc: 'Dashboard' },
-      { to: '/world-view/operativa',label: 'WORLD VIEW', desc: 'World View' },
+      { to: '/world-view',label: 'WORLD VIEW', desc: 'World View' },
       { to: '/endogenous',          label: 'ENDOGENOUS', desc: 'Endogenous' },
       { to: '/exogenous/operativa', label: 'EXOGENOUS',  desc: 'Exogenous' },
     ],
@@ -61,7 +61,7 @@ const DEFAULT_FKEYS = [
 ]
 
 const PAGE_FKEYS = {
-  '/world-view/operativa': [
+  '/world-view': [
     ['F1','HELP'], ['F2','MENU'], ['F3','BUSCAR'], ['F4','ATRAS'],
     ['F5','ACTUALIZAR'], ['F6','EXPORTAR'], ['F7','DATA'], ['F8','NOTIFICAS'],
     ['F9','MENSAJES'], ['F10','LOG'], ['F12','MAIN'],

@@ -122,7 +122,7 @@ export const modules = [
 ]
 
 export const pipelineStages = [
-  { id: 'worldview',  label: 'World View', part: 'I',    desc: 'Régimen macro global',    route: '/world-view/operativa' },
+  { id: 'worldview',  label: 'World View', part: 'I',    desc: 'Régimen macro global',    route: '/world-view' },
   { id: 'endogenous', label: 'Endogenous', part: 'II.5', desc: 'Drivers por país',         route: '/endogenous' },
   { id: 'exogenous',  label: 'Exogenous',  part: 'II.6', desc: 'Drivers externos',         route: '/exogenous/operativa' },
   { id: 'timing',     label: 'Timing',     part: 'III',  desc: 'Cronometraje de entrada',  route: '/timing/operativa' },

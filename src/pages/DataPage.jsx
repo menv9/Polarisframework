@@ -701,7 +701,7 @@ export default function DataPage() {
         {/* ===== FOOTER ===== */}
         <div className="mt-3 flex items-center justify-between text-xs text-[#555] uppercase tracking-wider">
           <span>{filtered.length} INDICADORES EN VISTA / {sources.length} TOTALES</span>
-          <Link to="/world-view/operativa" className="text-[#ecd987] hover:underline">
+          <Link to="/world-view" className="text-[#ecd987] hover:underline">
             IR A OPERATIVA {'->'}
           </Link>
         </div>

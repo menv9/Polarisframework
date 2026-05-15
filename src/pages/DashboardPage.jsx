@@ -281,7 +281,7 @@ export default function DashboardPage() {
         <div className="border-2 border-[#333] mb-3">
           <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333] flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">I — World View</span>
-            <Link to="/world-view/operativa" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">OPERATIVA →</Link>
+            <Link to="/world-view" className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">OPERATIVA →</Link>
           </div>
           <div className="grid grid-cols-4 sm:grid-cols-8 gap-0">
             {[
