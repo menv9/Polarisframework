@@ -78,12 +78,13 @@ function BetaCell({ entry, docBeta }) {
 }
 
 export default function EndogenousBetasPage() {
-  const [betas,           setBetas]           = useState(loadBetas)
-  const [confirm,         setConfirm]         = useState(false)
-  const [flashMsg,        setFlashMsg]        = useState(null)
-  const [pairMeta,        setPairMeta]        = useState(loadPairBetasMeta)
-  const [pairBetaData,    setPairBetaData]    = useState(loadPairBetas)
+  const [betas,            setBetas]            = useState(loadBetas)
+  const [confirm,          setConfirm]          = useState(false)
+  const [flashMsg,         setFlashMsg]         = useState(null)
+  const [pairMeta,         setPairMeta]         = useState(loadPairBetasMeta)
+  const [pairBetaData,     setPairBetaData]     = useState(loadPairBetas)
   const [selectedViewPair, setSelectedViewPair] = useState('EUR/USD')
+  const [viewMode,         setViewMode]         = useState('doc') // 'doc' | 'pipeline'
 
   function handleCSVUpload(e) {
     const file = e.target.files?.[0]
@@ -153,8 +154,23 @@ export default function EndogenousBetasPage() {
           </div>
           <div className="flex items-center gap-2">
             {flashMsg && <span className="text-xs font-bold text-[#f59e0b] uppercase tracking-wider">{flashMsg}</span>}
-            {modifiedCount > 0 && !flashMsg && (
+            {viewMode === 'doc' && modifiedCount > 0 && !flashMsg && (
               <span className="text-xs text-[#f59e0b] uppercase tracking-wider">{modifiedCount} modificados</span>
+            )}
+            {/* Toggle Doc / Pipeline */}
+            {pairBetaData && (
+              <div className="flex border border-[#333] overflow-hidden">
+                <button onClick={() => setViewMode('doc')}
+                  className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors
+                    ${viewMode === 'doc' ? 'bg-[#222] text-white' : 'text-[#444] hover:text-[#888]'}`}>
+                  Doc
+                </button>
+                <button onClick={() => setViewMode('pipeline')}
+                  className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors border-l border-[#333]
+                    ${viewMode === 'pipeline' ? 'bg-[#0a1220] text-[#60a5fa]' : 'text-[#444] hover:text-[#888]'}`}>
+                  Pipeline
+                </button>
+              </div>
             )}
             {confirm ? (
               <div className="flex items-center gap-2 border border-[#ef4444] px-2 py-1">
@@ -174,8 +190,8 @@ export default function EndogenousBetasPage() {
           </div>
         </div>
 
-        {/* ── RESUMEN ── */}
-        <div className="border-2 border-[#333] mb-3">
+        {/* ── RESUMEN — solo en modo Doc ── */}
+        {viewMode === 'doc' && <div className="border-2 border-[#333] mb-3">
           <div className="grid grid-cols-2 sm:grid-cols-4">
             <div className="p-3 border-r border-b border-[#222]">
               <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Implementados</div>
@@ -208,10 +224,10 @@ export default function EndogenousBetasPage() {
             Los valores por defecto son literatura académica (§15.2). Indicadores atenuados = pendientes.
             <span className="text-[#ecd987] ml-1">★ = dominante</span>
           </div>
-        </div>
+        </div>}
 
-        {/* ── TABLA POR CATEGORÍA ── */}
-        {GROUPS.map(({ category, items }) => (
+        {/* ── TABLA POR CATEGORÍA — solo en modo Doc ── */}
+        {viewMode === 'doc' && GROUPS.map(({ category, items }) => (
           <div key={category} className="border-2 border-[#333] mb-2">
             <div className="px-3 py-1.5 bg-[#0f0f0f] border-b border-[#222] flex items-center justify-between">
               <span className={`text-xs font-bold uppercase tracking-widest ${CATEGORY_COLOR[category] ?? 'text-[#555]'}`}>
@@ -344,8 +360,8 @@ export default function EndogenousBetasPage() {
           </div>
         </div>
 
-        {/* ── VISTA POR PAR — solo si hay CSV cargado ── */}
-        {pairBetaData && (() => {
+        {/* ── VISTA POR PAR — solo en modo Pipeline ── */}
+        {pairBetaData && viewMode === 'pipeline' && (() => {
           const vp = VIEW_PAIRS.find(p => p.label === selectedViewPair) ?? VIEW_PAIRS[0]
           const pairId = pairLabelToId(vp.label)
           const implOnly = ALL_INDICATORS.filter(i => i.implemented)
@@ -422,8 +438,8 @@ export default function EndogenousBetasPage() {
           )
         })()}
 
-        {/* Footer total */}
-        <div className="border border-[#222] px-3 py-2 flex items-center justify-between text-xs">
+        {/* Footer total — solo en modo Doc */}
+        {viewMode === 'doc' && <div className="border border-[#222] px-3 py-2 flex items-center justify-between text-xs">
           <span className="text-[#444] uppercase tracking-wider">Total — {ALL_INDICATORS.length} indicadores</span>
           <div className="flex gap-6 font-mono">
             <span className="text-[#555]">Doc: {BETA_DOC_TOTAL.toFixed(2)}</span>
@@ -432,7 +448,7 @@ export default function EndogenousBetasPage() {
               {Math.abs(betaTotalCustom - 1) < 0.005 ? '✓ OK' : '⚠ Suma ≠ 1'}
             </span>
           </div>
-        </div>
+        </div>}
 
       </div>
     </div>
