@@ -44,7 +44,7 @@ const EMPTY_FORM = {
 const EMPTY_CLOSE = {
   closeDate: new Date().toISOString().split('T')[0],
   closePrice: '',
-  closeReason: 'TARGET',
+  closeReason: '',
   pnlGross: '',
   costSpread: '',
   costSwap: '',
@@ -90,6 +90,7 @@ export default function JournalPage() {
   }
 
   function saveClose(tradeId) {
+    if (!closeForm.closeReason) return
     const pnlNet = (parseFloat(closeForm.pnlGross) || 0) -
       (parseFloat(closeForm.costSpread) || 0) -
       (parseFloat(closeForm.costSwap) || 0) -
@@ -212,7 +213,7 @@ export default function JournalPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4">
               <Field label="Fecha cierre"  value={closeForm.closeDate}  onChange={v => setCloseForm(f => ({...f, closeDate: v}))}  type="date" />
               <Field label="Precio cierre" value={closeForm.closePrice} onChange={v => setCloseForm(f => ({...f, closePrice: v}))} />
-              <Field label="Razón cierre"  value={closeForm.closeReason} onChange={v => setCloseForm(f => ({...f, closeReason: v}))} options={CLOSE_REASONS} />
+              <Field label="Razón cierre"  value={closeForm.closeReason} onChange={v => setCloseForm(f => ({...f, closeReason: v}))} options={['', ...CLOSE_REASONS]} />
               <Field label="P&L bruto ($)" value={closeForm.pnlGross}   onChange={v => setCloseForm(f => ({...f, pnlGross: v}))} />
               <Field label="Coste spread ($)" value={closeForm.costSpread}     onChange={v => setCloseForm(f => ({...f, costSpread: v}))} />
               <Field label="Coste swap ($)"   value={closeForm.costSwap}       onChange={v => setCloseForm(f => ({...f, costSwap: v}))} />
@@ -229,8 +230,8 @@ export default function JournalPage() {
                 className="bg-[#111] border border-[#333] text-[#e5e5e5] text-xs px-2 py-1.5 w-full focus:outline-none focus:border-[#4ade80]" />
             </div>
             <div className="px-3 py-2 border-t border-[#333] flex justify-end">
-              <button onClick={() => saveClose(closingId)}
-                className="px-4 py-1.5 text-xs font-bold uppercase tracking-wider bg-[#4ade80] text-black hover:bg-[#22c55e] transition-colors">
+              <button onClick={() => saveClose(closingId)} disabled={!closeForm.closeReason}
+                className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${closeForm.closeReason ? 'bg-[#4ade80] text-black hover:bg-[#22c55e]' : 'bg-[#333] text-[#777] cursor-not-allowed'}`}>
                 Cerrar Trade
               </button>
             </div>

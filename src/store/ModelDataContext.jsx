@@ -83,8 +83,8 @@ function migrateEntry(entry) {
   return null
 }
 
-function deriveZscores(history, current = {}) {
-  const updated = { ...current }
+function deriveZscores(history) {
+  const updated = {}
   for (const [key, entry] of Object.entries(history)) {
     if (!entry?.series?.length) continue
     const { z } = computeRollingZScore(entry.series, { key })

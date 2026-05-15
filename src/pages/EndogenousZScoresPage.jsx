@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, Fragment } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { INDICATORS as BASE_INDICATORS } from '../lib/endogenousBetas'
+import { computeRollingZScore } from '../lib/scoring/zScore'
 import { useModelStore } from '../store/ModelDataContext'
 
 const COUNTRIES = [
@@ -236,9 +237,19 @@ function exportModelInputsCsv({ history, activeTab, activeCountry, activeStats }
   URL.revokeObjectURL(url)
 }
 
+function deriveZscoresFromHistory(history) {
+  const updated = {}
+  for (const [key, entry] of Object.entries(history)) {
+    if (!entry?.series?.length) continue
+    const { z } = computeRollingZScore(entry.series, { key })
+    updated[key] = z
+  }
+  return updated
+}
+
 // ── Componente ────────────────────────────────────────────────────────────────
 export default function ModelInputsPage() {
-  const { history, setHistory }         = useModelStore()
+  const { history, setHistory, setZscores } = useModelStore()
   const [searchParams]                  = useSearchParams()
   const [sourceUrls]                    = useState(loadSourceUrls)
   const [customUrls, setCustomUrls]     = useState(loadCustomUrls)
@@ -376,7 +387,8 @@ export default function ModelInputsPage() {
   }
 
   const handleSyncManual = () => {
-    setHistory(prev => ({ ...prev }))
+    const updated = deriveZscoresFromHistory(history)
+    setZscores(updated)
     setSyncMsg('Z-scores sincronizados ✓')
     setTimeout(() => setSyncMsg(null), 2500)
   }

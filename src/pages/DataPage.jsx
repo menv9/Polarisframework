@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { dataSources, getNextUpdate, getStatus, countByStatus, getAccessSummary } from '../data/dataSources'
+import { getNextUpdate, getStatus, countByStatus, getAccessSummary } from '../data/dataSources'
 import { useModelStore } from '../store/ModelDataContext'
 
 function exportCsv(sources) {
@@ -38,36 +38,8 @@ function exportCsv(sources) {
   URL.revokeObjectURL(url)
 }
 
-const STORAGE_KEY = 'polaris_data_sources'
-const USER_EDITABLE_FIELDS = ['lastUpdate', '_lastScrape', '_scrapedValue', '_value', '_refreshError']
-
 function splitModuleName(moduleName) {
   return moduleName.split(/\s+(?:—|â€”)\s+/)
-}
-
-function mergeSavedSource(defaultSrc, savedSrc) {
-  if (!savedSrc) return defaultSrc
-  const preserved = USER_EDITABLE_FIELDS.reduce((acc, field) => {
-    if (Object.hasOwn(savedSrc, field)) acc[field] = savedSrc[field]
-    return acc
-  }, {})
-  return { ...defaultSrc, ...preserved }
-}
-
-function loadSources() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      return dataSources.map((defaultSrc) => {
-        const savedSrc = parsed.find((s) => s.id === defaultSrc.id)
-        return mergeSavedSource(defaultSrc, savedSrc)
-      })
-    }
-  } catch {
-    // ignore parse errors
-  }
-  return dataSources
 }
 
 async function fetchFredData(seriesId, yoy = false) {

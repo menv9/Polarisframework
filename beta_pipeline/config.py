@@ -36,10 +36,10 @@ _load_dotenv()
 
 FRED_API_KEY = os.getenv("FRED_API_KEY", "").strip()
 
-START_DATE = os.getenv("BETA_START_DATE", "2015-01-01")
+START_DATE = os.getenv("BETA_START_DATE", "2005-01-01")
 FREQ = os.getenv("BETA_FREQ", "ME")
-ROLLING_WIN = int(os.getenv("BETA_ROLLING_WIN", "24"))
-MIN_OBS = int(os.getenv("BETA_MIN_OBS", "36"))
+ROLLING_WIN = int(os.getenv("BETA_ROLLING_WIN", "60"))
+MIN_OBS = int(os.getenv("BETA_MIN_OBS", "24"))
 MIN_OBS_ROLL = int(os.getenv("BETA_MIN_OBS_ROLL", "12"))
 FFILL_LIMIT = int(os.getenv("BETA_FFILL_LIMIT", "3"))
 COVERAGE_MIN = float(os.getenv("BETA_COVERAGE_MIN", "0.60"))
