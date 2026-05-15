@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ALL_INDICATORS, DEFAULT_BETAS, loadBetas, saveBetas } from '../lib/endogenousBetas'
-import { parsePairBetaCSV, savePairBetas, clearPairBetas, loadPairBetasMeta } from '../lib/pairBetas'
+import { parsePairBetaCSV, savePairBetas, clearPairBetas, loadPairBetasMeta, loadPairBetas, getPairEntry, pairLabelToId } from '../lib/pairBetas'
 
 const CATEGORY_MAP = {
   real_2y: 'CARRY', ca_gdp: 'ESTRUCTURAL', reer: 'VALUATION', tot: 'ESTRUCTURAL',
@@ -45,11 +45,45 @@ function groupByCategory(indicators) {
 
 const GROUPS = groupByCategory(ALL_INDICATORS)
 
+const VIEW_PAIRS = [
+  { label: 'EUR/USD', base: 'eur', quote: 'usa' },
+  { label: 'USD/JPY', base: 'usa', quote: 'jpn' },
+  { label: 'GBP/USD', base: 'gbr', quote: 'usa' },
+  { label: 'USD/CHF', base: 'usa', quote: 'che' },
+  { label: 'AUD/USD', base: 'aus', quote: 'usa' },
+  { label: 'USD/CAD', base: 'usa', quote: 'can' },
+  { label: 'NZD/USD', base: 'nzl', quote: 'usa' },
+  { label: 'EUR/GBP', base: 'eur', quote: 'gbr' },
+  { label: 'EUR/JPY', base: 'eur', quote: 'jpn' },
+  { label: 'GBP/JPY', base: 'gbr', quote: 'jpn' },
+]
+
+function BetaCell({ entry, docBeta }) {
+  if (!entry) return <span className="text-[#2a2a2a] font-mono text-xs">—</span>
+  const beta = entry.beta
+  const color = !entry.significant
+    ? 'text-[#444]'
+    : beta > 0 ? 'text-[#4ade80]' : 'text-[#ef4444]'
+  const r2Pct = entry.r2 != null ? (entry.r2 * 100).toFixed(0) : null
+  return (
+    <div className="flex flex-col items-end">
+      <span className={`font-mono text-xs font-bold ${color}`}>
+        {beta >= 0 ? '+' : ''}{beta.toFixed(4)}
+      </span>
+      {r2Pct != null && (
+        <span className="text-[9px] font-mono text-[#333]">R²{r2Pct}%</span>
+      )}
+    </div>
+  )
+}
+
 export default function EndogenousBetasPage() {
-  const [betas,    setBetas]    = useState(loadBetas)
-  const [confirm,  setConfirm]  = useState(false)
-  const [flashMsg, setFlashMsg] = useState(null)
-  const [pairMeta, setPairMeta] = useState(loadPairBetasMeta)
+  const [betas,           setBetas]           = useState(loadBetas)
+  const [confirm,         setConfirm]         = useState(false)
+  const [flashMsg,        setFlashMsg]        = useState(null)
+  const [pairMeta,        setPairMeta]        = useState(loadPairBetasMeta)
+  const [pairBetaData,    setPairBetaData]    = useState(loadPairBetas)
+  const [selectedViewPair, setSelectedViewPair] = useState('EUR/USD')
 
   function handleCSVUpload(e) {
     const file = e.target.files?.[0]
@@ -65,6 +99,7 @@ export default function EndogenousBetasPage() {
       }
       savePairBetas(data)
       setPairMeta(loadPairBetasMeta())
+      setPairBetaData(data)
       setFlashMsg(`CSV cargado — ${pairs.length} pares`)
       setTimeout(() => setFlashMsg(null), 4000)
     }
@@ -75,6 +110,7 @@ export default function EndogenousBetasPage() {
   function handleClearPairBetas() {
     clearPairBetas()
     setPairMeta(null)
+    setPairBetaData(null)
     setFlashMsg('Betas por par eliminadas')
     setTimeout(() => setFlashMsg(null), 3000)
   }
@@ -307,6 +343,84 @@ export default function EndogenousBetasPage() {
             </div>
           </div>
         </div>
+
+        {/* ── VISTA POR PAR — solo si hay CSV cargado ── */}
+        {pairBetaData && (() => {
+          const vp = VIEW_PAIRS.find(p => p.label === selectedViewPair) ?? VIEW_PAIRS[0]
+          const pairId = pairLabelToId(vp.label)
+          const implOnly = ALL_INDICATORS.filter(i => i.implemented)
+          const baseLbl  = vp.base.toUpperCase()
+          const quoteLbl = vp.quote === 'can' ? 'CAD' : vp.quote.toUpperCase()
+          return (
+            <div className="border-2 border-[#60a5fa]/30 mb-2">
+              {/* Cabecera + selector de par */}
+              <div className="px-3 py-1.5 bg-[#0a0f1a] border-b border-[#60a5fa]/20 flex items-center justify-between flex-wrap gap-2">
+                <span className="text-xs font-bold uppercase tracking-widest text-[#60a5fa]">
+                  Betas Pipeline por Par
+                </span>
+                <div className="flex items-center gap-1 flex-wrap">
+                  {VIEW_PAIRS.map(p => (
+                    <button key={p.label} onClick={() => setSelectedViewPair(p.label)}
+                      className={`px-2 py-0.5 text-[10px] font-bold font-mono uppercase transition-colors
+                        ${selectedViewPair === p.label
+                          ? 'bg-[#60a5fa]/20 text-[#60a5fa] border border-[#60a5fa]/50'
+                          : 'text-[#444] border border-[#222] hover:text-[#888]'}`}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tabla */}
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#1a1a2e]">
+                    <th className="px-3 py-1.5 text-left text-[10px] text-[#444] uppercase tracking-wider w-[35%]">Indicador</th>
+                    <th className="px-3 py-1.5 text-right text-[10px] text-[#60a5fa] uppercase tracking-wider w-[20%]">{baseLbl} (base)</th>
+                    <th className="px-3 py-1.5 text-right text-[10px] text-[#f59e0b] uppercase tracking-wider w-[20%]">{quoteLbl} (quote)</th>
+                    <th className="px-3 py-1.5 text-right text-[10px] text-[#444] uppercase tracking-wider w-[12%]">β doc</th>
+                    <th className="px-3 py-1.5 text-right text-[10px] text-[#444] uppercase tracking-wider w-[13%]">horizon</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {implOnly.map(ind => {
+                    const baseEntry  = getPairEntry(pairBetaData, pairId, vp.base,  ind.key)
+                    const quoteEntry = getPairEntry(pairBetaData, pairId, vp.quote, ind.key)
+                    const hasSig = baseEntry?.significant || quoteEntry?.significant
+                    return (
+                      <tr key={ind.key}
+                        className={`border-b border-[#0d0d1a] transition-colors hover:bg-[#080810]
+                          ${hasSig ? '' : 'opacity-40'}`}>
+                        <td className="px-3 py-1.5">
+                          <div className="text-xs font-bold text-[#e5e5e5]">{ind.label}</div>
+                          <div className="text-[9px] font-mono text-[#333]">{ind.key}</div>
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          <BetaCell entry={baseEntry}  docBeta={ind.betaDoc} />
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          <BetaCell entry={quoteEntry} docBeta={ind.betaDoc} />
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          <span className="text-[10px] font-mono text-[#333]">{ind.betaDoc.toFixed(2)}</span>
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          <span className={`text-[9px] font-bold uppercase ${
+                            ind.horizon === 'SHORT' ? 'text-[#60a5fa]' : ind.horizon === 'MEDIUM' ? 'text-[#f59e0b]' : 'text-[#555]'
+                          }`}>{ind.horizon}</span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              <div className="px-3 py-2 border-t border-[#0d0d1a] text-[10px] text-[#333]">
+                Betas con signo directo del pipeline OLS. Verde = positivo (divisa sube con el indicador). Rojo = negativo.
+                Atenuado = p≥0.05, no significativo. R² = poder explicativo.
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Footer total */}
         <div className="border border-[#222] px-3 py-2 flex items-center justify-between text-xs">

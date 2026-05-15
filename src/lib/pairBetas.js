@@ -99,6 +99,14 @@ export function getPairBeta(pairData, fxPairId, appPrefix, appKey) {
   return Math.abs(entry.beta)
 }
 
+// Devuelve la entrada completa { beta (con signo), r2, significant } o null.
+// Para uso en UI de visualización.
+export function getPairEntry(pairData, fxPairId, appPrefix, appKey) {
+  const pairEntry = pairData?.[fxPairId]
+  if (!pairEntry) return null
+  return pairEntry[toPipelineName(appPrefix, appKey)] ?? null
+}
+
 // 'EUR/USD' → 'eurusd'
 export function pairLabelToId(label) {
   return label.replace('/', '').toLowerCase()
