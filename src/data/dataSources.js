@@ -3157,9 +3157,11 @@ export function getAccessSummary(sources = dataSources) {
  * Calcula la fecha de proxima actualizacion basada en lastUpdate + frequencyDays.
  */
 export function getNextUpdate(lastUpdateStr, frequencyDays) {
+  if (!lastUpdateStr) return '—'
   const last = new Date(lastUpdateStr)
+  if (Number.isNaN(last.getTime())) return '—'
   const next = new Date(last)
-  next.setDate(next.getDate() + frequencyDays)
+  next.setDate(next.getDate() + (Number(frequencyDays) || 30))
   return next.toISOString().split('T')[0]
 }
 
@@ -3174,6 +3176,9 @@ export function getStatus(source) {
   today.setHours(0, 0, 0, 0)
 
   const last = new Date(source.lastUpdate)
+  if (!source.lastUpdate || Number.isNaN(last.getTime())) {
+    return { code: 'stale', label: 'SIN FECHA', color: 'text-[#ef4444]' }
+  }
   last.setHours(0, 0, 0, 0)
 
   // Si fue actualizado hoy -> OK
@@ -3184,6 +3189,9 @@ export function getStatus(source) {
 
   const nextStr = getNextUpdate(source.lastUpdate, source.frequencyDays)
   const next = new Date(nextStr)
+  if (Number.isNaN(next.getTime())) {
+    return { code: 'stale', label: 'SIN FECHA', color: 'text-[#ef4444]' }
+  }
   next.setHours(0, 0, 0, 0)
 
   const diffNext = Math.ceil((next - today) / (1000 * 60 * 60 * 24))
