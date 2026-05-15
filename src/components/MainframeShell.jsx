@@ -1,15 +1,56 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAppStore } from '../stores/appStore'
 
-const TABS = [
-  { key: '1', label: 'DASHBOARD',   to: '/dashboard' },
-  { key: '2', label: 'ANÁLISIS',    to: '/world-view/operativa' },
-  { key: '3', label: 'EJECUCIÓN',   to: '/execution/operativa' },
-  { key: '4', label: 'APRENDIZAJE', to: '/world-view' },
-  { key: '5', label: 'DATA',        to: '/data' },
-  { key: '6', label: 'ADMIN',       to: '/admin' },
-  { key: '7', label: 'FRAMEWORK',   to: '/world-view' },
+const TAB_GROUPS = [
+  {
+    key: '1', label: 'DASHBOARD', to: '/dashboard',
+  },
+  {
+    key: '2', label: 'ANÁLISIS', to: '/world-view/operativa',
+    items: [
+      { to: '/dashboard',           label: 'HUB',        desc: 'Dashboard' },
+      { to: '/world-view/operativa',label: 'WORLD VIEW', desc: 'World View' },
+      { to: '/endogenous',          label: 'ENDOGENOUS', desc: 'Endogenous' },
+      { to: '/exogenous/operativa', label: 'EXOGENOUS',  desc: 'Exogenous' },
+    ],
+  },
+  {
+    key: '3', label: 'EJECUCIÓN', to: '/execution/operativa',
+    items: [
+      { to: '/timing/operativa',    label: 'TIMING',    desc: 'Timing' },
+      { to: '/risk/operativa',      label: 'RISK',      desc: 'Risk Mgmt' },
+      { to: '/execution/operativa', label: 'EXECUTION', desc: 'Execution' },
+    ],
+  },
+  {
+    key: '4', label: 'APRENDIZAJE', to: '/world-view',
+    items: [
+      { to: '/world-view',  label: 'TEORÍA',     desc: 'World View Theory' },
+      { to: '/journal',     label: 'JOURNAL',    desc: 'Trade Journal' },
+      { to: '/performance', label: 'PERFORMANCE',desc: 'Performance' },
+    ],
+  },
+  {
+    key: '5', label: 'DATA', to: '/data',
+    items: [
+      { to: '/data',                      label: 'HUB',           desc: 'Data Hub' },
+      { to: '/data/raw',                  label: 'RAW',           desc: 'Raw Data' },
+      { to: '/data/coverage-matrix',      label: 'COVERAGE',      desc: 'Coverage Matrix' },
+      { to: '/data/history',              label: 'HISTORY',       desc: 'History' },
+      { to: '/data/economic-calendar',    label: 'CALENDAR',      desc: 'Economic Calendar' },
+      { to: '/data/notifications',        label: 'NOTIFICATIONS', desc: 'Notifications' },
+    ],
+  },
+  {
+    key: '6', label: 'ADMIN', to: '/admin', adminOnly: true,
+  },
+  {
+    key: '7', label: 'FRAMEWORK', to: '/world-view',
+    items: [
+      { to: '/world-view', label: 'DOCUMENTACIÓN', desc: 'Framework Docs' },
+    ],
+  },
 ]
 
 const DEFAULT_FKEYS = [
@@ -85,11 +126,63 @@ function getFkeys(pathname) {
   return DEFAULT_FKEYS
 }
 
+function TabDropdown({ group, location }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  const isGroupActive = group.items.some(
+    item => location.pathname.startsWith(item.to) && item.to !== '/'
+  ) || location.pathname === group.to
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  return (
+    <div ref={ref} className="mf-tab-dropdown">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`mf-tab-btn ${isGroupActive ? 'is-active' : ''}`}
+      >
+        <span className="mf-tab-key">[{group.key}]</span>
+        {group.label}
+        <span className={`mf-tab-arrow ${open ? 'open' : ''}`}>▼</span>
+      </button>
+
+      {open && (
+        <div className="mf-tab-menu">
+          {group.items.map(item => {
+            const active = location.pathname === item.to || (item.to !== '/' && location.pathname.startsWith(item.to))
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                onClick={() => setOpen(false)}
+                className={`mf-tab-menu-item ${active ? 'is-active' : ''}`}
+              >
+                <span>{item.label}</span>
+                <span className="mf-tab-menu-desc">{item.desc}</span>
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function MainframeShell() {
   const theme = useAppStore((s) => s.theme)
   const toggleTheme = useAppStore((s) => s.toggleTheme)
+  const user = useAppStore((s) => s.user)
   const location = useLocation()
   const [now, setNow] = useState(() => new Date())
+
+  const isAdmin = user?.app_metadata?.role === 'admin'
 
   useEffect(() => {
     if (theme !== 'mainframe') return
@@ -110,7 +203,7 @@ export default function MainframeShell() {
 
   const stamp = formatStamp(now)
   const termId = '3278-2'
-  const user = 'ERIS'
+  const userLabel = user?.email ? user.email.split('@')[0].toUpperCase() : 'ERIS'
   const fkeys = getFkeys(location.pathname)
 
   return (
@@ -122,19 +215,25 @@ export default function MainframeShell() {
         <span className="mf-topbar__spacer" />
         <span className="mf-topbar__cell">{stamp}<span className="mf-blink">_</span></span>
         <span className="mf-topbar__cell">TERM:<strong>{termId}</strong></span>
-        <span className="mf-topbar__cell">USER:<strong>{user}</strong></span>
+        <span className="mf-topbar__cell">USER:<strong>{userLabel}</strong></span>
         <button className="mf-topbar__logout" onClick={toggleTheme} title="Return to default UI">
           LOGOUT
         </button>
       </div>
 
       <nav className="mf-tabs" aria-label="primary">
-        {TABS.map((t) => {
+        {TAB_GROUPS.map((t) => {
+          if (t.adminOnly && !isAdmin) return null
+
+          if (t.items) {
+            return <TabDropdown key={t.key} group={t} location={location} />
+          }
+
           const active =
             (t.to === '/' && location.pathname === '/') ||
             (t.to !== '/' && location.pathname.startsWith(t.to))
           return (
-            <Link key={t.key} to={t.to} className={active ? 'is-active' : ''}>
+            <Link key={t.key} to={t.to} className={`mf-tab-btn ${active ? 'is-active' : ''}`}>
               <span className="mf-tab-key">[{t.key}]</span>
               {t.label}
             </Link>

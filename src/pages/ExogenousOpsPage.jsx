@@ -209,9 +209,9 @@ export default function ExogenousOpsPage() {
 
         {/* ── SESGO PONDERADO POR DIVISA ── */}
         <div className="border-2 border-[#333] mb-3">
-          <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333]">
+          <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333] flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Sesgo Exógeno Ponderado por Divisa</span>
-            <span className="text-[10px] text-[#555] ml-3">Score −1 (muy bearish) a +1 (muy bullish) · ponderado por relevancia del driver</span>
+            <span className="text-[10px] text-[#555]">Score −1 (muy bearish) a +1 (muy bullish) · ponderado por relevancia del driver</span>
           </div>
           <div className="grid grid-cols-5 sm:grid-cols-10">
             {CCYS.map(ccy => {
