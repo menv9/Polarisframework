@@ -8,7 +8,10 @@ import pandas as pd
 import requests
 import yfinance as yf
 
-from config import CACHE_DIR, FRED_API_KEY, FRED_SERIES, FRED_SLEEP, START_DATE, YAHOO_TICKERS
+from config import (
+    CACHE_DIR, FRED_API_KEY, FRED_SERIES, FRED_SLEEP, START_DATE,
+    YAHOO_TICKERS, WORLDBANK_CA_SERIES,
+)
 
 
 FRED_URL = "https://api.stlouisfed.org/fred/series/observations"
@@ -107,19 +110,87 @@ def fetch_yahoo(start_date: str = START_DATE, verbose: bool = True) -> tuple[pd.
     return close, failed
 
 
+WB_URL = "https://api.worldbank.org/v2/country/{country}/indicator/{indicator}"
+
+
+def fetch_worldbank(
+    series_map: dict[str, tuple[str, str]] = WORLDBANK_CA_SERIES,
+    start_date: str = START_DATE,
+    verbose: bool = True,
+) -> tuple[pd.DataFrame, dict]:
+    """Fetch annual series from the World Bank API and expand to monthly.
+
+    series_map: {pipeline_name: (wb_country_iso2, wb_indicator_id)}
+    Annual values are forward-filled to calendar-month frequency so that
+    the pipeline's alignment step handles them like any other monthly series.
+    """
+    ok: list[str] = []
+    failed: list[dict] = []
+    series: dict[str, pd.Series] = {}
+    start_yr = max(2000, int(start_date[:4]) - 1)
+
+    for name, (country, indicator) in series_map.items():
+        url = WB_URL.format(country=country, indicator=indicator)
+        params = {
+            "format": "json",
+            "date": f"{start_yr}:2030",
+            "per_page": "200",
+            "mrv": "30",
+        }
+        try:
+            resp = requests.get(url, params=params, timeout=30)
+            resp.raise_for_status()
+            payload = resp.json()
+            if len(payload) < 2 or not payload[1]:
+                raise ValueError("empty response")
+            records = [
+                (pd.Timestamp(f"{r['date']}-12-31"), float(r["value"]))
+                for r in payload[1]
+                if r.get("value") is not None
+            ]
+            if not records:
+                raise ValueError("no non-null observations")
+            records.sort(key=lambda x: x[0])
+            s = pd.Series(
+                [v for _, v in records],
+                index=pd.DatetimeIndex([d for d, _ in records]),
+            )
+            # Expand annual → monthly: forward-fill each year's value across 12 months
+            monthly_idx = pd.date_range(s.index.min(), pd.Timestamp.today(), freq="ME")
+            series[name] = s.reindex(monthly_idx).ffill()
+            ok.append(name)
+            if verbose:
+                _log(f"WB ok   {name:<30} {len(records)} annual obs → {len(series[name])} monthly")
+        except Exception as exc:
+            failed.append({"name": name, "country": country, "indicator": indicator, "error": str(exc)})
+            if verbose:
+                _log(f"WB fail {name:<30} {exc}")
+        time.sleep(0.4)
+
+    if verbose:
+        _log(f"World Bank: {len(ok)} downloaded, {len(failed)} failed")
+
+    df = pd.DataFrame(series).sort_index() if series else pd.DataFrame()
+    return df, {"wb_ok": ok, "wb_failed": failed}
+
+
 def fetch_all(start_date: str = START_DATE, verbose: bool = True) -> tuple[pd.DataFrame, dict]:
-    """Fetch FRED and Yahoo data, then combine them into one raw frame."""
+    """Fetch FRED, Yahoo Finance, and World Bank data, then combine into one raw frame."""
     print("\n-- Phase 1 / Ingestion ---------------------------------------------")
     fred_df, fred_failed = fetch_fred(start_date=start_date, verbose=verbose)
     yahoo_df, yahoo_failed = fetch_yahoo(start_date=start_date, verbose=verbose)
+    wb_df, wb_report = fetch_worldbank(start_date=start_date, verbose=verbose)
 
-    df_raw = pd.concat([fred_df, yahoo_df], axis=1).sort_index()
+    frames = [df for df in (fred_df, yahoo_df, wb_df) if not df.empty]
+    df_raw = pd.concat(frames, axis=1).sort_index()
     report = {
-        "sources": ["FRED", "Yahoo Finance"],
+        "sources": ["FRED", "Yahoo Finance", "World Bank"],
         "fred_ok": [col for col in FRED_SERIES if col in fred_df.columns],
         "fred_failed": fred_failed,
         "yahoo_ok": [col for col in YAHOO_TICKERS if col in yahoo_df.columns],
         "yahoo_failed": yahoo_failed,
+        "wb_ok": wb_report["wb_ok"],
+        "wb_failed": wb_report["wb_failed"],
         "total_series": int(df_raw.shape[1]),
         "start_date": start_date,
     }

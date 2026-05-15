@@ -108,7 +108,7 @@ FRED_SERIES = {
     "endo_usa_empl": "UNRATE",
     "endo_usa_nfp": "PAYEMS",
     "endo_usa_retail": "RSAFS",
-    "endo_usa_ca": "BOPGSTB",
+    "endo_usa_niip": "IIPUSNETIQ",
     "endo_usa_reer": "RBUSBIS",
     "endo_usa_debt_gdp": "GFDEGDQ188S",
     "endo_usa_cb_balance": "WALCL",
@@ -127,6 +127,7 @@ FRED_SERIES = {
     # GBP
     "endo_gbr_policy": "BOEBR",
     "endo_gbr_cpi": "GBRCPIALLMINMEI",
+    "endo_gbr_core_cpi": "GBRCPICORMINMEI",
     "endo_gbr_reer": "RNGBRBIS",
     "endo_gbr_unempl": "LRHUTTTTGBM156S",
     # JPY
@@ -144,6 +145,7 @@ FRED_SERIES = {
     "endo_nzl_policy": "IRSTCI01NZM156N",
     "endo_nzl_cpi": "NZLCPIALLQINMEI",
     "endo_nzl_reer": "RNNZLBIS",
+    "endo_nzl_unempl": "LRHUTTTTNZM156S",
     "endo_cad_policy": "IRSTCI01CAM156N",
     "endo_cad_cpi": "CANCPIALLMINMEI",
     "endo_cad_reer": "RNCANBIS",
@@ -151,6 +153,7 @@ FRED_SERIES = {
     "endo_che_policy": "IRSTCI01CHM156N",
     "endo_che_cpi": "CHECPIALLMINMEI",
     "endo_che_reer": "RNCHEBIS",
+    "endo_che_unempl": "LRHUTTTTCHM156S",
     "endo_swe_policy": "IRSTCI01SEM156N",
     "endo_swe_cpi": "SWECPIALLMINMEI",
     "endo_nor_policy": "IRSTCI01NOM156N",
@@ -228,7 +231,10 @@ TRANSFORM_RULES = {
         "endo_gbr_unempl",
         "endo_jpn_unempl",
         "endo_aus_unempl",
+        "endo_nzl_unempl",
         "endo_cad_unempl",
+        "endo_che_unempl",
+        "endo_usa_niip",
         "exo_chn_pmi",
     ],
     "level": [
@@ -241,6 +247,7 @@ TRANSFORM_RULES = {
         "endo_eur_cpi",
         "endo_eur_core_cpi",
         "endo_gbr_cpi",
+        "endo_gbr_core_cpi",
         "endo_jpn_cpi",
         "endo_jpn_core_cpi",
         "endo_aus_cpi",
@@ -260,5 +267,30 @@ TRANSFORM_RULES = {
         "endo_usa_debt_gdp",
         "endo_eur_debt_gdp",
         "endo_usa_conf",
+        # World Bank CA % GDP series (annual, already in % → level transform)
+        "endo_usa_ca",
+        "endo_eur_ca",
+        "endo_gbr_ca",
+        "endo_jpn_ca",
+        "endo_aus_ca",
+        "endo_nzl_ca",
+        "endo_cad_ca",
+        "endo_che_ca",
+        # NIIP — non-stationary level (use diff in zScore, level here for pipeline input)
+        "endo_usa_niip",
     ],
+}
+
+# World Bank current account % GDP  (indicator BN.CAB.XOKA.GD.ZS)
+# Annual data → expanded to monthly in fetch_worldbank()
+# WB country codes: ISO2 for G10 + "EMU" for Euro Area aggregate
+WORLDBANK_CA_SERIES: dict[str, tuple[str, str]] = {
+    "endo_usa_ca": ("US",  "BN.CAB.XOKA.GD.ZS"),
+    "endo_eur_ca": ("EMU", "BN.CAB.XOKA.GD.ZS"),
+    "endo_gbr_ca": ("GB",  "BN.CAB.XOKA.GD.ZS"),
+    "endo_jpn_ca": ("JP",  "BN.CAB.XOKA.GD.ZS"),
+    "endo_aus_ca": ("AU",  "BN.CAB.XOKA.GD.ZS"),
+    "endo_nzl_ca": ("NZ",  "BN.CAB.XOKA.GD.ZS"),
+    "endo_cad_ca": ("CA",  "BN.CAB.XOKA.GD.ZS"),
+    "endo_che_ca": ("CH",  "BN.CAB.XOKA.GD.ZS"),
 }

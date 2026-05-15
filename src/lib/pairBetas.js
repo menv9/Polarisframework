@@ -93,12 +93,13 @@ export function loadPairBetasMeta() {
 
 // ─── Lookups puntuales ────────────────────────────────────────────────────────
 
-// abs(beta) para un par concreto — fallback a null si no hay dato.
+// abs(beta) para un par concreto — solo si es significativa (p<0.05).
+// Devuelve null si no hay dato o si no es significativa → fallback a betaDoc en el caller.
 export function getPairBeta(pairData, fxPairId, appPrefix, appKey) {
   const pairEntry = pairData?.[fxPairId]
   if (!pairEntry) return null
   const entry = pairEntry[toPipelineName(appPrefix, appKey)]
-  if (!entry) return null
+  if (!entry?.significant) return null
   return Math.abs(entry.beta)
 }
 
@@ -110,14 +111,15 @@ export function getPairEntry(pairData, fxPairId, appPrefix, appKey) {
 }
 
 // Promedio de abs(beta) de un indicador para una divisa a través de TODOS los pares.
-// Usado para scores individuales de país (ranking G10, EndogenousOps).
+// Solo cuenta los pares donde la beta es estadísticamente significativa (p<0.05).
+// Si ningún par tiene beta significativa, devuelve null → fallback a betaDoc.
 function getCountryAvgBeta(pairData, appPrefix, appKey) {
   if (!pairData) return null
   const name = toPipelineName(appPrefix, appKey)
   const values = []
   for (const indicators of Object.values(pairData)) {
     const entry = indicators[name]
-    if (entry) values.push(Math.abs(entry.beta))
+    if (entry?.significant) values.push(Math.abs(entry.beta))
   }
   return values.length > 0 ? values.reduce((s, v) => s + v, 0) / values.length : null
 }
@@ -156,7 +158,7 @@ export function computeCountryScore(prefix, cyclical, regime, zScores, pairData)
     else                               longScore += contrib
   })
 
-  return 0.20 * short + 0.50 * medium + 0.30 * longScore
+  return (0.20 * short + 0.50 * medium + 0.30 * longScore) * 10
 }
 
 // Igual que computeCountryScore pero devuelve el desglose por horizonte.
@@ -175,7 +177,13 @@ export function computeCountryScoreDetailed(prefix, cyclical, regime, zScores, p
     else                               longScore += contrib
   })
 
-  return { composite: 0.20 * short + 0.50 * medium + 0.30 * longScore, short, medium, long: longScore }
+  const scale = 10
+  return {
+    composite: (0.20 * short + 0.50 * medium + 0.30 * longScore) * scale,
+    short:     short     * scale,
+    medium:    medium    * scale,
+    long:      longScore * scale,
+  }
 }
 
 // Score endógeno de un país en el contexto de un par concreto.
@@ -199,5 +207,5 @@ export function computeCountryScoreForPair(prefix, cyclical, regime, zScores, pa
     else                               longScore += contrib
   })
 
-  return 0.20 * short + 0.50 * medium + 0.30 * longScore
+  return (0.20 * short + 0.50 * medium + 0.30 * longScore) * 10
 }

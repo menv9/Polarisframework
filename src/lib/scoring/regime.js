@@ -150,5 +150,5 @@ export function getConviction(signal, historicalSignals = []) {
     return a >= p75 ? 'FULL' : a >= p50 ? 'HALF' : 'FLAT'
   }
 
-  return a > 0.25 ? 'FULL' : a > 0.10 ? 'HALF' : 'FLAT'
+  return a > 2.5 ? 'FULL' : a > 1.0 ? 'HALF' : 'FLAT'
 }

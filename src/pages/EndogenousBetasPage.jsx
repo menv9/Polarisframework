@@ -148,10 +148,11 @@ export default function EndogenousBetasPage() {
             )}
             <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-[#333] text-[#555] hover:text-white hover:border-white transition-colors">
               <input type="file" accept=".csv" onChange={handleCSVUpload} className="hidden" />
-              {pairMeta ? 'Actualizar CSV' : 'Cargar beta_matrix_full.csv'}
+              {pairMeta ? 'Actualizar CSV' : 'Cargar beta_matrix_app.csv'}
             </label>
             <span className="text-[10px] text-[#333]">
               Genera con: <span className="font-mono text-[#3a3a3a]">beta_pipeline/run.py</span>
+              <span className="ml-1 text-[#2a2a2a]">→ output/YYYYMMDD_HHMMSS/beta_matrix_app.csv</span>
             </span>
           </div>
         </div>

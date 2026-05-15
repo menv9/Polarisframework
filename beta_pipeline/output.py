@@ -52,6 +52,66 @@ def _style() -> None:
     )
 
 
+# Reverse of pairBetas.js PREFIX_MAP: pipeline prefix → app prefix
+_PIPELINE_TO_APP_PREFIX: dict[str, str] = {"cad": "can"}
+
+# Reverse of pairBetas.js KEY_MAP + nfp special case: pipeline suffix → app key
+_PIPELINE_TO_APP_KEY: dict[str, str] = {
+    "debt_gdp": "debt",
+    "ca":       "ca_gdp",
+    "conf":     "umcsi",
+    "unempl":   "nfp",
+}
+
+_KNOWN_PREFIXES = {"usa", "eur", "gbr", "jpn", "aus", "nzl", "cad", "che", "swe", "nor"}
+
+
+def _pipeline_col_to_app_key(col: str) -> str | None:
+    """'endo_cad_debt_gdp' → 'can_debt', 'endo_eur_unempl' → 'eur_nfp', etc."""
+    if not col.startswith("endo_"):
+        return None
+    rest = col[5:]
+    for prefix in _KNOWN_PREFIXES:
+        if rest.startswith(prefix + "_"):
+            pipeline_key = rest[len(prefix) + 1:]
+            app_prefix = _PIPELINE_TO_APP_PREFIX.get(prefix, prefix)
+            app_key = _PIPELINE_TO_APP_KEY.get(pipeline_key, pipeline_key)
+            return f"{app_prefix}_{app_key}"
+    return None
+
+
+def save_endogenous_history(run_path: Path, df_aligned: pd.DataFrame) -> None:
+    """Export aligned monthly series as endogenous_history.json for direct app import.
+
+    The JSON matches the polaris_endogenous_history localStorage structure so the
+    app can load it via the PIPELINE JSON button in Model Inputs.
+    """
+    endo_cols = [c for c in df_aligned.columns if c.startswith("endo_")]
+    history: dict = {}
+    today = datetime.now().isoformat(timespec="seconds")
+
+    for col in endo_cols:
+        app_key = _pipeline_col_to_app_key(col)
+        if not app_key:
+            continue
+        series = df_aligned[col].dropna()
+        if len(series) < 12:
+            continue
+        history[app_key] = {
+            "series": [
+                {"date": idx.strftime("%Y-%m"), "value": round(float(v), 6)}
+                for idx, v in series.items()
+            ],
+            "lastImported": today,
+        }
+
+    import json as _json
+    out = run_path / "endogenous_history.json"
+    with out.open("w", encoding="utf-8") as f:
+        _json.dump(history, f, separators=(",", ":"))
+    print(f"  Exported {len(history)} endogenous series → endogenous_history.json")
+
+
 def save_tables(
     run_path: Path,
     beta_static: pd.DataFrame,
@@ -63,11 +123,20 @@ def save_tables(
     coverage: pd.Series | None = None,
 ) -> None:
     beta_static.to_csv(run_path / "beta_matrix_full.csv", index=False)
+
+    # App-specific filtered matrix: only endo_ indicators, columns the app reads.
+    # Import this file (beta_matrix_app.csv) in the Polaris app instead of the full one.
+    _app_cols = ["fx_pair", "indicator", "beta", "r2", "p_value", "significant"]
+    beta_static[beta_static["indicator"].str.startswith("endo_")][_app_cols].to_csv(
+        run_path / "beta_matrix_app.csv", index=False
+    )
+
     pivot.to_csv(run_path / "beta_matrix_pivot.csv")
     regime_flags.to_csv(run_path / "regime_flags.csv", index=False)
 
     if df_aligned is not None:
         df_aligned.to_csv(run_path / "aligned_monthly.csv")
+        save_endogenous_history(run_path, df_aligned)
     if df_trans is not None:
         df_trans.to_csv(run_path / "transformed_monthly.csv")
     if coverage is not None:
@@ -225,9 +294,11 @@ def save_report(
         f"Run ID: {run_id}",
         f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         "",
-        "Sources: FRED API + Yahoo Finance only. Paid/manual-only sources excluded.",
+        "Sources: FRED API + Yahoo Finance + World Bank. Paid/manual-only sources excluded.",
+        "App import file: beta_matrix_app.csv (endo_ indicators only, all pairs)",
         f"FRED downloaded: {len(fetch_report.get('fred_ok', []))}",
         f"Yahoo downloaded: {len(fetch_report.get('yahoo_ok', []))}",
+        f"World Bank downloaded: {len(fetch_report.get('wb_ok', []))}",
         f"Total raw series: {fetch_report.get('total_series', 0)}",
         "",
         "Static beta",

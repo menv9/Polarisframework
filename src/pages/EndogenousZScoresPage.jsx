@@ -255,7 +255,9 @@ export default function ModelInputsPage() {
   const [urlEditKey, setUrlEditKey]     = useState(null)
   const [urlEditValue, setUrlEditValue] = useState('')
   const fileInputRef                    = useRef(null)
+  const pipelineJsonRef                 = useRef(null)
   const [isDragging, setIsDragging]     = useState(false)
+  const [pipelineMsg, setPipelineMsg]   = useState(null)
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_URLS, JSON.stringify(customUrls))
@@ -384,6 +386,35 @@ export default function ModelInputsPage() {
     setHistory({})
   }
 
+  const handlePipelineJSON = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = evt => {
+      try {
+        const data = JSON.parse(evt.target.result)
+        let count = 0
+        setHistory(prev => {
+          const next = { ...prev }
+          for (const [key, entry] of Object.entries(data)) {
+            if (Array.isArray(entry?.series) && entry.series.length > 0) {
+              next[key] = entry
+              count++
+            }
+          }
+          return next
+        })
+        setPipelineMsg(`Pipeline: ${count} series cargadas`)
+        setTimeout(() => setPipelineMsg(null), 4000)
+      } catch {
+        setPipelineMsg('Error: JSON inválido')
+        setTimeout(() => setPipelineMsg(null), 4000)
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
   const handleLoadFromHistory = async (prefix, key) => {
     const sourceId = getSourceId(prefix, key)
     const storageKey = `${prefix}_${key}`
@@ -470,6 +501,11 @@ export default function ModelInputsPage() {
           <div className="flex items-center gap-3">
             {syncMsg && <span className="text-xs font-bold text-[#4ade80] uppercase tracking-wider">{syncMsg}</span>}
             {featureMsg && <span className={`text-xs font-bold uppercase tracking-wider ${featureMsg.startsWith('Error') ? 'text-[#ef4444]' : 'text-[#4ade80]'}`}>{featureMsg}</span>}
+            {pipelineMsg && <span className={`text-xs font-bold uppercase tracking-wider ${pipelineMsg.startsWith('Error') ? 'text-[#ef4444]' : 'text-[#60a5fa]'}`}>{pipelineMsg}</span>}
+            <label className="cursor-pointer px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#60a5fa] text-[#60a5fa] hover:text-white hover:border-white">
+              <input ref={pipelineJsonRef} type="file" accept=".json" onChange={handlePipelineJSON} className="hidden" />
+              PIPELINE JSON
+            </label>
             <button
               onClick={() => exportModelInputsCsv({ history, activeTab, activeCountry, activeStats })}
               className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#4ade80] text-[#4ade80] hover:text-white hover:border-white"
