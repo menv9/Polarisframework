@@ -1,9 +1,8 @@
 import { useState, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useModelStore } from '../store/ModelDataContext'
-import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
 import { computePositionSize, PIP_VALUES, CONVICTION_MULTIPLIER, REGIME_VOL_MULTIPLIER } from '../lib/risk/sizing'
-import { getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
+import { getConviction } from '../lib/scoring/regime'
 import { loadPairBetas, computeCountryScoreForPair, pairLabelToId } from '../lib/pairBetas'
 import { DRAWDOWN_LEVELS, getDrawdownLevel, getRampupStage, computeCircuitBreakers, computePortfolioExposure } from '../lib/risk/drawdown'
 
@@ -28,20 +27,6 @@ const PAIR_TO_COUNTRIES = {
   'NZD/USD': ['nzl', 'usa'], 'USD/NOK': ['usa', 'nor'], 'USD/SEK': ['usa', 'swe'],
 }
 
-function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
-  const rm = getRegimeMultiplier(regime, cyclical)
-  const betaTotal = computeBetaTotal(betas)
-  let short = 0, medium = 0, longScore = 0
-  for (const ind of INDICATORS) {
-    const beta    = betas[ind.key] ?? ind.betaDoc
-    const z       = zScores[`${prefix}_${ind.key}`] ?? 0
-    const contrib = (beta / betaTotal) * z * ind.sign * rm
-    if (ind.horizon === 'SHORT')  short     += contrib
-    if (ind.horizon === 'MEDIUM') medium    += contrib
-    if (ind.horizon === 'LONG')   longScore += contrib
-  }
-  return 0.20 * short + 0.50 * medium + 0.30 * longScore
-}
 
 function fmtLots(v) {
   if (!v || v === 0) return '0.000'
@@ -50,7 +35,6 @@ function fmtLots(v) {
 
 export default function RiskOpsPage() {
   const { regime, zscores: zScores, signalHistory } = useModelStore()
-  const [betas] = useState(loadBetas)
   const [pairBetaData] = useState(loadPairBetas)
   const [searchParams] = useSearchParams()
 
@@ -97,10 +81,10 @@ export default function RiskOpsPage() {
     const quote = byPrefix.get(ccys[1])
     if (!base || !quote) return 'HALF'
     const pairId     = pairLabelToId(pair)
-    const scoreBase  = computeCountryScoreForPair(base.prefix,  base.cyclical,  regime, zScores, betas, pairBetaData, pairId)
-    const scoreQuote = computeCountryScoreForPair(quote.prefix, quote.cyclical, regime, zScores, betas, pairBetaData, pairId)
+    const scoreBase  = computeCountryScoreForPair(base.prefix,  base.cyclical,  regime, zScores, pairBetaData, pairId)
+    const scoreQuote = computeCountryScoreForPair(quote.prefix, quote.cyclical, regime, zScores, pairBetaData, pairId)
     return getConviction(scoreBase - scoreQuote, signalHistory[pair])
-  }, [pair, regime, zScores, betas, pairBetaData, signalHistory])
+  }, [pair, regime, zScores, pairBetaData, signalHistory])
 
   const ddPct = peakCapital > 0
     ? Math.max(0, (peakCapital - currentCapital) / peakCapital * 100)

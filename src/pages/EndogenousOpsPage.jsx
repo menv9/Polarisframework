@@ -1,8 +1,9 @@
 import { useState, Fragment, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { INDICATORS as BASE_INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
+import { INDICATORS as BASE_INDICATORS } from '../lib/endogenousBetas'
 import { getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
 import { computeExogenousCurrencyScores, combineEndogenousExogenous } from '../lib/scoring/exogenous'
+import { loadPairBetas, computeCountryScoreDetailed, buildCountryBetaArr } from '../lib/pairBetas'
 import { useModelStore } from '../store/ModelDataContext'
 import { getFreshness, FRESHNESS_DOT, FRESHNESS_TEXT } from '../lib/freshness'
 
@@ -98,20 +99,6 @@ function getSourceId(prefix, key) {
   return `endo_${prefix}_${suffix}`
 }
 
-function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
-  const rm = getRegimeMultiplier(regime, cyclical)
-  const betaTotal = computeBetaTotal(betas)
-  let short = 0, medium = 0, longScore = 0
-  for (const ind of INDICATORS) {
-    const beta    = betas[ind.key] ?? ind.betaDoc
-    const z       = zScores[`${prefix}_${ind.key}`] ?? 0
-    const contrib = (beta / betaTotal) * z * ind.sign * rm
-    if (ind.horizon === 'SHORT')  short     += contrib
-    if (ind.horizon === 'MEDIUM') medium    += contrib
-    if (ind.horizon === 'LONG')   longScore += contrib
-  }
-  return { composite: 0.20 * short + 0.50 * medium + 0.30 * longScore, short, medium, long: longScore }
-}
 
 function scoreColor(v) {
   return v > 0.001 ? 'text-[#4ade80]' : v < -0.001 ? 'text-[#ef4444]' : 'text-[#555]'
@@ -178,14 +165,14 @@ function Tooltip({ text, align = 'center' }) {
 
 export default function EndogenousOpsPage() {
   const { zscores: zScores, regime, history, dataSources, features, signalHistory, recordSignalSample } = useModelStore()
-  const [betas]        = useState(loadBetas)
+  const [pairBetaData] = useState(loadPairBetas)
   const [pairA, setPairA]   = useState('usa')
   const [pairB, setPairB]   = useState('eur')
   const [activeTab, setActiveTab] = useState('usa')
 
   const exogenousScores = computeExogenousCurrencyScores(dataSources, history)
   const countryScores  = COUNTRIES.map(c => {
-    const endo = computeCountryScore(c.prefix, c.cyclical, regime, zScores, betas)
+    const endo     = computeCountryScoreDetailed(c.prefix, c.cyclical, regime, zScores, pairBetaData)
     const exoScore = exogenousScores[c.ccy] ?? 0
     return {
       ...c,
@@ -217,12 +204,15 @@ export default function EndogenousOpsPage() {
     if (pairLabel) recordSignalSample(pairLabel, signal)
   }, [pairLabel, signal, recordSignalSample])
 
+  // Betas efectivas del país activo (promedio pipeline o betaDoc fallback)
+  const activeBetaArr = activeCountry ? buildCountryBetaArr(pairBetaData, activeCountry.prefix) : []
+  const activeBetaTotal = activeBetaArr.reduce((s, b) => s + b, 0) || 1
+
   // Max contribution for bar scaling
-  const betaTotal = computeBetaTotal(betas)
   const allContribs = activeCountry
-    ? INDICATORS.map(ind => {
+    ? INDICATORS.map((ind, i) => {
         const z = zScores[`${activeCountry.prefix}_${ind.key}`] ?? 0
-        return Math.abs((betas[ind.key] ?? ind.betaDoc) / betaTotal * z * ind.sign * activeRegimeMult)
+        return Math.abs((activeBetaArr[i] ?? ind.betaDoc) / activeBetaTotal * z * ind.sign * activeRegimeMult)
       })
     : []
   const maxContrib = Math.max(...allContribs, 0.001)
@@ -450,10 +440,11 @@ export default function EndogenousOpsPage() {
                         </td>
                       </tr>
 
-                      {items.map(ind => {
+                      {items.map((ind, _i) => {
+                        const indIdx   = INDICATORS.findIndex(x => x.key === ind.key)
                         const z        = zScores[`${activeCountry.prefix}_${ind.key}`] ?? 0
-                        const beta     = betas[ind.key] ?? ind.betaDoc
-                        const contrib  = (beta / betaTotal) * z * ind.sign * activeRegimeMult
+                        const beta     = activeBetaArr[indIdx] ?? ind.betaDoc
+                        const contrib  = (beta / activeBetaTotal) * z * ind.sign * activeRegimeMult
                         const rawVal   = features.valuesBySourceId[getSourceId(activeCountry.prefix, ind.key)]
                         const hasData  = z !== 0 || rawVal != null
                         const entry    = history[`${activeCountry.prefix}_${ind.key}`]

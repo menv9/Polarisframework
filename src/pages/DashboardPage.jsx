@@ -1,10 +1,9 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useModelStore } from '../store/ModelDataContext'
-import { INDICATORS, loadBetas, computeBetaTotal } from '../lib/endogenousBetas'
-import { detectInflationRegime, getRegimeMultiplier, getConviction } from '../lib/scoring/regime'
+import { detectInflationRegime, getConviction } from '../lib/scoring/regime'
 import { computeExogenousCurrencyScores, combineEndogenousExogenous } from '../lib/scoring/exogenous'
-import { loadPairBetas, computeCountryScoreForPair, pairLabelToId } from '../lib/pairBetas'
+import { loadPairBetas, computeCountryScore, computeCountryScoreForPair, pairLabelToId } from '../lib/pairBetas'
 
 const EXO_CCYS = ['AUD','CAD','NOK','NZD','JPY','CHF','USD','EUR','GBP','SEK']
 
@@ -53,20 +52,6 @@ const DASHBOARD_PAIRS = [
   { label: 'USD/SEK', base: 'usa', quote: 'swe' },
 ]
 
-function computeCountryScore(prefix, cyclical, regime, zScores, betas) {
-  const rm = getRegimeMultiplier(regime, cyclical)
-  const betaTotal = computeBetaTotal(betas)
-  let short = 0, medium = 0, longScore = 0
-  for (const ind of INDICATORS) {
-    const beta    = betas[ind.key] ?? ind.betaDoc
-    const z       = zScores[`${prefix}_${ind.key}`] ?? 0
-    const contrib = (beta / betaTotal) * z * ind.sign * rm
-    if (ind.horizon === 'SHORT')  short     += contrib
-    if (ind.horizon === 'MEDIUM') medium    += contrib
-    if (ind.horizon === 'LONG')   longScore += contrib
-  }
-  return 0.20 * short + 0.50 * medium + 0.30 * longScore
-}
 
 function scoreColor(v) {
   return v > 0 ? 'text-[#4ade80]' : v < 0 ? 'text-[#ef4444]' : 'text-[#555]'
@@ -78,7 +63,6 @@ function fmtScore(v) {
 
 export default function DashboardPage() {
   const { worldview: wv, regime, dataSources: sources, zscores: zScores, history, features, signalHistory, recordSignalSample } = useModelStore()
-  const [betas] = useState(loadBetas)
   const [pairBetaData] = useState(loadPairBetas)
   const navigate = useNavigate()
 
@@ -96,8 +80,8 @@ export default function DashboardPage() {
 
   const countryScores = useMemo(() =>
     COUNTRIES.map(c => {
-      const endoScore = computeCountryScore(c.prefix, c.cyclical, regime, zScores, betas)
-      const exoScore = exogenousScores[c.ccy] ?? 0
+      const endoScore = computeCountryScore(c.prefix, c.cyclical, regime, zScores, pairBetaData)
+      const exoScore  = exogenousScores[c.ccy] ?? 0
       return {
         ...c,
         endoScore,
@@ -105,7 +89,7 @@ export default function DashboardPage() {
         score: combineEndogenousExogenous(endoScore, exoScore, c.ccy),
       }
     }),
-    [regime, zScores, betas, exogenousScores]
+    [regime, zScores, pairBetaData, exogenousScores]
   )
 
   const hasZscores = useMemo(() =>
@@ -121,8 +105,8 @@ export default function DashboardPage() {
       const quote = byPrefix.get(pair.quote)
       if (!base || !quote) return { ...pair, signal: 0, conv: 'FLAT', direction: 'LONG' }
       const pairId    = pairLabelToId(pair.label)
-      const baseEndo  = computeCountryScoreForPair(pair.base,  base.cyclical,  regime, zScores, betas, pairBetaData, pairId)
-      const quoteEndo = computeCountryScoreForPair(pair.quote, quote.cyclical, regime, zScores, betas, pairBetaData, pairId)
+      const baseEndo  = computeCountryScoreForPair(pair.base,  base.cyclical,  regime, zScores, pairBetaData, pairId)
+      const quoteEndo = computeCountryScoreForPair(pair.quote, quote.cyclical, regime, zScores, pairBetaData, pairId)
       const signal    = combineEndogenousExogenous(baseEndo,  base.exoScore,  base.ccy)
                       - combineEndogenousExogenous(quoteEndo, quote.exoScore, quote.ccy)
       return {
@@ -132,7 +116,7 @@ export default function DashboardPage() {
         direction: signal >= 0 ? 'LONG' : 'SHORT',
       }
     })
-  }, [countryScores, regime, zScores, betas, pairBetaData, signalHistory])
+  }, [countryScores, regime, zScores, pairBetaData, signalHistory])
 
   useEffect(() => {
     for (const pair of dashboardPairs) recordSignalSample(pair.label, pair.signal)

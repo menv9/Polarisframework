@@ -25,6 +25,8 @@ function toPipelineName(appPrefix, appKey) {
   return `endo_${prefix}_${suffix}`
 }
 
+// ─── CSV / Storage ────────────────────────────────────────────────────────────
+
 // Parsea beta_matrix_full.csv → { [fxPair]: { [indicator]: { beta, r2, significant } } }
 export function parsePairBetaCSV(csvText) {
   const lines = csvText.trim().split(/\r?\n/)
@@ -89,8 +91,9 @@ export function loadPairBetasMeta() {
   } catch { return null }
 }
 
-// Devuelve abs(beta) del pipeline para (fxPair, countryPrefix, indicatorKey).
-// null si no hay dato → el caller usa betaDoc como fallback.
+// ─── Lookups puntuales ────────────────────────────────────────────────────────
+
+// abs(beta) para un par concreto — fallback a null si no hay dato.
 export function getPairBeta(pairData, fxPairId, appPrefix, appKey) {
   const pairEntry = pairData?.[fxPairId]
   if (!pairEntry) return null
@@ -99,12 +102,24 @@ export function getPairBeta(pairData, fxPairId, appPrefix, appKey) {
   return Math.abs(entry.beta)
 }
 
-// Devuelve la entrada completa { beta (con signo), r2, significant } o null.
-// Para uso en UI de visualización.
+// Entrada completa { beta (con signo), r2, significant } para visualización.
 export function getPairEntry(pairData, fxPairId, appPrefix, appKey) {
   const pairEntry = pairData?.[fxPairId]
   if (!pairEntry) return null
   return pairEntry[toPipelineName(appPrefix, appKey)] ?? null
+}
+
+// Promedio de abs(beta) de un indicador para una divisa a través de TODOS los pares.
+// Usado para scores individuales de país (ranking G10, EndogenousOps).
+function getCountryAvgBeta(pairData, appPrefix, appKey) {
+  if (!pairData) return null
+  const name = toPipelineName(appPrefix, appKey)
+  const values = []
+  for (const indicators of Object.values(pairData)) {
+    const entry = indicators[name]
+    if (entry) values.push(Math.abs(entry.beta))
+  }
+  return values.length > 0 ? values.reduce((s, v) => s + v, 0) / values.length : null
 }
 
 // 'EUR/USD' → 'eurusd'
@@ -112,16 +127,65 @@ export function pairLabelToId(label) {
   return label.replace('/', '').toLowerCase()
 }
 
-// Score endógeno de un país usando betas específicas del par cuando estén disponibles.
-// Si no hay dato de pipeline para un indicador, usa defaultBetas[key] ?? betaDoc.
-export function computeCountryScoreForPair(
-  prefix, cyclical, regime, zScores, defaultBetas, pairData, fxPairId
-) {
+// ─── Arrays de betas efectivas ───────────────────────────────────────────────
+
+// Array de betas para un país (promedio pipeline o betaDoc si no hay dato).
+// Un elemento por cada INDICATOR implementado, mismo orden que INDICATORS.
+export function buildCountryBetaArr(pairData, appPrefix) {
+  return INDICATORS.map(ind => {
+    const avg = getCountryAvgBeta(pairData, appPrefix, ind.key)
+    return avg ?? ind.betaDoc
+  })
+}
+
+// ─── Funciones de scoring ─────────────────────────────────────────────────────
+
+// Score endógeno de país usando betas promediadas del pipeline (o betaDoc fallback).
+// Para scores individuales: ranking G10, EndogenousOps.
+export function computeCountryScore(prefix, cyclical, regime, zScores, pairData) {
+  const rm      = getRegimeMultiplier(regime, cyclical)
+  const betaArr = buildCountryBetaArr(pairData, prefix)
+  const total   = betaArr.reduce((s, b) => s + b, 0) || 1
+  let short = 0, medium = 0, longScore = 0
+
+  INDICATORS.forEach((ind, i) => {
+    const z       = zScores[`${prefix}_${ind.key}`] ?? 0
+    const contrib = (betaArr[i] / total) * z * ind.sign * rm
+    if      (ind.horizon === 'SHORT')  short     += contrib
+    else if (ind.horizon === 'MEDIUM') medium    += contrib
+    else                               longScore += contrib
+  })
+
+  return 0.20 * short + 0.50 * medium + 0.30 * longScore
+}
+
+// Igual que computeCountryScore pero devuelve el desglose por horizonte.
+// Para EndogenousOpsPage que necesita short/medium/long por separado.
+export function computeCountryScoreDetailed(prefix, cyclical, regime, zScores, pairData) {
+  const rm      = getRegimeMultiplier(regime, cyclical)
+  const betaArr = buildCountryBetaArr(pairData, prefix)
+  const total   = betaArr.reduce((s, b) => s + b, 0) || 1
+  let short = 0, medium = 0, longScore = 0
+
+  INDICATORS.forEach((ind, i) => {
+    const z       = zScores[`${prefix}_${ind.key}`] ?? 0
+    const contrib = (betaArr[i] / total) * z * ind.sign * rm
+    if      (ind.horizon === 'SHORT')  short     += contrib
+    else if (ind.horizon === 'MEDIUM') medium    += contrib
+    else                               longScore += contrib
+  })
+
+  return { composite: 0.20 * short + 0.50 * medium + 0.30 * longScore, short, medium, long: longScore }
+}
+
+// Score endógeno de un país en el contexto de un par concreto.
+// Usa betas específicas del par; fallback a betaDoc si el indicador no está en el CSV.
+export function computeCountryScoreForPair(prefix, cyclical, regime, zScores, pairData, fxPairId) {
   const rm = getRegimeMultiplier(regime, cyclical)
 
   const betaArr = INDICATORS.map(ind => {
     const pb = getPairBeta(pairData, fxPairId, prefix, ind.key)
-    return pb ?? (defaultBetas[ind.key] ?? ind.betaDoc)
+    return pb ?? ind.betaDoc
   })
 
   const total = betaArr.reduce((s, b) => s + b, 0) || 1
