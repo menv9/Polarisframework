@@ -178,7 +178,7 @@ export default function DashboardPage() {
     const html = document.documentElement
     const prevZoom = html.style.zoom
     const prevOverflow = html.style.overflow
-    html.style.zoom = '0.95'
+    html.style.zoom = '1.0'
     html.style.overflow = 'hidden'
     return () => {
       html.style.zoom = prevZoom
