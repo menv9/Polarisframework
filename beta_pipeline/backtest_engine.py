@@ -29,11 +29,13 @@ rolling.  No hay look-ahead porque los features en t son conocidos en t.
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from scipy import stats as scipy_stats
 
 # ── Configuración ────────────────────────────────────────────────────────────
 
@@ -191,12 +193,57 @@ def simulate(
 
 # ── Métricas ─────────────────────────────────────────────────────────────────
 
+def _period_metrics(r: pd.Series, eq: pd.Series, label: str) -> dict:
+    """Compute standard metrics for a sub-period. Returns dict with label prefix."""
+    if r.empty or len(r) < 2:
+        return {f"{label}_sharpe": None, f"{label}_sortino": None,
+                f"{label}_max_dd_pct": None, f"{label}_ann_ret_pct": None,
+                f"{label}_n_months": 0}
+
+    total_ret = eq.iloc[-1] / eq.iloc[0] - 1.0
+    ann_ret = (1 + total_ret) ** (12 / len(r)) - 1.0
+    ann_vol = r.std() * np.sqrt(12)
+    sharpe = ann_ret / ann_vol if ann_vol > 1e-12 else 0.0
+
+    downside = r[r < 0]
+    sortino = (
+        ann_ret / (downside.std() * np.sqrt(12))
+        if len(downside) > 1 and downside.std() > 1e-12
+        else 0.0
+    )
+
+    peak = eq.cummax()
+    mdd = ((eq - peak) / peak).min()
+
+    return {
+        f"{label}_n_months": int(len(r)),
+        f"{label}_ann_ret_pct": round(ann_ret * 100, 2),
+        f"{label}_sharpe": round(sharpe, 3),
+        f"{label}_sortino": round(sortino, 3),
+        f"{label}_max_dd_pct": round(mdd * 100, 2),
+    }
+
+
+def _deflated_sharpe(sr_hat: float, n: float, skew: float, kurt: float) -> float:
+    """Probabilistic Sharpe Ratio vs SR*=0. Returns P(SR > 0)."""
+    if n < 2:
+        return float("nan")
+    # Bailey & López de Prado (2014): PSR(SR*=0)
+    sigma_sr = math.sqrt((1 - skew * sr_hat + (kurt - 1) / 4 * sr_hat ** 2) / (n - 1))
+    if sigma_sr < 1e-12:
+        return float("nan")
+    z = sr_hat / sigma_sr
+    return round(float(scipy_stats.norm.cdf(z)), 4)
+
+
 def compute_metrics(result: BacktestResult) -> dict:
     r = result.monthly_returns.dropna()
     if r.empty or len(r) < 2:
         return {"status": "insufficient_data", "n_months": int(len(r)), "total_return_pct": 0.0}
 
     equity = result.equity
+
+    # ── Métricas full-sample ──────────────────────────────────────────────────
     total_ret = equity.iloc[-1] - 1.0
     ann_ret = (1 + total_ret) ** (12 / len(r)) - 1.0
     ann_vol = r.std() * np.sqrt(12)
@@ -210,16 +257,101 @@ def compute_metrics(result: BacktestResult) -> dict:
     mdd = dd.min()
     calmar = ann_ret / abs(mdd) if mdd < 0 else 0.0
 
-    win_rate = (r > 0).mean()
+    # Time underwater
+    time_underwater_pct = round(float((dd < 0).mean() * 100), 1)
+
+    # Distribution
+    skew = float(r.skew())
+    kurt = float(r.kurtosis() + 3)  # convert excess → full kurtosis
+
+    # VaR / CVaR (95 %)
+    var_95 = round(float(np.percentile(r, 5) * 100), 3)
+    cvar_95 = round(float(r[r <= np.percentile(r, 5)].mean() * 100), 3)
+
+    # Probabilistic Sharpe Ratio (vs SR*=0)
+    sr_monthly = r.mean() / r.std() if r.std() > 1e-12 else 0.0
+    psr = _deflated_sharpe(sr_monthly, len(r), skew, kurt)
+
+    # ── IS / OOS split (70/30 aproximado) ────────────────────────────────────
+    # Nota: betas calculadas full-sample → IS/OOS aquí es análisis de estabilidad,
+    # no verdadero walk-forward. Se documenta explícitamente.
+    split = max(2, int(len(r) * 0.70))
+    r_is, r_oos = r.iloc[:split], r.iloc[split:]
+    eq_is = (1 + r_is).cumprod()
+    eq_oos_raw = (1 + r_oos).cumprod()
+    eq_oos = eq_oos_raw / eq_oos_raw.iloc[0] * eq_is.iloc[-1] if not eq_oos_raw.empty else eq_oos_raw
+
+    is_metrics = _period_metrics(r_is, eq_is, "is")
+    oos_metrics = _period_metrics(r_oos, eq_oos, "oos")
+
+    # ── IC — Information Coefficient ─────────────────────────────────────────
     trades = result.trades
-    wins = [t for t in trades if t.net_return_pct > 0]
-    trade_wr = len(wins) / len(trades) if trades else 0.0
+    ic_monthly, ic_quarterly = None, None
+    if trades:
+        df_tr = pd.DataFrame([
+            {"month": t.open_date.to_period("M"), "quarter": t.open_date.to_period("Q"),
+             "predicted": t.predicted, "actual": t.actual}
+            for t in trades
+        ])
+        # Monthly IC: mean of per-month cross-sectional correlations
+        monthly_ics = []
+        for _, grp in df_tr.groupby("month"):
+            if len(grp) >= 2:
+                c, _ = scipy_stats.pearsonr(grp["predicted"], grp["actual"])
+                monthly_ics.append(c)
+        ic_monthly = round(float(np.mean(monthly_ics)), 4) if monthly_ics else None
+
+        quarterly_ics = []
+        for _, grp in df_tr.groupby("quarter"):
+            if len(grp) >= 2:
+                c, _ = scipy_stats.pearsonr(grp["predicted"], grp["actual"])
+                quarterly_ics.append(c)
+        ic_quarterly = round(float(np.mean(quarterly_ics)), 4) if quarterly_ics else None
+
+    # ── Trades ───────────────────────────────────────────────────────────────
+    wins_list = [t for t in trades if t.net_return_pct > 0]
+    losses_list = [t for t in trades if t.net_return_pct < 0]
+    trade_wr = len(wins_list) / len(trades) if trades else 0.0
     avg_trade = np.mean([t.net_return_pct for t in trades]) if trades else 0.0
     gross = sum(t.gross_return_pct for t in trades)
     costs = sum(t.cost_pct for t in trades)
 
+    avg_win = np.mean([t.net_return_pct for t in wins_list]) * 100 if wins_list else 0.0
+    avg_loss = np.mean([t.net_return_pct for t in losses_list]) * 100 if losses_list else 0.0
+    gross_win = sum(t.net_return_pct for t in wins_list)
+    gross_loss = abs(sum(t.net_return_pct for t in losses_list))
+    profit_factor = round(gross_win / gross_loss, 3) if gross_loss > 1e-12 else None
+
+    durations = [(t.close_date - t.open_date).days for t in trades if hasattr(t.close_date, "days") or True]
+    try:
+        avg_duration_days = round(float(np.mean(durations)), 1) if durations else None
+    except Exception:
+        avg_duration_days = None
+
+    # ── Monthly heatmap data ──────────────────────────────────────────────────
+    heatmap = []
+    for date, ret in r.items():
+        heatmap.append({"year": int(date.year), "month": int(date.month), "ret_pct": round(float(ret) * 100, 2)})
+
+    # ── Attribution por par ───────────────────────────────────────────────────
+    by_pair: dict[str, dict] = {}
+    for t in trades:
+        p = t.pair
+        if p not in by_pair:
+            by_pair[p] = {"n": 0, "wins": 0, "net_pct": 0.0}
+        by_pair[p]["n"] += 1
+        by_pair[p]["net_pct"] = round(by_pair[p]["net_pct"] + t.net_return_pct * 100, 4)
+        if t.net_return_pct > 0:
+            by_pair[p]["wins"] += 1
+    attribution_by_pair = [
+        {"pair": p, **v, "win_rate_pct": round(v["wins"] / v["n"] * 100, 1)}
+        for p, v in sorted(by_pair.items(), key=lambda x: -x[1]["net_pct"])
+    ]
+
     return {
         "status": "ok",
+        "note_is_oos": "Betas calculadas full-sample. IS/OOS es análisis de estabilidad, no walk-forward puro.",
+        # Full period
         "n_months": int(len(r)),
         "start_date": str(r.index[0].date()),
         "end_date": str(r.index[-1].date()),
@@ -230,13 +362,34 @@ def compute_metrics(result: BacktestResult) -> dict:
         "sortino": round(sortino, 3),
         "max_drawdown_pct": round(mdd * 100, 2),
         "calmar": round(calmar, 3),
-        "monthly_win_rate": round(win_rate * 100, 1),
+        "time_underwater_pct": time_underwater_pct,
+        # Distribution
+        "skew": round(skew, 3),
+        "kurtosis": round(kurt, 3),
+        "var_95_pct": var_95,
+        "cvar_95_pct": cvar_95,
+        # Statistical quality
+        "probabilistic_sharpe_ratio": psr,
+        "ic_monthly": ic_monthly,
+        "ic_quarterly": ic_quarterly,
+        # IS / OOS
+        **is_metrics,
+        **oos_metrics,
+        # Trades
+        "monthly_win_rate": round(trade_wr * 100, 1),
         "n_trades": len(trades),
         "trade_win_rate": round(trade_wr * 100, 1),
         "avg_trade_return_pct": round(avg_trade * 100, 3),
+        "avg_win_pct": round(avg_win, 3),
+        "avg_loss_pct": round(avg_loss, 3),
+        "profit_factor": profit_factor,
+        "avg_trade_duration_days": avg_duration_days,
         "gross_pnl_pct": round(gross * 100, 2),
         "total_cost_pct": round(costs * 100, 2),
         "net_pnl_pct": round((gross - costs) * 100, 2),
+        # Data for charts
+        "monthly_heatmap": heatmap,
+        "attribution_by_pair": attribution_by_pair,
     }
 
 
@@ -275,35 +428,56 @@ def save_backtest(
     with open(run_path / "backtest_metrics.json", "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2, default=str)
 
+    def _f(key, fmt=".2f", suffix=" %", default=0):
+        v = metrics.get(key, default)
+        return f"{v:{fmt}}{suffix}" if v is not None else "—"
+
     lines = [
         "=" * 72,
         "POLARIS BACKTEST REPORT — Capa 1 FX Macro G10",
         "=" * 72,
         "",
         f"Period:        {metrics.get('start_date', '-')} to {metrics.get('end_date', '-')}",
-        f"Months:        {metrics.get('n_months', 0)}",
-        f"Trades:        {metrics.get('n_trades', 0)}",
+        f"Months:        {metrics.get('n_months', 0)}  |  Trades: {metrics.get('n_trades', 0)}",
         "",
         "RETURNS",
-        f"  Total return:        {metrics.get('total_return_pct', 0):.2f} %",
-        f"  Annualized return:   {metrics.get('annualized_return_pct', 0):.2f} %",
-        f"  Annualized vol:      {metrics.get('annualized_vol_pct', 0):.2f} %",
+        f"  Total return:        {_f('total_return_pct')}",
+        f"  Annualized return:   {_f('annualized_return_pct')}",
+        f"  Annualized vol:      {_f('annualized_vol_pct')}",
         "",
         "RISK-ADJUSTED",
-        f"  Sharpe:              {metrics.get('sharpe', 0):.3f}",
-        f"  Sortino:             {metrics.get('sortino', 0):.3f}",
-        f"  Max Drawdown:        {metrics.get('max_drawdown_pct', 0):.2f} %",
-        f"  Calmar:              {metrics.get('calmar', 0):.3f}",
+        f"  Sharpe:              {_f('sharpe', '.3f', '')}",
+        f"  Sortino:             {_f('sortino', '.3f', '')}",
+        f"  Max Drawdown:        {_f('max_drawdown_pct')}",
+        f"  Calmar:              {_f('calmar', '.3f', '')}",
+        f"  Time underwater:     {_f('time_underwater_pct')}",
         "",
-        "WIN RATES",
-        f"  Monthly win rate:    {metrics.get('monthly_win_rate', 0):.1f} %",
-        f"  Trade win rate:      {metrics.get('trade_win_rate', 0):.1f} %",
-        f"  Avg trade return:    {metrics.get('avg_trade_return_pct', 0):.3f} %",
+        "DISTRIBUTION",
+        f"  Skew:                {_f('skew', '.3f', '')}",
+        f"  Kurtosis:            {_f('kurtosis', '.3f', '')}",
+        f"  VaR 95%:             {_f('var_95_pct')}",
+        f"  CVaR 95%:            {_f('cvar_95_pct')}",
+        "",
+        "STATISTICAL QUALITY",
+        f"  Probabilistic SR:    {_f('probabilistic_sharpe_ratio', '.4f', '')}  (P[SR>0])",
+        f"  IC mensual:          {_f('ic_monthly', '.4f', '')}",
+        f"  IC trimestral:       {_f('ic_quarterly', '.4f', '')}",
+        "",
+        "IS / OOS (70 / 30 — betas full-sample, análisis de estabilidad)",
+        f"  IS  ({metrics.get('is_n_months', 0)}m):  Sharpe {_f('is_sharpe', '.3f', '')}  |  MaxDD {_f('is_max_dd_pct')}  |  AnnRet {_f('is_ann_ret_pct')}",
+        f"  OOS ({metrics.get('oos_n_months', 0)}m): Sharpe {_f('oos_sharpe', '.3f', '')}  |  MaxDD {_f('oos_max_dd_pct')}  |  AnnRet {_f('oos_ann_ret_pct')}",
+        "",
+        "TRADES",
+        f"  Trade win rate:      {_f('trade_win_rate', '.1f')}",
+        f"  Avg trade return:    {_f('avg_trade_return_pct', '.3f')}",
+        f"  Avg win / loss:      {_f('avg_win_pct', '.3f')} / {_f('avg_loss_pct', '.3f')}",
+        f"  Profit factor:       {_f('profit_factor', '.3f', '')}",
+        f"  Avg duration:        {_f('avg_trade_duration_days', '.1f', ' days')}",
         "",
         "COSTS",
-        f"  Gross P&L:           {metrics.get('gross_pnl_pct', 0):.2f} %",
-        f"  Total costs:         {metrics.get('total_cost_pct', 0):.2f} %",
-        f"  Net P&L:             {metrics.get('net_pnl_pct', 0):.2f} %",
+        f"  Gross P&L:           {_f('gross_pnl_pct')}",
+        f"  Total costs:         {_f('total_cost_pct')}",
+        f"  Net P&L:             {_f('net_pnl_pct')}",
         "",
         "=" * 72,
     ]

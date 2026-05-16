@@ -38,8 +38,9 @@ const GROUPS = [
   {
     label: 'Aprendizaje',
     items: [
-      { to: '/journal',     label: 'Journal', desc: 'Trade Journal' },
-      { to: '/performance', label: 'Perf',    desc: 'Performance' },
+      { to: '/journal',     label: 'Journal',   desc: 'Trade Journal' },
+      { to: '/performance', label: 'Perf',      desc: 'Performance' },
+      { to: '/backtest',    label: 'Backtest',  desc: 'Backtest' },
     ],
   },
 ]
