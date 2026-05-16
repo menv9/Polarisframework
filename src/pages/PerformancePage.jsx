@@ -153,7 +153,7 @@ export default function PerformancePage() {
                   sub={metrics ? `${metrics.wins}W / ${metrics.losses}L` : ''}
                   color={metrics?.winRate >= 50 ? 'text-[#4ade80]' : 'text-[#f59e0b]'} />
                 <MetricCard label="Expectancy"
-                  value={metrics ? `$${metrics.expectancy >= 0 ? '+' : ''}${metrics.expectancy.toFixed(0)}` : '—'}
+                  value={metrics ? `$${metrics.expectancy >= 0 ? '+' : ''}${metrics.expectancy.toFixed(2)}` : '—'}
                   sub="por trade promedio"
                   color={metrics?.expectancy > 0 ? 'text-[#4ade80]' : 'text-[#ef4444]'} />
                 <MetricCard label="R-Multiple Medio"

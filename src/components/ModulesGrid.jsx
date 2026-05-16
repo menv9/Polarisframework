@@ -18,8 +18,8 @@ export default function ModulesGrid() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-0 border-2 border-[#333]">
-          {modules.map((mod, i) => (
-            <ModuleCard key={mod.id} module={mod} index={i} />
+          {modules.map((mod) => (
+            <ModuleCard key={mod.id} module={mod} />
           ))}
         </div>
       </div>

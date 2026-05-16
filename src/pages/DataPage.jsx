@@ -39,7 +39,7 @@ function exportCsv(sources) {
 }
 
 function splitModuleName(moduleName) {
-  return moduleName.split(/\s+(?:—|â€”)\s+/)
+  return moduleName.split(/\s*—\s*/)
 }
 
 async function fetchFredData(seriesId, yoy = false) {

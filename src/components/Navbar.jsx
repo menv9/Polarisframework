@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Menu, X } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { supabase } from '../lib/supabase'
 
@@ -105,6 +106,9 @@ export default function Navbar() {
   const location = useLocation()
   const navigate = useNavigate()
   const isAdmin = user?.app_metadata?.role === 'admin'
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  useEffect(() => { setMobileOpen(false) }, [location.pathname])
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -168,7 +172,51 @@ export default function Navbar() {
             <ThemeToggle />
           </div>
         </div>
+
+        {/* Mobile — hamburger */}
+        <button
+          className="md:hidden ml-auto text-[#555] hover:text-white"
+          onClick={() => setMobileOpen(o => !o)}
+          aria-label="Menú"
+        >
+          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
       </div>
+
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <div className="md:hidden bg-black border-t border-[#222] pb-4">
+          {GROUPS.map(group => (
+            <div key={group.label}>
+              <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-[#444]">
+                {group.label}
+              </div>
+              {group.items.map(item => {
+                const active = location.pathname.startsWith(item.to) && item.to !== '/'
+                return (
+                  <Link key={item.to} to={item.to}
+                    className={`flex items-center justify-between px-6 py-2.5 text-xs font-bold uppercase tracking-wider border-b border-[#111] ${
+                      active ? 'text-[#ecd987] bg-[#0a0a0a]' : 'text-[#555]'
+                    }`}
+                  >
+                    <span>{item.desc}</span>
+                    {active && <span className="text-[8px]">▶</span>}
+                  </Link>
+                )
+              })}
+            </div>
+          ))}
+          <div className="px-4 pt-2 border-t border-[#222] mt-2 flex items-center justify-between">
+            {user && (
+              <button onClick={handleLogout}
+                className="text-xs text-[#555] hover:text-red-400 uppercase tracking-wider">
+                Salir
+              </button>
+            )}
+            <ThemeToggle />
+          </div>
+        </div>
+      )}
     </nav>
   )
 }

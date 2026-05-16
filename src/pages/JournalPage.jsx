@@ -65,6 +65,7 @@ export default function JournalPage() {
   const [closingId, setClosingId] = useState(null)
   const [viewId,  setViewId]  = useState(null)
   const [filter,  setFilter]  = useState('all') // all | open | closed
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
 
   function persist(updated) {
     setTrades(updated)
@@ -110,9 +111,10 @@ export default function JournalPage() {
   }
 
   function deleteTrade(id) {
-    if (!window.confirm('¿Eliminar este trade del journal?')) return
+    if (confirmDeleteId !== id) { setConfirmDeleteId(id); return }
     persist(trades.filter(t => t.id !== id))
     if (viewId === id) setViewId(null)
+    setConfirmDeleteId(null)
   }
 
   const filtered = useMemo(() =>
@@ -298,10 +300,23 @@ export default function JournalPage() {
                             Cerrar
                           </button>
                         )}
-                        <button onClick={() => deleteTrade(t.id)}
-                          className="text-[10px] text-[#333] hover:text-[#ef4444] uppercase tracking-wider">
-                          Borrar
-                        </button>
+                        {confirmDeleteId === t.id ? (
+                          <span className="flex items-center gap-1">
+                            <button onClick={() => deleteTrade(t.id)}
+                              className="text-[10px] text-[#ef4444] border border-[#ef4444] px-1.5 uppercase tracking-wider">
+                              Confirmar
+                            </button>
+                            <button onClick={() => setConfirmDeleteId(null)}
+                              className="text-[10px] text-[#555] hover:text-white uppercase tracking-wider">
+                              Cancelar
+                            </button>
+                          </span>
+                        ) : (
+                          <button onClick={() => deleteTrade(t.id)}
+                            className="text-[10px] text-[#333] hover:text-[#ef4444] uppercase tracking-wider">
+                            Borrar
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

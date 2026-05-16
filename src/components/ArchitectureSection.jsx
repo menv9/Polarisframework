@@ -1,4 +1,7 @@
+import { Layers, Clock, Shield, CheckCircle, RefreshCw, Users } from 'lucide-react'
 import { architecturePillars } from '../data/modules'
+
+const PILLAR_ICONS = { Layers, Clock, Shield, CheckCircle, RefreshCw, Users }
 
 export default function ArchitectureSection() {
   return (
@@ -22,8 +25,8 @@ export default function ArchitectureSection() {
               key={pillar.title}
               className="p-4 border-r-2 border-b-2 border-[#333] bg-black"
             >
-              <div className="text-sm font-bold text-[#777] tracking-widest uppercase mb-2">
-                {pillar.icon.toUpperCase()}
+              <div className="text-[#777] mb-2">
+                {(() => { const Icon = PILLAR_ICONS[pillar.icon]; return Icon ? <Icon size={18} /> : null })()}
               </div>
               <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-2">{pillar.title}</h4>
               <p className="text-sm text-[#888] leading-snug">{pillar.desc}</p>

@@ -261,6 +261,7 @@ export default function ModelInputsPage() {
   const [syncMsg, setSyncMsg]           = useState(null)
   const [featureMsg, setFeatureMsg]     = useState(null)
   const [buildingFeatures, setBuildingFeatures] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(new Set())
   const [loadAllMsg, setLoadAllMsg]     = useState(null)
   const [urlEditKey, setUrlEditKey]     = useState(null)
@@ -394,8 +395,9 @@ export default function ModelInputsPage() {
   }
 
   const handleClearAll = () => {
-    if (!window.confirm('¿Borrar TODO el histórico de z-scores?')) return
+    if (!confirmClear) { setConfirmClear(true); return }
     setHistory({})
+    setConfirmClear(false)
   }
 
   const handlePipelineJSON = (e) => {
@@ -601,12 +603,23 @@ export default function ModelInputsPage() {
             >
               LOAD ALL FROM HISTORY
             </button>
-            <button
-              onClick={handleClearAll}
-              className="text-[10px] font-bold uppercase tracking-wider text-[#444] hover:text-[#ef4444]"
-            >
-              BORRAR TODO
-            </button>
+            {confirmClear ? (
+              <span className="flex items-center gap-2">
+                <button onClick={handleClearAll}
+                  className="text-[10px] font-bold uppercase tracking-wider text-[#ef4444] border border-[#ef4444] px-1.5">
+                  CONFIRMAR BORRADO
+                </button>
+                <button onClick={() => setConfirmClear(false)}
+                  className="text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-white">
+                  CANCELAR
+                </button>
+              </span>
+            ) : (
+              <button onClick={handleClearAll}
+                className="text-[10px] font-bold uppercase tracking-wider text-[#444] hover:text-[#ef4444]">
+                BORRAR TODO
+              </button>
+            )}
           </div>
 
           {/* Tabla de indicadores */}

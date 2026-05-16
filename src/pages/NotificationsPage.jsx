@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getNextUpdate, getStatus } from '../data/dataSources'
 import { useModelStore } from '../store/ModelDataContext'
+import { useAppStore } from '../stores/appStore'
 
-const REVIEWED_KEY = 'polaris_data_notifications_reviewed'
+function reviewedKey(userId) {
+  return userId ? `polaris_data_notifications_reviewed:${userId}` : 'polaris_data_notifications_reviewed'
+}
 
-function loadReviewed() {
+function loadReviewed(userId) {
   try {
-    const saved = localStorage.getItem(REVIEWED_KEY)
+    const saved = localStorage.getItem(reviewedKey(userId))
     return saved ? JSON.parse(saved) : {}
   } catch {
     return {}
@@ -33,14 +36,15 @@ function isNewRelease(row) {
 
 export default function NotificationsPage() {
   const { dataSources } = useModelStore()
+  const userId = useAppStore((s) => s.user?.id)
   const [releases, setReleases] = useState([])
   const [error, setError] = useState(null)
-  const [reviewed, setReviewed] = useState(loadReviewed)
+  const [reviewed, setReviewed] = useState(() => loadReviewed(userId))
   const [filter, setFilter] = useState('open')
 
   useEffect(() => {
-    localStorage.setItem(REVIEWED_KEY, JSON.stringify(reviewed))
-  }, [reviewed])
+    localStorage.setItem(reviewedKey(userId), JSON.stringify(reviewed))
+  }, [reviewed, userId])
 
   useEffect(() => {
     let cancelled = false
