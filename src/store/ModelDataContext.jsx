@@ -101,6 +101,10 @@ function median(values) {
   return nums.length % 2 === 1 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2
 }
 
+// Keys that must be z-scores (±10 max). Raw CFTC/SSI values (e.g. -922 contracts) are rejected.
+const Z_SCORE_KEYS = new Set(['smartZ', 'retailZ'])
+const Z_SCORE_MAX = 10
+
 // Deriva el objeto worldview desde el array de dataSources
 function deriveWorldview(features) {
   const values = features.valuesBySourceId
@@ -117,7 +121,11 @@ function deriveWorldview(features) {
   for (const [key, id] of Object.entries(WV_DATA_MAP)) {
     if (key in WV_GDP_GAP_MAP) continue
     if (key === 'cpiG7') continue
-    if (Number.isFinite(values[id])) derived[key] = values[id]
+    const v = values[id]
+    if (!Number.isFinite(v)) continue
+    // Reject z-score fields populated with raw values (e.g. CFTC net contracts = -922)
+    if (Z_SCORE_KEYS.has(key) && Math.abs(v) > Z_SCORE_MAX) continue
+    derived[key] = v
   }
   const cpiG7 = median(WV_CPI_G7_SOURCE_IDS.map(id => values[id]))
   if (cpiG7 !== null) derived.cpiG7 = cpiG7

@@ -221,7 +221,8 @@ export default function DashboardPage() {
   }, [])
 
   const scoreGDP  = wv.gdpUsa * 0.25 + wv.gdpEur * 0.18 + wv.gdpChn * 0.18 + wv.gdpJpn * 0.05 + wv.gdpResto * 0.34
-  const wocScore  = 0.7 * wv.smartZ - 0.3 * wv.retailZ
+  const wocRaw    = 0.7 * wv.smartZ - 0.3 * wv.retailZ
+  const wocScore  = Number.isFinite(wocRaw) ? wocRaw : 0
   const usdBias   = wv.dxyRising === 1 && wv.dxy > 100 ? 'BULLISH' : wv.dxyRising === 0 && wv.dxy < 95 ? 'BEARISH' : 'NEUTRAL'
   const inflation = detectInflationRegime(wv)
 

@@ -61,7 +61,18 @@ export default function WorldViewOpsPage() {
   const sourceMap = new Map(dataSources.map(s => [s.id, s]))
 
   const scoreGDP  = data.gdpUsa * 0.25 + data.gdpEur * 0.18 + data.gdpChn * 0.18 + data.gdpJpn * 0.05 + data.gdpResto * 0.34
-  const wocScore  = 0.7 * data.smartZ - 0.3 * data.retailZ
+  const wocRaw    = 0.7 * data.smartZ - 0.3 * data.retailZ
+  const wocScore  = Number.isFinite(wocRaw) ? wocRaw : 0
+  // Detect if raw CFTC/retail values were entered instead of z-scores
+  const wocDataWarning = (() => {
+    const cftcSrc  = dataSources.find(s => s.id === 'wv_cftc')
+    const retailSrc = dataSources.find(s => s.id === 'wv_retail')
+    const cftcRaw  = Number(cftcSrc?._value)
+    const retailRaw = Number(retailSrc?._value)
+    if (Number.isFinite(cftcRaw)  && Math.abs(cftcRaw)  > 10) return `wv_cftc = ${cftcRaw} rechazado (valor bruto, no z-score). Introduce un z-score entre −10 y +10.`
+    if (Number.isFinite(retailRaw) && Math.abs(retailRaw) > 10) return `wv_retail = ${retailRaw} rechazado (valor bruto, no z-score). Introduce un z-score entre −10 y +10.`
+    return null
+  })()
   const usdBias   = data.dxyRising === 1 && data.dxy > 100 ? 'BULLISH' : data.dxyRising === 0 && data.dxy < 95 ? 'BEARISH' : 'NEUTRAL'
   const inflation = detectInflationRegime(data)
   const pendingRegime = rawRegime !== regime && regimeState?.candidate
@@ -122,6 +133,13 @@ export default function WorldViewOpsPage() {
                 ACTUALIZAR DATOS →
               </Link>
             </div>
+
+            {/* ── Aviso dato WOC corrupto ── */}
+            {wocDataWarning && (
+              <div className="mb-3 px-3 py-2 border border-[#ef4444] bg-[#1a0000] text-[11px] font-mono text-[#ef4444]">
+                ⚠ WOC DATO RECHAZADO — {wocDataWarning}
+              </div>
+            )}
 
             {/* ── Estado derivado ── */}
             <div className="border-2 border-[#333] mb-4">
