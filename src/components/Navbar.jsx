@@ -113,14 +113,14 @@ export default function Navbar() {
 
   return (
     <nav data-app-navbar className={`fixed top-0 left-0 right-0 z-50 border-b-2 border-[#333] bg-black ${scrolled ? 'border-white' : ''}`}>
-      <div className="w-full px-4 h-12 flex items-center">
+      <div className="w-full px-4 h-12 flex items-center relative">
         {/* Logo — izquierda */}
         <Link to="/" className="flex items-center flex-none">
           <span className="text-sm font-bold tracking-widest text-white">POLARIS</span>
         </Link>
 
-        {/* Nav links — centro */}
-        <div className="hidden md:flex items-center gap-5 flex-1 justify-center">
+        {/* Nav links — centrado sobre el ancho total del viewport */}
+        <div className="hidden md:flex items-center gap-5 absolute left-1/2 -translate-x-1/2">
           {GROUPS.map(group => (
             <NavDropdown key={group.label} group={group} location={location} />
           ))}
