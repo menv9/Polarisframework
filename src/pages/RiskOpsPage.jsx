@@ -60,6 +60,12 @@ export default function RiskOpsPage() {
   const [volTarget,    setVolTarget]    = useState(12)
   const [annualVol,    setAnnualVol]    = useState(8)
 
+  // Trailing / temporal stop state
+  const [trailDirection,  setTrailDirection]  = useState('LONG')
+  const [entryPrice,      setEntryPrice]      = useState(1.0800)
+  const [currentPrice,    setCurrentPrice]    = useState(1.0800)
+  const [openDateStr,     setOpenDateStr]     = useState(() => new Date().toISOString().slice(0, 10))
+
   // Drawdown & circuit breaker inputs
   const [peakCapital,        setPeakCapital]        = useState(100000)
   const [currentCapital,     setCurrentCapital]     = useState(100000)
@@ -103,6 +109,43 @@ export default function RiskOpsPage() {
   const portfolio      = useMemo(() => computePortfolioExposure(openPositions), [openPositions])
 
   const verdictColor = result.verdict === 'OPERAR' ? 'text-[#4ade80]' : 'text-[#ef4444]'
+
+  // ── Trailing stop calculations ────────────────────────────────────────────
+  const PIP_SIZE = pair.includes('JPY') || pair.includes('NOK') || pair.includes('SEK') ? 0.01 : 0.0001
+  const stopPriceDistance = stopPips * PIP_SIZE
+  const priceDiff = trailDirection === 'LONG'
+    ? currentPrice - entryPrice
+    : entryPrice - currentPrice
+  const rMultiple = stopPriceDistance > 0 ? priceDiff / stopPriceDistance : 0
+
+  // Trail levels: at each R, where the stop should be
+  const trailLevels = [
+    { label: 'Breakeven (1R trigger)', rTrigger: 1.0, stopOffsetR: 0,   desc: 'Mover stop a entry — riesgo cero' },
+    { label: 'Trail +0.5R',           rTrigger: 1.5, stopOffsetR: 0.5, desc: 'Stop en +0.5R desde entry' },
+    { label: 'Trail +1R',             rTrigger: 2.0, stopOffsetR: 1.0, desc: 'Stop en +1R desde entry' },
+    { label: 'Trail +1.5R',           rTrigger: 2.5, stopOffsetR: 1.5, desc: 'Stop en +1.5R desde entry' },
+  ]
+  // Current applicable stop level
+  const activeTrail = [...trailLevels].reverse().find(l => rMultiple >= l.rTrigger) ?? null
+  const nextTrail   = trailLevels.find(l => rMultiple < l.rTrigger) ?? null
+
+  function trailStopPrice(offsetR) {
+    const offsetPrice = offsetR * stopPriceDistance
+    return trailDirection === 'LONG'
+      ? entryPrice + offsetPrice
+      : entryPrice - offsetPrice
+  }
+
+  // ── Temporal stop calculations ────────────────────────────────────────────
+  const HORIZON_DAYS = { SHORT: 30, MEDIUM: 90, LONG: 180 }
+  const horizonDays  = HORIZON_DAYS[horizon] ?? 90
+  const openDate     = new Date(openDateStr)
+  const today        = new Date()
+  const daysElapsed  = Math.max(0, Math.floor((today - openDate) / 86400000))
+  const pctElapsed   = horizonDays > 0 ? Math.min(100, (daysElapsed / horizonDays) * 100) : 0
+  const triggerDay   = Math.floor(horizonDays * 0.8)
+  const daysToTrigger = Math.max(0, triggerDay - daysElapsed)
+  const temporalAlert = daysElapsed >= triggerDay
 
   function NumInput({ label, value, onChange, min, max, step, suffix }) {
     return (
@@ -252,6 +295,148 @@ export default function RiskOpsPage() {
                 className="px-4 py-2 text-xs font-bold uppercase tracking-wider bg-[#4ade80] text-black hover:bg-[#22c55e] transition-colors">
                 → Execution
               </Link>
+            )}
+          </div>
+        </div>
+
+        {/* ── GESTIÓN DE POSICIÓN ABIERTA ── */}
+        <div className="border-2 border-[#333] mb-3">
+          <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333] flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Gestión de Posición Abierta</span>
+            <span className="text-[10px] text-[#555]">Trailing Stops · Stop Temporal</span>
+          </div>
+
+          {/* Inputs: dirección, entry, current, fecha apertura */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-[#222]">
+            {/* Dirección */}
+            <div className="p-3 border-r border-b border-[#222]">
+              <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Dirección</div>
+              <div className="flex gap-2">
+                {['LONG', 'SHORT'].map(d => (
+                  <button key={d} onClick={() => setTrailDirection(d)}
+                    className={`px-3 py-0.5 text-xs font-bold uppercase tracking-wider border ${trailDirection === d
+                      ? d === 'LONG' ? 'border-[#4ade80] text-[#4ade80]' : 'border-[#ef4444] text-[#ef4444]'
+                      : 'border-[#333] text-[#444] hover:border-[#555]'}`}>
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <NumInput label="Entry Price" value={entryPrice}   onChange={setEntryPrice}   min={0} step={0.0001} />
+            <NumInput label="Current Price" value={currentPrice} onChange={setCurrentPrice} min={0} step={0.0001} />
+            {/* Fecha apertura */}
+            <div className="p-3 border-r border-b border-[#222]">
+              <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Fecha Apertura</div>
+              <input type="date" value={openDateStr} onChange={e => setOpenDateStr(e.target.value)}
+                className="bg-[#111] border border-[#333] text-[#e5e5e5] font-mono text-sm px-2 py-1 w-full focus:outline-none focus:border-[#ecd987]" />
+            </div>
+          </div>
+
+          {/* R-multiple actual */}
+          <div className="px-3 py-2 border-b border-[#222] flex items-center gap-4">
+            <div>
+              <span className="text-[10px] text-[#555] uppercase tracking-wider">R actual: </span>
+              <span className={`text-sm font-mono font-bold ml-1 ${rMultiple >= 1 ? 'text-[#4ade80]' : rMultiple < 0 ? 'text-[#ef4444]' : 'text-[#a3a3a3]'}`}>
+                {rMultiple >= 0 ? '+' : ''}{rMultiple.toFixed(2)}R
+              </span>
+            </div>
+            <div className="text-[10px] text-[#444]">
+              Stop base: {stopPips} pips ({(stopPriceDistance).toFixed(4)}) · Par: {pair}
+            </div>
+          </div>
+
+          {/* Trailing stop table */}
+          <div className="overflow-x-auto border-b border-[#222]">
+            <table className="w-full text-xs table-fixed">
+              <thead>
+                <tr className="bg-[#0a0a0a] border-b border-[#222] text-[#444]">
+                  <th className="px-3 py-1.5 text-left font-bold uppercase tracking-widest w-[28%]">Nivel</th>
+                  <th className="px-3 py-1.5 text-left font-bold uppercase tracking-widest w-[15%]">Trigger</th>
+                  <th className="px-3 py-1.5 text-left font-bold uppercase tracking-widest w-[22%]">Stop Price</th>
+                  <th className="px-3 py-1.5 text-left font-bold uppercase tracking-widest w-[35%]">Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trailLevels.map(level => {
+                  const isActive    = activeTrail?.rTrigger === level.rTrigger
+                  const isNext      = nextTrail?.rTrigger   === level.rTrigger
+                  const isReached   = rMultiple >= level.rTrigger
+                  return (
+                    <tr key={level.label}
+                      className={`border-b border-[#111] ${isActive ? 'bg-[#0a1a0a]' : isNext ? 'bg-[#1a1200]' : ''}`}>
+                      <td className="px-3 py-2">
+                        <span className={`font-bold font-mono ${isActive ? 'text-[#4ade80]' : isNext ? 'text-[#ecd987]' : isReached ? 'text-[#555]' : 'text-[#333]'}`}>
+                          {isActive ? '▶ ' : isNext ? '→ ' : isReached ? '✓ ' : '  '}{level.label}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 font-mono text-[#777]">{level.rTrigger}R</td>
+                      <td className="px-3 py-2 font-mono font-bold">
+                        <span className={isActive ? 'text-[#4ade80]' : isReached ? 'text-[#555]' : 'text-[#333]'}>
+                          {trailStopPrice(level.stopOffsetR).toFixed(pair.includes('JPY') ? 3 : 5)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-[#666]">{level.desc}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Status activo / próximo */}
+          <div className={`px-3 py-2 border-b border-[#222] text-xs ${activeTrail ? 'bg-[#0a1a0a]' : 'bg-[#0a0a0a]'}`}>
+            {activeTrail ? (
+              <span className="text-[#4ade80] font-bold">
+                ▶ Stop activo en {trailStopPrice(activeTrail.stopOffsetR).toFixed(pair.includes('JPY') ? 3 : 5)} ({activeTrail.label})
+                {nextTrail && (
+                  <span className="text-[#ecd987] font-normal ml-3">
+                    · Próximo nivel: {nextTrail.label} a {nextTrail.rTrigger}R ({(nextTrail.rTrigger - rMultiple).toFixed(2)}R restante)
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span className="text-[#555]">
+                Trailing no activo — se activa al alcanzar 1R
+                {nextTrail && <span className="text-[#ecd987] ml-2">· Faltan {(nextTrail.rTrigger - rMultiple).toFixed(2)}R para breakeven</span>}
+              </span>
+            )}
+          </div>
+
+          {/* Temporal stop */}
+          <div className={`p-3 ${temporalAlert ? 'bg-[#1a0d00]' : ''}`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] text-[#555] uppercase tracking-wider font-bold">Stop Temporal (80% horizonte)</span>
+              <span className="text-[10px] font-mono text-[#555]">
+                {daysElapsed}d / {horizonDays}d ({pctElapsed.toFixed(0)}%) · Horizonte: {horizon}
+              </span>
+            </div>
+            {/* Progress bar */}
+            <div className="h-2 bg-[#111] border border-[#222] mb-2 relative">
+              <div
+                className={`h-full transition-all ${temporalAlert ? 'bg-[#f59e0b]' : 'bg-[#4ade80]'}`}
+                style={{ width: `${pctElapsed}%` }}
+              />
+              {/* 80% marker */}
+              <div className="absolute top-0 h-full border-l-2 border-[#ecd987]" style={{ left: '80%' }} />
+            </div>
+            <div className="flex items-center justify-between text-[10px]">
+              <span className="text-[#444]">Apertura: {openDateStr}</span>
+              <span className="text-[#555]">Trigger (80%): día {triggerDay}</span>
+              <span className="text-[#444]">Vence: {new Date(openDate.getTime() + horizonDays * 86400000).toISOString().slice(0, 10)}</span>
+            </div>
+            {temporalAlert ? (
+              <div className="mt-2 px-3 py-2 bg-[#2a1500] border border-[#f59e0b] text-xs text-[#f59e0b] font-bold">
+                ⚠ STOP TEMPORAL ACTIVO — Día {daysElapsed} de {horizonDays} ({pctElapsed.toFixed(0)}% del horizonte)
+                <div className="font-normal text-[10px] mt-0.5 text-[#a3a3a3]">
+                  Evaluar cierre. Si P&amp;L &gt; 0 proteger con trailing stop agresivo. Si negativo, considerar cerrar.
+                </div>
+              </div>
+            ) : (
+              <div className="mt-1 text-[10px] text-[#555]">
+                {daysToTrigger > 0
+                  ? `${daysToTrigger} días hasta el stop temporal`
+                  : 'Stop temporal no aplica aún'}
+              </div>
             )}
           </div>
         </div>
