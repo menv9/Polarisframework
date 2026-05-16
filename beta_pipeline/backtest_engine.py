@@ -133,7 +133,13 @@ def _risk_parity_weights(
         return {p: 1.0 / n for p in pairs} if n > 0 else {}
     inv_vol = {p: 1.0 / max(v, 1e-8) for p, v in vols.items()}
     total = sum(inv_vol.values())
-    return {p: inv_vol[p] / total for p in pairs}
+    # pairs without enough history get equal share of remaining weight
+    n_missing = len(pairs) - len(inv_vol)
+    missing_w = (1.0 / len(pairs)) if n_missing > 0 else 0.0
+    return {
+        p: (inv_vol[p] / total * (1.0 - missing_w * n_missing) if p in inv_vol else missing_w)
+        for p in pairs
+    }
 
 
 def predict_return_rolling(
