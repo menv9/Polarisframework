@@ -173,18 +173,6 @@ export default function DashboardPage() {
   const [upcomingEvents, setUpcomingEvents] = useState([])
   const navigate = useNavigate()
 
-  useEffect(() => {
-    if (theme !== 'mainframe') return
-    const html = document.documentElement
-    const prevZoom = html.style.zoom
-    const prevOverflow = html.style.overflow
-    html.style.zoom = '1.05'
-    html.style.overflow = 'hidden'
-    return () => {
-      html.style.zoom = prevZoom
-      html.style.overflow = prevOverflow
-    }
-  }, [theme])
 
   useEffect(() => {
     const ctrl = new AbortController()
