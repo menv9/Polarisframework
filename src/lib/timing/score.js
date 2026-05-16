@@ -17,7 +17,7 @@ export const TIMING_CHECKS = [
   {
     id: 'cftc_clean',
     label: 'CFTC no crowded',
-    description: 'z_LF no en extremo contrario a la señal (z < +2 si long, z > -2 si short)',
+    description: 'z_LF no crowded en la misma dirección que la señal (z < +2 si long, z > −2 si short)',
     required: false,
   },
   {
