@@ -220,6 +220,9 @@ export default function DashboardPage() {
     return () => ctrl.abort()
   }, [])
 
+  const historyCount = Object.values(history).filter(e => e?.series?.length > 0).length
+  const hasHistory   = historyCount > 0
+
   const scoreGDP  = wv.gdpUsa * 0.25 + wv.gdpEur * 0.18 + wv.gdpChn * 0.18 + wv.gdpJpn * 0.05 + wv.gdpResto * 0.34
   const wocRaw    = 0.7 * wv.smartZ - 0.3 * wv.retailZ
   const wocScore  = Number.isFinite(wocRaw) ? wocRaw : 0
@@ -326,6 +329,7 @@ export default function DashboardPage() {
           {/* HEADER */}
           <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-[#333]">
             <h1 className="text-2xl font-bold uppercase tracking-widest">DASHBOARD</h1>
+
             <div className="flex items-center gap-4">
               <button
                 onClick={() => exportDashboardCsv({ regime, wv, inflation, usdBias, scoreGDP, wocScore, dashboardPairs, ranked, exoBias, upcomingEvents })}
@@ -338,6 +342,18 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* Aviso: sin historial importado */}
+          {!hasHistory && (
+            <div className="mb-3 px-3 py-2 border border-[#ef4444] bg-[#1a0000] flex items-center justify-between gap-4">
+              <div className="text-[11px] font-mono text-[#ef4444]">
+                ⚠ SIN HISTORIAL — Todos los z-scores endógenos son 0 (defaults). Las señales no reflejan datos reales.
+              </div>
+              <Link to="/model-inputs" className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white whitespace-nowrap">
+                Importar datos →
+              </Link>
+            </div>
+          )}
 
           {/* WORLD VIEW */}
           <div className="border-2 border-[#333] mb-3">

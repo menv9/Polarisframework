@@ -171,6 +171,9 @@ export default function EndogenousOpsPage() {
   const [pairB, setPairB]   = useState('eur')
   const [activeTab, setActiveTab] = useState('usa')
 
+  const historyCount = Object.values(history).filter(e => e?.series?.length > 0).length
+  const hasHistory   = historyCount > 0
+
   const exogenousScores = computeExogenousCurrencyScores(dataSources, history)
   const countryScores  = COUNTRIES.map(c => {
     const endo     = computeCountryScoreDetailed(c.prefix, c.cyclical, regime, zScores, pairBetaData, vixRaw)
@@ -240,6 +243,25 @@ export default function EndogenousOpsPage() {
             </Link>
           </div>
         </div>
+
+        {/* Aviso: sin historial importado */}
+        {!hasHistory && (
+          <div className="mb-3 px-3 py-2 border border-[#ef4444] bg-[#1a0000] flex items-center justify-between gap-4">
+            <div className="text-[11px] font-mono text-[#ef4444]">
+              ⚠ SIN HISTORIAL — Z-scores son 0 (defaults). Importa el JSON del pipeline para activar el modelo real.
+            </div>
+            <Link to="/model-inputs" className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white whitespace-nowrap">
+              Importar →
+            </Link>
+          </div>
+        )}
+
+        {/* Indicador de cobertura parcial */}
+        {hasHistory && historyCount < 30 && (
+          <div className="mb-3 px-3 py-1.5 border border-[#f59e0b] bg-[#1a1200] text-[11px] font-mono text-[#f59e0b]">
+            ⚠ Cobertura parcial — {historyCount} series con datos. Indicadores sin historia usan z=0.
+          </div>
+        )}
 
         {/* ── SEÑAL DEL PAR ── */}
         <div className="border-2 border-[#333] mb-3">
