@@ -21,6 +21,18 @@ _GROWTH_KEYS  = ("exo_brent", "exo_wti", "exo_copper", "exo_chn_pmi", "wv_gdp")
 
 _COMPONENT_LABELS = ["PC_Risk", "PC_Policy", "PC_Growth", "PC_Residual"]
 
+# Anchor columns: the sign of each component is flipped if the correlation
+# with its anchor is negative (SVD sign is arbitrary).
+# PC_Risk   → VIX proxy: high loading = risk-OFF (score should rise with fear)
+# PC_Policy → policy rate proxy: high loading = tighter policy
+# PC_Growth → Brent proxy: high loading = expansion
+# If an anchor column is absent, no sign correction is applied.
+_SIGN_ANCHORS = {
+    "PC_Risk":    ("wv_vix",    +1),   # higher VIX → higher PC_Risk score
+    "PC_Policy":  ("policy",    +1),   # higher rates → higher PC_Policy
+    "PC_Growth":  ("exo_brent", +1),   # higher Brent → higher PC_Growth
+}
+
 
 def _log(msg: str) -> None:
     print(f"  {msg}")
@@ -76,6 +88,25 @@ def compute_pca(
     labels = _COMPONENT_LABELS[:n_comp]
     scores   = pd.DataFrame(scores_arr,   index=df_std.index,   columns=labels)
     loadings = pd.DataFrame(loadings_arr, index=df_macro.columns, columns=labels)
+
+    # ── Sign correction: flip components whose anchor correlation is wrong ────
+    for label, (anchor_col, expected_sign) in _SIGN_ANCHORS.items():
+        if label not in scores.columns:
+            continue
+        # Find anchor column by substring match (handles prefixed variants)
+        matches = [c for c in df_macro.columns if anchor_col in c]
+        if not matches:
+            continue
+        anchor_series = df_filled[matches[0]].to_numpy(dtype=float)
+        pc_series     = scores[label].to_numpy(dtype=float)
+        corr = float(np.corrcoef(anchor_series, pc_series)[0, 1])
+        if np.isnan(corr):
+            continue
+        if np.sign(corr) != np.sign(expected_sign):
+            scores[label]   *= -1
+            loadings[label] *= -1
+            if verbose:
+                _log(f"{label}: sign flipped (corr with '{matches[0]}' was {corr:.2f})")
 
     # Explained variance
     explained = (S[:n_comp] ** 2) / (S ** 2).sum()

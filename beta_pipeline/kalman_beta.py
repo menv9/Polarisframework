@@ -13,7 +13,7 @@ import pandas as pd
 
 from config import FX_PAIRS
 
-DEFAULT_Q = 1e-4   # state noise variance (how fast beta can drift)
+DEFAULT_Q = 1e-6   # state noise variance — very small → betas drift slowly, only on structural breaks
 DEFAULT_R = 1e-2   # observation noise variance
 DEFAULT_MIN_OBS = 24
 

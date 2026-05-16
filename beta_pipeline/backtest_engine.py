@@ -58,6 +58,8 @@ UMBRAL_PREDICCION = 0.0125   # 1.25 % mensual predicho para entrar — higher co
 TURNOVER_COST_MULTIPLIER = 2.0   # extra cost when reversing position direction
 MIN_SIGNAL_IMPROVEMENT   = 1.5   # signal must be 1.5× cost to justify a switch
 
+ZSCORE_CONVICTION = 1.25   # dead-zone: only trade when |pred| > 1.25σ of its own history
+
 
 def _log(msg: str) -> None:
     print(f"  {msg}")
@@ -203,6 +205,8 @@ def simulate(
     pair_return_history: dict[str, list[float]] = {p: [] for p in fx_pairs}
     # Track current open positions for turnover penalty
     current_positions: dict[str, str] = {}   # pair -> "LONG" | "SHORT" | None
+    # Track prediction history per pair for Z-score conviction filter
+    pred_history: dict[str, list[float]] = {p: [] for p in fx_pairs}
 
     for i in range(len(dates) - 1):
         t_open  = dates[i]
@@ -228,6 +232,14 @@ def simulate(
 
             if pred is None:
                 continue
+
+            # ── Z-score conviction filter (dead-zone) ────────────────────────
+            pred_hist = pred_history[pair]
+            pred_hist.append(pred)
+            if len(pred_hist) >= 12:
+                pred_std = float(np.std(pred_hist))
+                if pred_std > 1e-10 and abs(pred) / pred_std < ZSCORE_CONVICTION:
+                    continue   # signal too weak relative to its own history
 
             cost = COSTS.get(pair, 0.0005)
             prev_dir = current_positions.get(pair)
