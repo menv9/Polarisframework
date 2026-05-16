@@ -116,6 +116,8 @@ def save_tables(
     run_path: Path,
     beta_static: pd.DataFrame,
     pivot: pd.DataFrame,
+    beta_robust: pd.DataFrame | None,
+    robust_pivot: pd.DataFrame | None,
     regime_flags: pd.DataFrame,
     rolling_betas: dict[str, pd.DataFrame],
     df_aligned: pd.DataFrame | None = None,
@@ -123,6 +125,8 @@ def save_tables(
     coverage: pd.Series | None = None,
 ) -> None:
     beta_static.to_csv(run_path / "beta_matrix_full.csv", index=False)
+    if beta_robust is not None:
+        beta_robust.to_csv(run_path / "beta_matrix_robust.csv", index=False)
 
     # App-specific filtered matrix: only endo_ indicators, columns the app reads.
     # Import this file (beta_matrix_app.csv) in the Polaris app instead of the full one.
@@ -130,8 +134,20 @@ def save_tables(
     beta_static[beta_static["indicator"].str.startswith("endo_")][_app_cols].to_csv(
         run_path / "beta_matrix_app.csv", index=False
     )
+    if beta_robust is not None and not beta_robust.empty:
+        robust_app = beta_robust[
+            beta_robust["indicator"].str.startswith("endo_") & beta_robust["accepted"]
+        ].copy()
+        robust_app["significant"] = True
+        robust_app[["fx_pair", "indicator", "beta", "r2", "p_value", "significant"]].to_csv(
+            run_path / "beta_matrix_app_robust.csv", index=False
+        )
+    else:
+        pd.DataFrame(columns=_app_cols).to_csv(run_path / "beta_matrix_app_robust.csv", index=False)
 
     pivot.to_csv(run_path / "beta_matrix_pivot.csv")
+    if robust_pivot is not None:
+        robust_pivot.to_csv(run_path / "beta_matrix_robust_pivot.csv")
     regime_flags.to_csv(run_path / "regime_flags.csv", index=False)
 
     if df_aligned is not None:
@@ -150,6 +166,10 @@ def save_tables(
     with pd.ExcelWriter(run_path / "beta_outputs.xlsx", engine="openpyxl") as writer:
         beta_static.to_excel(writer, sheet_name="beta_full", index=False)
         pivot.to_excel(writer, sheet_name="pivot")
+        if beta_robust is not None:
+            beta_robust.to_excel(writer, sheet_name="beta_robust", index=False)
+        if robust_pivot is not None:
+            robust_pivot.to_excel(writer, sheet_name="robust_pivot")
         regime_flags.to_excel(writer, sheet_name="regime_flags", index=False)
         if coverage is not None:
             coverage.rename("coverage").to_excel(writer, sheet_name="coverage")
@@ -284,6 +304,7 @@ def save_metadata(run_path: Path, metadata: dict) -> None:
 def save_report(
     run_path: Path,
     beta_static: pd.DataFrame,
+    beta_robust: pd.DataFrame | None,
     regime_flags: pd.DataFrame,
     fetch_report: dict,
     fx_pairs: list[str],
@@ -306,6 +327,13 @@ def save_report(
         f"Significant p<0.05: {int(beta_static['significant'].sum()) if not beta_static.empty else 0}",
         f"Strong p<0.05 and R2>0.15: {int(beta_static['strong'].sum()) if not beta_static.empty else 0}",
         "",
+        "Robust beta candidates",
+        f"Candidates: {len(beta_robust) if beta_robust is not None else 0}",
+        f"Accepted: {int(beta_robust['accepted'].sum()) if beta_robust is not None and not beta_robust.empty else 0}",
+        f"Watchlist: {int(beta_robust['watchlist'].sum()) if beta_robust is not None and not beta_robust.empty and 'watchlist' in beta_robust.columns else 0}",
+        "Criteria: 1m feature lag, economic relevance, BH-FDR q<=0.10, walk-forward IC>0, directional accuracy>=52%",
+        "Watchlist: q<=0.25 and walk-forward IC>0, but not enough for production acceptance.",
+        "",
         "Regime flags",
         f"Changes detected: {len(regime_flags)}",
         f"Sign flips: {int(regime_flags['sign_flip'].sum()) if not regime_flags.empty else 0}",
@@ -313,6 +341,37 @@ def save_report(
     ]
 
     for fx in fx_pairs:
+        if beta_robust is not None and not beta_robust.empty:
+            top_robust = (
+                beta_robust[(beta_robust["fx_pair"] == fx) & (beta_robust["accepted"])]
+                .assign(abs_beta=lambda frame: frame["beta"].abs())
+                .nlargest(5, "abs_beta")
+            )
+            if not top_robust.empty:
+                lines.append(f"Robust drivers - {fx.upper()}")
+                for _, row in top_robust.iterrows():
+                    lines.append(
+                        f"  {row['indicator']:<30} beta={row['beta']:+.4f} "
+                        f"q={row['q_value']:.3f} WF_IC={row['wf_ic']:.3f} "
+                        f"dir={row['wf_directional_acc']:.1%}"
+                    )
+                lines.append("")
+
+            watchlist = (
+                beta_robust[(beta_robust["fx_pair"] == fx) & (beta_robust.get("watchlist", False))]
+                .assign(abs_beta=lambda frame: frame["beta"].abs())
+                .nlargest(3, "abs_beta")
+            )
+            if not watchlist.empty:
+                lines.append(f"Watchlist drivers - {fx.upper()}")
+                for _, row in watchlist.iterrows():
+                    lines.append(
+                        f"  {row['indicator']:<30} beta={row['beta']:+.4f} "
+                        f"q={row['q_value']:.3f} WF_IC={row['wf_ic']:.3f} "
+                        f"dir={row['wf_directional_acc']:.1%}"
+                    )
+                lines.append("")
+
         if beta_static.empty:
             continue
         top = (
@@ -343,6 +402,8 @@ def save_all(
     rolling_betas: dict[str, pd.DataFrame],
     fetch_report: dict,
     run_id: str,
+    beta_robust: pd.DataFrame | None = None,
+    robust_pivot: pd.DataFrame | None = None,
     df_aligned: pd.DataFrame | None = None,
     df_trans: pd.DataFrame | None = None,
     coverage: pd.Series | None = None,
@@ -355,12 +416,12 @@ def save_all(
     active_fx = fx_pairs or FX_PAIRS
     run_path = _ensure_output(run_id, output_dir)
 
-    save_tables(run_path, beta_static, pivot, regime_flags, rolling_betas, df_aligned, df_trans, coverage)
+    save_tables(run_path, beta_static, pivot, beta_robust, robust_pivot, regime_flags, rolling_betas, df_aligned, df_trans, coverage)
     if not skip_plots:
         plot_beta_heatmap(pivot, run_path)
         plot_top_drivers(beta_static, run_path, active_fx)
         plot_rolling_overview(rolling_betas, beta_static, regime_flags, run_path, active_fx)
-    save_report(run_path, beta_static, regime_flags, fetch_report, active_fx, run_id)
+    save_report(run_path, beta_static, beta_robust, regime_flags, fetch_report, active_fx, run_id)
     save_metadata(run_path, metadata or {})
 
     print(f"  Output directory: {run_path}")

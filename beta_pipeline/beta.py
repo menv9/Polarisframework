@@ -16,8 +16,7 @@ def _log(message: str) -> None:
 
 
 def _get_indicators(df: pd.DataFrame, fx_pairs: list[str] | None = None) -> list[str]:
-    active_fx = fx_pairs or FX_PAIRS
-    return [col for col in df.columns if col not in active_fx]
+    return [col for col in df.columns if col not in FX_PAIRS]
 
 
 def _rolling_beta_numpy(x: np.ndarray, y: np.ndarray, window: int, min_obs: int) -> np.ndarray:

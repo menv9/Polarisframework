@@ -18,6 +18,7 @@ import backtest_engine as bt
 import beta as beta_mod
 import fetch as fetcher
 import output as outputter
+import robust_beta as robust_beta_mod
 import transform as transformer
 from config import CACHE_DIR, FRED_API_KEY, FX_PAIRS, OUTPUT_DIR, START_DATE
 
@@ -135,6 +136,11 @@ def run(
     pivot = beta_mod.build_pivot(beta_static)
     print(f"  Phase 4 time: {_elapsed(phase_start)}")
 
+    phase_start = time.time()
+    beta_robust = robust_beta_mod.compute_robust_candidates(df_trans, fx_pairs=active_fx, verbose=verbose)
+    robust_pivot = robust_beta_mod.build_robust_pivot(beta_robust)
+    print(f"  Phase 4b time: {_elapsed(phase_start)}")
+
     if no_rolling:
         print("\n-- Phase 5 / Rolling beta ------------------------------------------")
         print("  Skipped with --no-rolling")
@@ -168,10 +174,21 @@ def run(
         "no_rolling": no_rolling,
         "from_cache": from_cache,
         "skip_plots": skip_plots,
+        "robust_beta": {
+            "feature_lag": robust_beta_mod.DEFAULT_FEATURE_LAG,
+            "train_window": robust_beta_mod.DEFAULT_TRAIN_WINDOW,
+            "min_train_obs": robust_beta_mod.DEFAULT_MIN_TRAIN_OBS,
+            "min_oos_obs": robust_beta_mod.DEFAULT_MIN_OOS_OBS,
+            "q_threshold": robust_beta_mod.DEFAULT_Q_THRESHOLD,
+            "watchlist_q_threshold": robust_beta_mod.DEFAULT_WATCHLIST_Q_THRESHOLD,
+            "min_directional_acc": robust_beta_mod.DEFAULT_MIN_DIRECTIONAL_ACC,
+        },
     }
     run_path = outputter.save_all(
         beta_static=beta_static,
         pivot=pivot,
+        beta_robust=beta_robust,
+        robust_pivot=robust_pivot,
         regime_flags=regime_flags,
         rolling_betas=rolling_betas,
         fetch_report=fetch_report,
@@ -207,7 +224,9 @@ def run(
         "df_aligned": df_aligned,
         "df_trans": df_trans,
         "beta_static": beta_static,
+        "beta_robust": beta_robust,
         "pivot": pivot,
+        "robust_pivot": robust_pivot,
         "rolling_betas": rolling_betas,
         "regime_flags": regime_flags,
         "fetch_report": fetch_report,
