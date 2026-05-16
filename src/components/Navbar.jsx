@@ -150,10 +150,8 @@ export default function Navbar() {
         </div>
 
         <div className="hidden md:flex items-center justify-end gap-3">
-          <ThemeToggle />
-
           {user && (
-            <div className="flex items-center gap-3 border-l border-[#333] pl-3">
+            <div className="flex items-center gap-3">
               <span className="text-xs text-[#555] max-w-[140px] truncate">{user.email}</span>
               <button
                 onClick={handleLogout}
@@ -163,6 +161,9 @@ export default function Navbar() {
               </button>
             </div>
           )}
+          <div className="border-l border-[#333] pl-3">
+            <ThemeToggle />
+          </div>
         </div>
       </div>
     </nav>
