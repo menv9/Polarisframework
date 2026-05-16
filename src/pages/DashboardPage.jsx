@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useModelStore } from '../store/ModelDataContext'
+import { useAppStore } from '../stores/appStore'
 import { detectInflationRegime, getConviction } from '../lib/scoring/regime'
 import { computeExogenousCurrencyScores, combineEndogenousExogenous } from '../lib/scoring/exogenous'
 import { loadPairBetas, computeCountryScore, computeCountryScoreForPair, pairLabelToId } from '../lib/pairBetas'
@@ -166,10 +167,24 @@ function exportDashboardCsv({ regime, wv, inflation, usdBias, scoreGDP, wocScore
 
 export default function DashboardPage() {
   const { worldview: wv, regime, dataSources: sources, zscores: zScores, history, features, signalHistory, recordSignalSample } = useModelStore()
+  const theme = useAppStore((s) => s.theme)
   const vixRaw = wv.vixRaw
   const [pairBetaData] = useState(loadPairBetas)
   const [upcomingEvents, setUpcomingEvents] = useState([])
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (theme !== 'mainframe') return
+    const html = document.documentElement
+    const prevZoom = html.style.zoom
+    const prevOverflow = html.style.overflow
+    html.style.zoom = '1.25'
+    html.style.overflow = 'hidden'
+    return () => {
+      html.style.zoom = prevZoom
+      html.style.overflow = prevOverflow
+    }
+  }, [theme])
 
   useEffect(() => {
     const ctrl = new AbortController()
