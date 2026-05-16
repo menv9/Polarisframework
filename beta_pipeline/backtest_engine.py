@@ -496,20 +496,40 @@ def compute_metrics(result: BacktestResult) -> dict:
     for date, ret in r.items():
         heatmap.append({"year": int(date.year), "month": int(date.month), "ret_pct": round(float(ret) * 100, 2)})
 
-    # ── Attribution por par ───────────────────────────────────────────────────
+    # ── Attribution + IC por par ─────────────────────────────────────────────
     by_pair: dict[str, dict] = {}
     for t in trades:
         p = t.pair
         if p not in by_pair:
-            by_pair[p] = {"n": 0, "wins": 0, "net_pct": 0.0}
+            by_pair[p] = {"n": 0, "wins": 0, "net_pct": 0.0, "_preds": [], "_actuals": []}
         by_pair[p]["n"] += 1
         by_pair[p]["net_pct"] = round(by_pair[p]["net_pct"] + t.net_return_pct * 100, 4)
         if t.net_return_pct > 0:
             by_pair[p]["wins"] += 1
-    attribution_by_pair = [
-        {"pair": p, **v, "win_rate_pct": round(v["wins"] / v["n"] * 100, 1)}
-        for p, v in sorted(by_pair.items(), key=lambda x: -x[1]["net_pct"])
-    ]
+        if np.isfinite(t.predicted) and abs(t.predicted) > 1e-10:
+            by_pair[p]["_preds"].append(t.predicted)
+            by_pair[p]["_actuals"].append(t.actual)
+
+    attribution_by_pair = []
+    for p, v in sorted(by_pair.items(), key=lambda x: -x[1]["net_pct"]):
+        preds_p, acts_p = v.pop("_preds"), v.pop("_actuals")
+        ic_p = None
+        if len(preds_p) >= 4:
+            pstd = float(np.std(preds_p))
+            astd = float(np.std(acts_p))
+            if pstd > 1e-10 and astd > 1e-10:
+                c, _ = scipy_stats.pearsonr(preds_p, acts_p)
+                ic_p = round(float(c), 4) if np.isfinite(c) else None
+        dir_acc_p = round(
+            float(np.mean([np.sign(pr) == np.sign(ac) for pr, ac in zip(preds_p, acts_p)]) * 100), 1
+        ) if preds_p else None
+        attribution_by_pair.append({
+            "pair": p,
+            **v,
+            "win_rate_pct": round(v["wins"] / v["n"] * 100, 1),
+            "ic": ic_p,
+            "directional_acc_pct": dir_acc_p,
+        })
 
     return {
         "status": "ok",
@@ -641,6 +661,24 @@ def save_backtest(
         f"  Gross P&L:           {_f('gross_pnl_pct')}",
         f"  Total costs:         {_f('total_cost_pct')}",
         f"  Net P&L:             {_f('net_pnl_pct')}",
+        "",
+        "IC POR PAR  (señal direccional — usar como bias macro)",
+        "  Pair       IC      Dir.Acc   WinRate   Net P&L",
+        "  " + "-" * 54,
+    ] + [
+        "  {:<10} {:>6}  {:>7}   {:>7}   {:>8}".format(
+            row["pair"],
+            f"{row['ic']:.4f}" if row["ic"] is not None else "  n/a ",
+            f"{row['directional_acc_pct']:.1f} %" if row["directional_acc_pct"] is not None else "  n/a",
+            f"{row['win_rate_pct']:.1f} %",
+            f"{row['net_pct']:.2f} %",
+        )
+        for row in sorted(
+            metrics.get("attribution_by_pair", []),
+            key=lambda x: (x["ic"] or -99),
+            reverse=True,
+        )
+    ] + [
         "",
         "=" * 72,
     ]
