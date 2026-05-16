@@ -324,7 +324,7 @@ def simulate(
                 close_date=t_close,
                 pair=pair,
                 direction=direction,
-                predicted=raw_signals.get(pair, 0.0),
+                predicted=raw_signals.get(pair, float("nan")),  # nan for carry-forward months
                 actual=gross,
                 gross_return_pct=gross,
                 cost_pct=cost_pct,
@@ -450,19 +450,25 @@ def compute_metrics(result: BacktestResult) -> dict:
              "predicted": t.predicted, "actual": t.actual}
             for t in trades
         ])
+        # Drop carry-forward months (predicted=nan) — only use rebalance-date predictions
+        df_tr = df_tr.dropna(subset=["predicted"])
+        df_tr = df_tr[df_tr["predicted"].abs() > 1e-10]  # also drop exact zeros
+
         # Monthly IC: mean of per-month cross-sectional correlations
         monthly_ics = []
         for _, grp in df_tr.groupby("month"):
-            if len(grp) >= 2:
+            if len(grp) >= 2 and grp["predicted"].std() > 1e-10 and grp["actual"].std() > 1e-10:
                 c, _ = scipy_stats.pearsonr(grp["predicted"], grp["actual"])
-                monthly_ics.append(c)
+                if np.isfinite(c):
+                    monthly_ics.append(c)
         ic_monthly = round(float(np.mean(monthly_ics)), 4) if monthly_ics else None
 
         quarterly_ics = []
         for _, grp in df_tr.groupby("quarter"):
-            if len(grp) >= 2:
+            if len(grp) >= 2 and grp["predicted"].std() > 1e-10 and grp["actual"].std() > 1e-10:
                 c, _ = scipy_stats.pearsonr(grp["predicted"], grp["actual"])
-                quarterly_ics.append(c)
+                if np.isfinite(c):
+                    quarterly_ics.append(c)
         ic_quarterly = round(float(np.mean(quarterly_ics)), 4) if quarterly_ics else None
 
     # ── Trades ───────────────────────────────────────────────────────────────
