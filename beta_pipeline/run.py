@@ -17,7 +17,9 @@ import pandas as pd
 import backtest_engine as bt
 import beta as beta_mod
 import fetch as fetcher
+import kalman_beta as kalman_mod
 import output as outputter
+import pca_factors as pca_mod
 import robust_beta as robust_beta_mod
 import transform as transformer
 from config import CACHE_DIR, FRED_API_KEY, FX_PAIRS, OUTPUT_DIR, START_DATE
@@ -141,6 +143,15 @@ def run(
     robust_pivot = robust_beta_mod.build_robust_pivot(beta_robust)
     print(f"  Phase 4b time: {_elapsed(phase_start)}")
 
+    phase_start = time.time()
+    kalman_betas = kalman_mod.compute_kalman(df_trans, fx_pairs=active_fx, verbose=verbose)
+    kalman_latest = kalman_mod.latest_kalman_betas(kalman_betas)
+    print(f"  Phase 4c time: {_elapsed(phase_start)}")
+
+    phase_start = time.time()
+    df_trans_pca = pca_mod.augment_with_pca(df_trans, fx_pairs=active_fx, verbose=verbose)
+    print(f"  Phase 4d time: {_elapsed(phase_start)}")
+
     if no_rolling:
         print("\n-- Phase 5 / Rolling beta ------------------------------------------")
         print("  Skipped with --no-rolling")
@@ -183,6 +194,13 @@ def run(
             "watchlist_q_threshold": robust_beta_mod.DEFAULT_WATCHLIST_Q_THRESHOLD,
             "min_directional_acc": robust_beta_mod.DEFAULT_MIN_DIRECTIONAL_ACC,
         },
+        "kalman": {
+            "Q": kalman_mod.DEFAULT_Q,
+            "R": kalman_mod.DEFAULT_R,
+        },
+        "pca": {
+            "n_components": 4,
+        },
     }
     run_path = outputter.save_all(
         beta_static=beta_static,
@@ -200,6 +218,8 @@ def run(
         fx_pairs=active_fx,
         output_dir=output_dir,
         skip_plots=skip_plots,
+        kalman_latest=kalman_latest,
+        df_trans_pca=df_trans_pca,
     )
     print(f"  Phase 6 time: {_elapsed(phase_start)}")
 
@@ -209,6 +229,7 @@ def run(
         df_trans=df_trans,
         beta_static=beta_static,
         run_path=run_path,
+        rolling_betas=rolling_betas if not no_rolling else None,
         verbose=verbose,
     )
 
@@ -231,6 +252,9 @@ def run(
         "regime_flags": regime_flags,
         "fetch_report": fetch_report,
         "backtest": backtest_result,
+        "kalman_betas": kalman_betas,
+        "kalman_latest": kalman_latest,
+        "df_trans_pca": df_trans_pca,
     }
 
 

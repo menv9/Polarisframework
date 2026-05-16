@@ -22,7 +22,7 @@ DEFAULT_FEATURE_LAG = 1
 DEFAULT_TRAIN_WINDOW = 84
 DEFAULT_MIN_TRAIN_OBS = 36
 DEFAULT_MIN_OOS_OBS = 24
-DEFAULT_Q_THRESHOLD = 0.10
+DEFAULT_Q_THRESHOLD = 0.05
 DEFAULT_WATCHLIST_Q_THRESHOLD = 0.25
 DEFAULT_MIN_DIRECTIONAL_ACC = 0.52
 
@@ -203,6 +203,7 @@ def compute_robust_candidates(
         (result["q_value"] <= q_threshold)
         & (result["wf_n"] >= min_oos_obs)
         & (result["wf_ic"] > 0)
+        & (result["wf_oos_r2"] > 0)          # NEW: R² OOS > 0
         & (result["wf_directional_acc"] >= min_directional_acc)
     )
     result["watchlist"] = (

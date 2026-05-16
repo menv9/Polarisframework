@@ -53,7 +53,10 @@ COSTS = {
     "usdchf": 0.00035,
 }
 
-UMBRAL_PREDICCION = 0.005   # 0.5 % mensual predicho para entrar
+UMBRAL_PREDICCION = 0.0125   # 1.25 % mensual predicho para entrar — higher conviction threshold
+
+TURNOVER_COST_MULTIPLIER = 2.0   # extra cost when reversing position direction
+MIN_SIGNAL_IMPROVEMENT   = 1.5   # signal must be 1.5× cost to justify a switch
 
 
 def _log(msg: str) -> None:
@@ -113,6 +116,58 @@ def predict_return(
 
 # ── Simulación ───────────────────────────────────────────────────────────────
 
+def _risk_parity_weights(
+    returns_history: dict[str, list[float]],
+    pairs: list[str],
+    min_obs: int = 12,
+) -> dict[str, float]:
+    """Inverse-volatility weights, falling back to equal weight."""
+    vols = {}
+    for p in pairs:
+        hist = returns_history.get(p, [])
+        if len(hist) >= min_obs:
+            vols[p] = float(np.std(hist[-36:]))  # rolling 36-month vol
+    if not vols or all(v < 1e-8 for v in vols.values()):
+        # Fallback: equal weight
+        n = len(pairs)
+        return {p: 1.0 / n for p in pairs} if n > 0 else {}
+    inv_vol = {p: 1.0 / max(v, 1e-8) for p, v in vols.items()}
+    total = sum(inv_vol.values())
+    return {p: inv_vol[p] / total for p in pairs}
+
+
+def predict_return_rolling(
+    rolling_betas: dict[str, pd.DataFrame],
+    fx_pair: str,
+    date: pd.Timestamp,
+    df_trans: pd.DataFrame,
+) -> float | None:
+    """Predict using rolling betas at *date* (using betas estimated at that date).
+
+    Rolling beta at t uses only data up to t → no look-ahead.
+    """
+    rb = rolling_betas.get(fx_pair)
+    if rb is None or rb.empty:
+        return None
+    if date not in rb.index:
+        return None
+
+    beta_row = rb.loc[date]
+    pred = 0.0
+    counted = 0
+    for ind, beta_val in beta_row.items():
+        if pd.isna(beta_val):
+            continue
+        if ind not in df_trans.columns:
+            continue
+        val = df_trans[ind].loc[date] if date in df_trans.index else float("nan")
+        if pd.isna(val):
+            continue
+        pred += beta_val * val
+        counted += 1
+    return pred if counted > 0 else None
+
+
 def simulate(
     df_aligned: pd.DataFrame,
     df_trans: pd.DataFrame,
@@ -120,64 +175,125 @@ def simulate(
     fx_pairs: list[str] = FX_PAIRS,
     min_obs: int = 24,
     threshold: float = UMBRAL_PREDICCION,
+    rolling_betas: dict | None = None,
     verbose: bool = True,
 ) -> BacktestResult:
-    """Backtest walk-forward mensual."""
+    """Backtest walk-forward mensual con Risk Parity y turnover penalty.
+
+    If rolling_betas is provided, uses time-varying betas (no look-ahead).
+    Falls back to beta_static if rolling unavailable for a pair/date.
+    """
     if verbose:
         print("\n-- Backtest / Simulation -------------------------------------------")
+        mode = "rolling betas (walk-forward)" if rolling_betas else "static betas (full-sample)"
+        print(f"  Beta mode: {mode}")
 
     dates = df_trans.index
     trades: list[Trade] = []
     monthly_pnl: dict[pd.Timestamp, float] = {}
     preds: list[float] = []
 
+    # Track historical returns per pair for risk parity
+    pair_return_history: dict[str, list[float]] = {p: [] for p in fx_pairs}
+    # Track current open positions for turnover penalty
+    current_positions: dict[str, str] = {}   # pair -> "LONG" | "SHORT" | None
+
     for i in range(len(dates) - 1):
-        t_open = dates[i]
+        t_open  = dates[i]
         t_close = dates[i + 1]
         if i < min_obs:
             continue
 
-        month_rets: list[float] = []
+        # ── Signal generation ────────────────────────────────────────────────
+        active_pairs: list[str] = []
+        signals: dict[str, float] = {}
+
         for pair in fx_pairs:
             if pair not in df_aligned.columns:
                 continue
 
-            pred = predict_return(df_trans, beta_static, pair, t_open)
-            if pred is None or abs(pred) < threshold:
-                continue
-            preds.append(pred)
+            # Try rolling betas first, fall back to static
+            if rolling_betas and pair in rolling_betas:
+                pred = predict_return_rolling(rolling_betas, pair, t_open, df_trans)
+                if pred is None:
+                    pred = predict_return(df_trans, beta_static, pair, t_open)
+            else:
+                pred = predict_return(df_trans, beta_static, pair, t_open)
 
+            if pred is None:
+                continue
+
+            cost = COSTS.get(pair, 0.0005)
+            prev_dir = current_positions.get(pair)
+            new_dir = "LONG" if pred > 0 else "SHORT"
+
+            # Turnover penalty: if reversing direction, need stronger signal
+            if prev_dir is not None and prev_dir != new_dir:
+                effective_threshold = threshold + cost * TURNOVER_COST_MULTIPLIER
+            else:
+                effective_threshold = threshold
+
+            if abs(pred) >= effective_threshold:
+                signals[pair] = pred
+                active_pairs.append(pair)
+
+        if not active_pairs:
+            current_positions = {}
+            continue
+
+        # ── Risk Parity weights ──────────────────────────────────────────────
+        weights = _risk_parity_weights(pair_return_history, active_pairs)
+
+        # ── Execute trades ───────────────────────────────────────────────────
+        month_weighted_ret = 0.0
+
+        for pair in active_pairs:
+            pred  = signals[pair]
+            preds.append(pred)
             direction = "LONG" if pred > 0 else "SHORT"
-            prices = df_aligned[pair]
+            prices    = df_aligned[pair]
+
             if t_open not in prices.index or t_close not in prices.index:
                 continue
 
-            entry = prices.loc[t_open]
-            exit_ = prices.loc[t_close]
-            gross = exit_ / entry - 1.0
+            entry  = prices.loc[t_open]
+            exit_  = prices.loc[t_close]
+            gross  = exit_ / entry - 1.0
             if direction == "SHORT":
                 gross = -gross
 
             cost = COSTS.get(pair, 0.0005)
+            # Extra cost if we are reversing direction
+            prev_dir = current_positions.get(pair)
+            if prev_dir is not None and prev_dir != direction:
+                cost *= TURNOVER_COST_MULTIPLIER
+
             net = gross - cost
+            w   = weights.get(pair, 1.0 / len(active_pairs))
 
-            trades.append(
-                Trade(
-                    open_date=t_open,
-                    close_date=t_close,
-                    pair=pair,
-                    direction=direction,
-                    predicted=pred,
-                    actual=gross,
-                    gross_return_pct=gross,
-                    cost_pct=cost,
-                    net_return_pct=net,
-                )
-            )
-            month_rets.append(net)
+            trades.append(Trade(
+                open_date=t_open,
+                close_date=t_close,
+                pair=pair,
+                direction=direction,
+                predicted=pred,
+                actual=gross,
+                gross_return_pct=gross,
+                cost_pct=cost,
+                net_return_pct=net,
+            ))
 
-        if month_rets:
-            monthly_pnl[t_close] = sum(month_rets) / len(month_rets)
+            pair_return_history[pair].append(net)
+            month_weighted_ret += w * net
+            current_positions[pair] = direction
+
+        # Remove closed pairs from tracking
+        for pair in list(current_positions):
+            if pair not in active_pairs:
+                del current_positions[pair]
+
+        if active_pairs:
+            monthly_pnl[t_close] = month_weighted_ret
 
     monthly_returns = pd.Series(monthly_pnl, dtype=float).sort_index()
     equity = (1 + monthly_returns).cumprod() if not monthly_returns.empty else pd.Series(dtype=float)
@@ -498,19 +614,23 @@ def run_backtest(
     beta_static: pd.DataFrame,
     run_path: Path | str,
     fx_pairs: list[str] = FX_PAIRS,
+    rolling_betas: dict | None = None,
     verbose: bool = True,
 ) -> BacktestResult:
     if verbose:
         print("\n-- Phase 7 / Backtest ----------------------------------------------")
         print("  Strategy: Capa 1 FX Macro G10 — monthly rebalance")
-        print("  Model:    static beta prediction (sign-based)")
-        print("  Costs:    half-turn spread")
+        mode = "rolling walk-forward" if rolling_betas else "static full-sample"
+        print(f"  Beta mode: {mode}")
+        print(f"  Weighting: Risk Parity (inverse-vol)")
+        print(f"  Costs:     half-turn spread + turnover penalty on reversals")
 
     result = simulate(
         df_aligned=df_aligned,
         df_trans=df_trans,
         beta_static=beta_static,
         fx_pairs=fx_pairs,
+        rolling_betas=rolling_betas,
         verbose=verbose,
     )
     metrics = compute_metrics(result)

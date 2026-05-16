@@ -411,6 +411,8 @@ def save_all(
     fx_pairs: list[str] | None = None,
     output_dir: Path | str = OUTPUT_DIR,
     skip_plots: bool = False,
+    kalman_latest: pd.DataFrame | None = None,
+    df_trans_pca: pd.DataFrame | None = None,
 ) -> Path:
     print("\n-- Phase 6 / Output ------------------------------------------------")
     active_fx = fx_pairs or FX_PAIRS
@@ -423,6 +425,14 @@ def save_all(
         plot_rolling_overview(rolling_betas, beta_static, regime_flags, run_path, active_fx)
     save_report(run_path, beta_static, beta_robust, regime_flags, fetch_report, active_fx, run_id)
     save_metadata(run_path, metadata or {})
+
+    if kalman_latest is not None and not kalman_latest.empty:
+        kalman_latest.to_csv(run_path / "kalman_betas_latest.csv", index=False)
+
+    if df_trans_pca is not None and not df_trans_pca.empty:
+        pca_cols = [c for c in df_trans_pca.columns if c.startswith("PC_")]
+        if pca_cols:
+            df_trans_pca[pca_cols].to_csv(run_path / "pca_factors.csv")
 
     print(f"  Output directory: {run_path}")
     return run_path
