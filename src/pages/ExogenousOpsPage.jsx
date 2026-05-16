@@ -91,9 +91,8 @@ function FreshDot({ lastUpdate, frequencyDays }) {
 }
 
 // Weighted average z-score per currency.
-// Uses z-score magnitude from historical series when available,
-// falls back to ±1 (direction only) when history is absent.
-// Output is a weighted average z-score; rendered bars scale to ±3.
+// Drivers without enough historical series are excluded instead of falling back
+// to direction-only values, so the exogenous score is always history-backed.
 function weightedScore(ccy, allItems, featureValues, history) {
   let num = 0, den = 0
   for (const item of allItems) {
@@ -104,10 +103,8 @@ function weightedScore(ccy, allItems, featureValues, history) {
     if (!Number.isFinite(featureValues[item.id])) continue
     const dir = bullDir ? 1 : -1
     const hist = history?.[item.id]
-    // Use actual z-score when series history is available (≥3 points)
-    const mag = hist?.series?.length >= 3
-      ? computeRollingZScore(hist.series, { key: item.id }).z * dir
-      : dir
+    if (!hist?.series?.length || hist.series.length < 3) continue
+    const mag = computeRollingZScore(hist.series, { key: item.id }).z * dir
     num += item.weight * mag
     den += item.weight
   }

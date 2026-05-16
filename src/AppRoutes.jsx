@@ -23,6 +23,8 @@ import ExecutionOpsPage from './pages/ExecutionOpsPage'
 import JournalPage from './pages/JournalPage'
 import PerformancePage from './pages/PerformancePage'
 import BacktestPage from './pages/BacktestPage'
+import ScenarioLibraryPage from './pages/ScenarioLibraryPage'
+import CapitalAllocationPage from './pages/CapitalAllocationPage'
 
 function Layout({ children }) {
   return (
@@ -65,6 +67,8 @@ export default function AppRoutes() {
         <Route path="/journal" element={<JournalPage />} />
         <Route path="/performance" element={<PerformancePage />} />
         <Route path="/backtest" element={<BacktestPage />} />
+        <Route path="/scenario-library" element={<ScenarioLibraryPage />} />
+        <Route path="/capital-allocation" element={<CapitalAllocationPage />} />
       </Route>
     </Routes>
   )

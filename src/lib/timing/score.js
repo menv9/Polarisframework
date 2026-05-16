@@ -80,6 +80,26 @@ export const TECH_SETUP_DEFAULTS = {
   divergence: false,
   confluences: 0,
   mtfAligned: null,
+  weeklyTrend: 'UNKNOWN',
+  monthlyTrend: 'UNKNOWN',
+  weeklySupport: '',
+  weeklyResistance: '',
+  monthlySupport: '',
+  monthlyResistance: '',
+  htfNotes: '',
+}
+
+export function evaluateMtfAlignment(input, direction = 'LONG') {
+  const setup = { ...TECH_SETUP_DEFAULTS, ...input }
+  const trends = [setup.weeklyTrend, setup.monthlyTrend].filter(trend => trend && trend !== 'UNKNOWN')
+  if (trends.length === 0) return setup.mtfAligned === true ? true : setup.mtfAligned === false ? false : null
+
+  const isLong = direction !== 'SHORT'
+  const opposing = isLong ? 'DOWN' : 'UP'
+  const confirming = isLong ? 'UP' : 'DOWN'
+  const hasOpposing = trends.includes(opposing)
+  const hasConfirming = trends.includes(confirming)
+  return !hasOpposing && hasConfirming
 }
 
 export function evaluateTechnicalSetup(input, direction = 'LONG') {
@@ -95,7 +115,7 @@ export function evaluateTechnicalSetup(input, direction = 'LONG') {
   )
   const structureOk = Boolean(setup.pullback || setup.retest || setup.candlePattern || setup.divergence)
   const confluenceOk = Number.isFinite(confluences) && confluences >= 2
-  const mtfOk = setup.mtfAligned === true ? true : setup.mtfAligned === false ? false : null
+  const mtfOk = evaluateMtfAlignment(setup, direction)
   const aPlus = rsiOk && adxOk && structureOk && confluenceOk
 
   return {

@@ -42,6 +42,8 @@ const GROUPS = [
       { to: '/journal',     label: 'Journal',   desc: 'Trade Journal' },
       { to: '/performance', label: 'Perf',      desc: 'Performance' },
       { to: '/backtest',    label: 'Backtest',  desc: 'Backtest' },
+      { to: '/scenario-library', label: 'Scenarios', desc: 'Scenario Library' },
+      { to: '/capital-allocation', label: 'Capital', desc: 'Capital Allocation' },
     ],
   },
 ]

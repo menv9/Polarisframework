@@ -6,6 +6,8 @@ import { getConviction } from '../lib/scoring/regime'
 import { computeExogenousCurrencyScores, combineEndogenousExogenous } from '../lib/scoring/exogenous'
 import { loadPairBetas, computeCountryScore, computeCountryScoreForPair, pairLabelToId } from '../lib/pairBetas'
 
+const HTF_STORAGE_KEY = 'polaris_timing_htf_levels'
+
 const PAIRS = [
   { label: 'EUR/USD', base: 'eur', quote: 'usa' },
   { label: 'USD/JPY', base: 'usa', quote: 'jpn' },
@@ -17,6 +19,12 @@ const PAIRS = [
   { label: 'USD/NOK', base: 'usa', quote: 'nor' },
   { label: 'USD/SEK', base: 'usa', quote: 'swe' },
 ]
+
+const FX_SPOT_SOURCE_IDS = {
+  'EUR/USD': 'exo_eurusd',
+  'USD/JPY': 'exo_usdjpy',
+  'GBP/USD': 'exo_gbpusd',
+}
 
 const COUNTRIES = [
   { label: 'USD', prefix: 'usa', ccy: 'USD', cyclical: false },
@@ -34,8 +42,29 @@ const COUNTRIES = [
 
 const STATUS_VALUES = { true: true, false: false, null: null }
 
+function loadHtfLevels() {
+  try {
+    const saved = localStorage.getItem(HTF_STORAGE_KEY)
+    if (saved) return JSON.parse(saved)
+  } catch { /* ignore */ }
+  return {}
+}
+
+function htfFieldsForPair(htfLevels, pair) {
+  return {
+    weeklyTrend: 'UNKNOWN',
+    monthlyTrend: 'UNKNOWN',
+    weeklySupport: '',
+    weeklyResistance: '',
+    monthlySupport: '',
+    monthlyResistance: '',
+    htfNotes: '',
+    ...(htfLevels[pair] || {}),
+  }
+}
+
 export default function TimingOpsPage() {
-  const { regime, zscores: zScores, dataSources, history, worldview: wv, signalHistory, recordSignalSample } = useModelStore()
+  const { regime, zscores: zScores, dataSources, history, worldview: wv, features, signalHistory, recordSignalSample } = useModelStore()
   const vixRaw = wv.vixRaw
   const [pairBetaData] = useState(loadPairBetas)
   const [searchParams] = useSearchParams()
@@ -45,11 +74,23 @@ export default function TimingOpsPage() {
   })
   const [checks, setChecks] = useState({})
   const [techSetup, setTechSetup] = useState(TECH_SETUP_DEFAULTS)
+  const [htfLevels, setHtfLevels] = useState(loadHtfLevels)
 
   const queryPair = searchParams.get('pair')
   const querySignal = Number(searchParams.get('signal'))
   const queryConviction = searchParams.get('conviction')
   const hasSignalOverride = selectedPair === queryPair && Number.isFinite(querySignal)
+  const selectedHtf = htfFieldsForPair(htfLevels, selectedPair)
+  const spotSourceId = FX_SPOT_SOURCE_IDS[selectedPair]
+  const spotPrice = spotSourceId ? features.valuesBySourceId[spotSourceId] : null
+
+  useEffect(() => {
+    localStorage.setItem(HTF_STORAGE_KEY, JSON.stringify(htfLevels))
+  }, [htfLevels])
+
+  useEffect(() => {
+    setTechSetup(prev => ({ ...prev, ...htfFieldsForPair(htfLevels, selectedPair) }))
+  }, [selectedPair, htfLevels])
 
   const exogenousScores = useMemo(() =>
     computeExogenousCurrencyScores(dataSources, history),
@@ -123,7 +164,17 @@ export default function TimingOpsPage() {
 
   function resetChecks() {
     setChecks({})
-    setTechSetup(TECH_SETUP_DEFAULTS)
+    setTechSetup({ ...TECH_SETUP_DEFAULTS, ...selectedHtf })
+  }
+
+  function updateHtfField(key, value) {
+    setHtfLevels(prev => ({
+      ...prev,
+      [selectedPair]: {
+        ...htfFieldsForPair(prev, selectedPair),
+        [key]: value,
+      },
+    }))
   }
 
   const verdictColor = verdict === 'READY' ? 'text-[#4ade80]' : verdict === 'WAIT' ? 'text-[#f59e0b]' : 'text-[#ef4444]'
@@ -245,6 +296,63 @@ export default function TimingOpsPage() {
             >
               <div className="text-[10px] font-bold uppercase tracking-wider">MTF {techSetup.mtfAligned === true ? 'OK' : techSetup.mtfAligned === false ? 'FAIL' : 'N/A'}</div>
             </button>
+          </div>
+        </div>
+
+        {/* Niveles HTF */}
+        <div className="border-2 border-[#333] mb-3">
+          <div className="px-3 py-1.5 bg-[#1a1a0d] border-b border-[#333] flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Filtro Multi-Timeframe</span>
+            <span className="text-[10px] text-[#777] uppercase tracking-wider">
+              Spot {Number.isFinite(spotPrice) ? spotPrice.toFixed(selectedPair.includes('JPY') ? 3 : 5) : 'sin fuente'}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-[#222]">
+            {[
+              ['weeklyTrend', 'Weekly trend'],
+              ['monthlyTrend', 'Monthly trend'],
+            ].map(([key, label]) => (
+              <div key={key} className="p-3 border-r border-b border-[#222]">
+                <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">{label}</div>
+                <select
+                  value={selectedHtf[key]}
+                  onChange={e => updateHtfField(key, e.target.value)}
+                  className="bg-[#111] border border-[#333] text-[#e5e5e5] font-mono text-sm px-2 py-1 w-full focus:outline-none focus:border-[#ecd987]"
+                >
+                  <option value="UNKNOWN">Sin dato</option>
+                  <option value="UP">Alcista</option>
+                  <option value="DOWN">Bajista</option>
+                  <option value="RANGE">Rango</option>
+                </select>
+              </div>
+            ))}
+            {[
+              ['weeklySupport', 'Weekly soporte'],
+              ['weeklyResistance', 'Weekly resistencia'],
+              ['monthlySupport', 'Monthly soporte'],
+              ['monthlyResistance', 'Monthly resistencia'],
+            ].map(([key, label]) => (
+              <div key={key} className="p-3 border-r border-b border-[#222]">
+                <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">{label}</div>
+                <input
+                  type="number"
+                  value={selectedHtf[key]}
+                  step={selectedPair.includes('JPY') ? 0.01 : 0.0001}
+                  onChange={e => updateHtfField(key, e.target.value)}
+                  className="bg-[#111] border border-[#333] text-[#e5e5e5] font-mono text-sm px-2 py-1 w-full focus:outline-none focus:border-[#ecd987]"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="p-3">
+            <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Notas HTF</div>
+            <input
+              type="text"
+              value={selectedHtf.htfNotes}
+              onChange={e => updateHtfField('htfNotes', e.target.value)}
+              placeholder="Ej: weekly HH-HL, monthly resistance 1.1050, esperar cierre sobre nivel"
+              className="bg-[#111] border border-[#333] text-[#e5e5e5] text-xs px-2 py-1.5 w-full focus:outline-none focus:border-[#ecd987]"
+            />
           </div>
         </div>
 
