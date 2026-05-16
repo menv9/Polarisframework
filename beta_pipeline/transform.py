@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from config import COVERAGE_MIN, FFILL_LIMIT, FREQ, FX_PAIRS, START_DATE, TRANSFORM_RULES
+from config import CARRY_PAIRS, COVERAGE_MIN, FFILL_LIMIT, FREQ, FX_PAIRS, START_DATE, TRANSFORM_RULES
 
 
 def _log(message: str) -> None:
@@ -49,18 +49,39 @@ def build_transform_map(columns: list[str]) -> dict[str, str]:
     return {col: reverse.get(col, "pct_change") for col in columns}
 
 
+def compute_carry_factors(df_aligned: pd.DataFrame, fx_pairs: list[str]) -> pd.DataFrame:
+    """Compute interest rate differentials (carry) for each FX pair.
+
+    carry_pair = rate_base - rate_quote  (level, annualised percentage points)
+
+    The level of the differential — not its change — is the carry trade signal.
+    A positive carry means the base currency yields more → positive expected carry return.
+    """
+    carry_cols: dict[str, pd.Series] = {}
+    for pair in fx_pairs:
+        if pair not in CARRY_PAIRS:
+            continue
+        base_col, quote_col = CARRY_PAIRS[pair]
+        if base_col not in df_aligned.columns or quote_col not in df_aligned.columns:
+            continue
+        carry_cols[f"carry_{pair}"] = df_aligned[base_col] - df_aligned[quote_col]
+    return pd.DataFrame(carry_cols, index=df_aligned.index)
+
+
 def transform(df_aligned: pd.DataFrame, verbose: bool = True) -> tuple[pd.DataFrame, dict[str, str]]:
-    """Apply pct_change, diff, or level transformations before regression."""
+    """Apply pct_change, pct_change_yoy, diff, or level transformations before regression."""
     print("\n-- Phase 3 / Transformation ----------------------------------------")
     transform_map = build_transform_map(df_aligned.columns.tolist())
     result = pd.DataFrame(index=df_aligned.index)
-    counts = {"pct_change": 0, "diff": 0, "level": 0}
+    counts: dict[str, int] = {}
 
     for col in df_aligned.columns:
         rule = transform_map[col]
         counts[rule] = counts.get(rule, 0) + 1
         if rule == "pct_change":
             result[col] = df_aligned[col].pct_change()
+        elif rule == "pct_change_yoy":
+            result[col] = df_aligned[col].pct_change(12)   # YoY%: what central banks target
         elif rule == "diff":
             result[col] = df_aligned[col].diff()
         elif rule == "level":
@@ -70,12 +91,8 @@ def transform(df_aligned: pd.DataFrame, verbose: bool = True) -> tuple[pd.DataFr
 
     result = result.replace([float("inf"), float("-inf")], pd.NA).dropna(how="all")
     if verbose:
-        _log(
-            "Rules: "
-            f"pct_change={counts.get('pct_change', 0)}, "
-            f"diff={counts.get('diff', 0)}, "
-            f"level={counts.get('level', 0)}"
-        )
+        parts = ", ".join(f"{k}={v}" for k, v in sorted(counts.items()))
+        _log(f"Rules: {parts}")
         _log(f"Transformed shape: {result.shape[0]} months x {result.shape[1]} series")
     return result, transform_map
 
@@ -86,10 +103,17 @@ def prepare(
     start_date: str = START_DATE,
     verbose: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, str], list[str], pd.Series]:
-    """Run alignment and transformation in sequence."""
+    """Run alignment and transformation in sequence, then append carry factors."""
     active_fx = fx_pairs or FX_PAIRS
     df_aligned, excluded, coverage = align(df_raw, start_date=start_date, verbose=verbose)
     df_trans, transform_map = transform(df_aligned, verbose=verbose)
+
+    # Carry factors: rate differential in level form (base rate − quote rate)
+    carry = compute_carry_factors(df_aligned, active_fx)
+    if not carry.empty:
+        df_trans = pd.concat([df_trans, carry], axis=1)
+        if verbose:
+            _log(f"Carry factors added: {list(carry.columns)}")
 
     missing_fx = [fx for fx in active_fx if fx not in df_trans.columns]
     if missing_fx:

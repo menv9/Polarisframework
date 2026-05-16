@@ -198,6 +198,37 @@ TRANSFORM_RULES = {
         "endo_usa_nfp",
         "endo_usa_retail",
         "endo_usa_housing",
+        # REER: MoM% change in real effective exchange rate (stationary, policy-relevant)
+        "endo_usa_reer",
+        "endo_eur_reer",
+        "endo_gbr_reer",
+        "endo_jpn_reer",
+        "endo_aus_reer",
+        "endo_nzl_reer",
+        "endo_cad_reer",
+        "endo_che_reer",
+    ],
+    "pct_change_yoy": [
+        # Inflation series: YoY% is what central banks target and markets price
+        # (MoM% is too noisy; level is non-stationary → spurious betas)
+        "wv_cpi_usa",
+        "wv_cpi_eur",
+        "endo_usa_cpi",
+        "endo_usa_core_cpi",
+        "endo_usa_pce",
+        "endo_usa_core_pce",
+        "endo_eur_cpi",
+        "endo_eur_core_cpi",
+        "endo_gbr_cpi",
+        "endo_gbr_core_cpi",
+        "endo_jpn_cpi",
+        "endo_jpn_core_cpi",
+        "endo_aus_cpi",
+        "endo_nzl_cpi",
+        "endo_cad_cpi",
+        "endo_che_cpi",
+        "endo_swe_cpi",
+        "endo_nor_cpi",
     ],
     "diff": [
         "wv_vix",
@@ -236,38 +267,14 @@ TRANSFORM_RULES = {
         "endo_che_unempl",
         "endo_usa_niip",
         "exo_chn_pmi",
-    ],
-    "level": [
-        "wv_cpi_usa",
-        "wv_cpi_eur",
-        "endo_usa_cpi",
-        "endo_usa_core_cpi",
-        "endo_usa_pce",
-        "endo_usa_core_pce",
-        "endo_eur_cpi",
-        "endo_eur_core_cpi",
-        "endo_gbr_cpi",
-        "endo_gbr_core_cpi",
-        "endo_jpn_cpi",
-        "endo_jpn_core_cpi",
-        "endo_aus_cpi",
-        "endo_nzl_cpi",
-        "endo_cad_cpi",
-        "endo_che_cpi",
-        "endo_swe_cpi",
-        "endo_nor_cpi",
-        "endo_usa_reer",
-        "endo_eur_reer",
-        "endo_gbr_reer",
-        "endo_jpn_reer",
-        "endo_aus_reer",
-        "endo_nzl_reer",
-        "endo_cad_reer",
-        "endo_che_reer",
+        # Change in debt/GDP ratio and sentiment (slow-moving levels → diff for stationarity)
         "endo_usa_debt_gdp",
         "endo_eur_debt_gdp",
         "endo_usa_conf",
-        # World Bank CA % GDP series (annual, already in % → level transform)
+    ],
+    "level": [
+        # Current account % GDP: annual data forwarded monthly; level is a structural
+        # position signal (positive CA → currency support over medium term)
         "endo_usa_ca",
         "endo_eur_ca",
         "endo_gbr_ca",
@@ -276,9 +283,22 @@ TRANSFORM_RULES = {
         "endo_nzl_ca",
         "endo_cad_ca",
         "endo_che_ca",
-        # NIIP — non-stationary level (use diff in zScore, level here for pipeline input)
-        "endo_usa_niip",
     ],
+}
+
+# Carry factor definitions: carry_pair = rate_base - rate_quote (in annualised %)
+# Level of differential is the economic signal for carry trade (high-yield vs low-yield)
+CARRY_PAIRS: dict[str, tuple[str, str]] = {
+    "eurusd": ("endo_eur_policy", "endo_usa_policy"),
+    "usdjpy": ("endo_usa_policy", "endo_jpn_policy"),
+    "gbpusd": ("endo_gbr_policy", "endo_usa_policy"),
+    "audusd": ("endo_aus_policy", "endo_usa_policy"),
+    "usdcad": ("endo_usa_policy", "endo_cad_policy"),
+    "nzdusd": ("endo_nzl_policy", "endo_usa_policy"),
+    "usdchf": ("endo_usa_policy", "endo_che_policy"),
+    "eurgbp": ("endo_eur_policy", "endo_gbr_policy"),
+    "eurjpy": ("endo_eur_policy", "endo_jpn_policy"),
+    "gbpjpy": ("endo_gbr_policy", "endo_jpn_policy"),
 }
 
 # World Bank current account % GDP  (indicator BN.CAB.XOKA.GD.ZS)

@@ -54,9 +54,13 @@ def is_economically_relevant(fx_pair: str, indicator: str) -> bool:
 
     Global World View / Exogenous drivers are allowed for all pairs. Endogenous
     country drivers are restricted to the currencies present in the pair.
+    Carry factors (carry_pair) are only relevant for their exact pair.
     """
     if indicator.startswith(_GLOBAL_PREFIXES):
         return True
+    # Carry factor: pair-specific — only relevant for the exact FX pair
+    if indicator.startswith("carry_"):
+        return indicator == f"carry_{fx_pair}"
     if not indicator.startswith("endo_"):
         return False
     parts = indicator.split("_")
