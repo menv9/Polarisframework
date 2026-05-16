@@ -230,6 +230,8 @@ def run(
         beta_static=beta_static,
         run_path=run_path,
         rolling_betas=rolling_betas if not no_rolling else None,
+        rebalance_freq=bt.REBALANCE_FREQ,
+        hysteresis=bt.HYSTERESIS_THRESHOLD,
         verbose=verbose,
     )
 

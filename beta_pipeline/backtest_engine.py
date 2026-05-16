@@ -60,6 +60,9 @@ MIN_SIGNAL_IMPROVEMENT   = 1.5   # signal must be 1.5× cost to justify a switch
 
 ZSCORE_CONVICTION = 1.25   # dead-zone: only trade when |pred| > 1.25σ of its own history
 
+REBALANCE_FREQ      = 3     # rebalance every N months (3 = quarterly)
+HYSTERESIS_THRESHOLD = 0.02  # minimum |signed-weight change| to execute a trade
+
 
 def _log(msg: str) -> None:
     print(f"  {msg}")
@@ -184,29 +187,33 @@ def simulate(
     min_obs: int = 24,
     threshold: float = UMBRAL_PREDICCION,
     rolling_betas: dict | None = None,
+    rebalance_freq: int = REBALANCE_FREQ,
+    hysteresis: float = HYSTERESIS_THRESHOLD,
     verbose: bool = True,
 ) -> BacktestResult:
-    """Backtest walk-forward mensual con Risk Parity y turnover penalty.
+    """Backtest walk-forward con Risk Parity, rebalanceo N-mensual e histéresis.
 
-    If rolling_betas is provided, uses time-varying betas (no look-ahead).
-    Falls back to beta_static if rolling unavailable for a pair/date.
+    rebalance_freq : months between signal evaluations (1=monthly, 3=quarterly).
+    hysteresis     : minimum |signed-weight change| required to execute a trade.
+                     Positions within the band are carried forward at zero cost.
     """
     if verbose:
         print("\n-- Backtest / Simulation -------------------------------------------")
         mode = "rolling betas (walk-forward)" if rolling_betas else "static betas (full-sample)"
-        print(f"  Beta mode: {mode}")
+        print(f"  Beta mode:   {mode}")
+        print(f"  Rebalance:   every {rebalance_freq} month(s)")
+        print(f"  Hysteresis:  {hysteresis * 100:.1f}% minimum weight change")
 
     dates = df_trans.index
     trades: list[Trade] = []
     monthly_pnl: dict[pd.Timestamp, float] = {}
     preds: list[float] = []
 
-    # Track historical returns per pair for risk parity
     pair_return_history: dict[str, list[float]] = {p: [] for p in fx_pairs}
-    # Track current open positions for turnover penalty
-    current_positions: dict[str, str] = {}   # pair -> "LONG" | "SHORT" | None
-    # Track prediction history per pair for Z-score conviction filter
     pred_history: dict[str, list[float]] = {p: [] for p in fx_pairs}
+    # Signed weights: positive = LONG, negative = SHORT, absent = flat
+    current_weights: dict[str, float] = {}
+    rebalance_counter = 0
 
     for i in range(len(dates) - 1):
         t_open  = dates[i]
@@ -214,104 +221,120 @@ def simulate(
         if i < min_obs:
             continue
 
-        # ── Signal generation ────────────────────────────────────────────────
-        active_pairs: list[str] = []
-        signals: dict[str, float] = {}
+        rebalance_counter += 1
+        is_rebalance = (rebalance_counter % rebalance_freq == 0)
 
-        for pair in fx_pairs:
-            if pair not in df_aligned.columns:
-                continue
+        # pairs whose weights actually changed this period → pay transaction cost
+        executed_changes: dict[str, tuple[float, float]] = {}  # pair -> (old_w, new_w)
+        raw_signals: dict[str, float] = {}
 
-            # Try rolling betas first, fall back to static
-            if rolling_betas and pair in rolling_betas:
-                pred = predict_return_rolling(rolling_betas, pair, t_open, df_trans)
-                if pred is None:
+        # ── Quarterly (or N-monthly) rebalance ───────────────────────────────
+        if is_rebalance:
+            active_for_rp: list[str] = []
+
+            for pair in fx_pairs:
+                if pair not in df_aligned.columns:
+                    continue
+
+                if rolling_betas and pair in rolling_betas:
+                    pred = predict_return_rolling(rolling_betas, pair, t_open, df_trans)
+                    if pred is None:
+                        pred = predict_return(df_trans, beta_static, pair, t_open)
+                else:
                     pred = predict_return(df_trans, beta_static, pair, t_open)
-            else:
-                pred = predict_return(df_trans, beta_static, pair, t_open)
 
-            if pred is None:
-                continue
+                if pred is None:
+                    continue
 
-            # ── Z-score conviction filter (dead-zone) ────────────────────────
-            pred_hist = pred_history[pair]
-            pred_hist.append(pred)
-            if len(pred_hist) >= 12:
-                pred_std = float(np.std(pred_hist))
-                if pred_std > 1e-10 and abs(pred) / pred_std < ZSCORE_CONVICTION:
-                    continue   # signal too weak relative to its own history
+                # Z-score conviction filter
+                pred_hist = pred_history[pair]
+                pred_hist.append(pred)
+                if len(pred_hist) >= 12:
+                    pred_std = float(np.std(pred_hist))
+                    if pred_std > 1e-10 and abs(pred) / pred_std < ZSCORE_CONVICTION:
+                        continue
 
-            cost = COSTS.get(pair, 0.0005)
-            prev_dir = current_positions.get(pair)
-            new_dir = "LONG" if pred > 0 else "SHORT"
+                old_w = current_weights.get(pair, 0.0)
+                old_dir = "LONG" if old_w > 0 else ("SHORT" if old_w < 0 else None)
+                new_dir = "LONG" if pred > 0 else "SHORT"
+                reversing = old_dir is not None and old_dir != new_dir
+                base_cost = COSTS.get(pair, 0.0005)
+                eff_threshold = threshold + (base_cost * TURNOVER_COST_MULTIPLIER if reversing else 0.0)
 
-            # Turnover penalty: if reversing direction, need stronger signal
-            if prev_dir is not None and prev_dir != new_dir:
-                effective_threshold = threshold + cost * TURNOVER_COST_MULTIPLIER
-            else:
-                effective_threshold = threshold
+                if abs(pred) >= eff_threshold:
+                    active_for_rp.append(pair)
+                    raw_signals[pair] = pred
 
-            if abs(pred) >= effective_threshold:
-                signals[pair] = pred
-                active_pairs.append(pair)
+            # Compute candidate signed weights via Risk Parity
+            candidate_weights: dict[str, float] = {}
+            if active_for_rp:
+                rp_w = _risk_parity_weights(pair_return_history, active_for_rp)
+                for pair in active_for_rp:
+                    sign = 1.0 if raw_signals[pair] > 0 else -1.0
+                    candidate_weights[pair] = sign * rp_w.get(pair, 1.0 / len(active_for_rp))
 
-        if not active_pairs:
-            current_positions = {}
+            # Apply hysteresis band: only execute if weight change >= threshold
+            prev_weights = dict(current_weights)
+            next_weights: dict[str, float] = {}
+
+            all_pairs = set(list(fx_pairs))
+            for pair in all_pairs:
+                new_w = candidate_weights.get(pair, 0.0)
+                old_w = prev_weights.get(pair, 0.0)
+                if abs(new_w - old_w) >= hysteresis:
+                    next_weights[pair] = new_w
+                    executed_changes[pair] = (old_w, new_w)
+                else:
+                    next_weights[pair] = old_w  # carry forward — no cost
+
+            current_weights = {p: w for p, w in next_weights.items() if abs(w) > 1e-10}
+            if verbose and executed_changes:
+                preds.extend(raw_signals[p] for p in executed_changes if p in raw_signals)
+
+        if not current_weights:
             continue
 
-        # ── Risk Parity weights ──────────────────────────────────────────────
-        weights = _risk_parity_weights(pair_return_history, active_pairs)
-
-        # ── Execute trades ───────────────────────────────────────────────────
+        # ── Monthly P&L on currently held positions ───────────────────────────
         month_weighted_ret = 0.0
 
-        for pair in active_pairs:
-            pred  = signals[pair]
-            preds.append(pred)
-            direction = "LONG" if pred > 0 else "SHORT"
-            prices    = df_aligned[pair]
-
+        for pair, w in current_weights.items():
+            prices = df_aligned[pair]
             if t_open not in prices.index or t_close not in prices.index:
                 continue
 
             entry  = prices.loc[t_open]
             exit_  = prices.loc[t_close]
             gross  = exit_ / entry - 1.0
+            direction = "LONG" if w > 0 else "SHORT"
             if direction == "SHORT":
                 gross = -gross
 
-            cost = COSTS.get(pair, 0.0005)
-            # Extra cost if we are reversing direction
-            prev_dir = current_positions.get(pair)
-            if prev_dir is not None and prev_dir != direction:
-                cost *= TURNOVER_COST_MULTIPLIER
+            # Transaction cost only when this position was actually changed
+            cost_pct = 0.0
+            if pair in executed_changes:
+                old_w, new_w = executed_changes[pair]
+                cost_pct = COSTS.get(pair, 0.0005)
+                if np.sign(old_w) != np.sign(new_w) and old_w != 0.0:
+                    cost_pct *= TURNOVER_COST_MULTIPLIER
 
-            net = gross - cost
-            w   = weights.get(pair, 1.0 / len(active_pairs))
+            net = gross - cost_pct
 
             trades.append(Trade(
                 open_date=t_open,
                 close_date=t_close,
                 pair=pair,
                 direction=direction,
-                predicted=pred,
+                predicted=raw_signals.get(pair, 0.0),
                 actual=gross,
                 gross_return_pct=gross,
-                cost_pct=cost,
+                cost_pct=cost_pct,
                 net_return_pct=net,
             ))
 
             pair_return_history[pair].append(net)
-            month_weighted_ret += w * net
-            current_positions[pair] = direction
+            month_weighted_ret += abs(w) * net
 
-        # Remove closed pairs from tracking
-        for pair in list(current_positions):
-            if pair not in active_pairs:
-                del current_positions[pair]
-
-        if active_pairs:
-            monthly_pnl[t_close] = month_weighted_ret
+        monthly_pnl[t_close] = month_weighted_ret
 
     monthly_returns = pd.Series(monthly_pnl, dtype=float).sort_index()
     equity = (1 + monthly_returns).cumprod() if not monthly_returns.empty else pd.Series(dtype=float)
@@ -320,7 +343,7 @@ def simulate(
         if preds:
             p = pd.Series(preds)
             _log(f"Predicción media: {p.mean():.4f} (std {p.std():.4f}, range [{p.min():.4f}, {p.max():.4f}])")
-        _log(f"Trades: {len(trades)}  |  Meses activos: {len(monthly_returns)}")
+        _log(f"Periodos: {len(trades)}  |  Meses activos: {len(monthly_returns)}")
 
     return BacktestResult(trades=trades, equity=equity, monthly_returns=monthly_returns)
 
@@ -633,14 +656,17 @@ def run_backtest(
     run_path: Path | str,
     fx_pairs: list[str] = FX_PAIRS,
     rolling_betas: dict | None = None,
+    rebalance_freq: int = REBALANCE_FREQ,
+    hysteresis: float = HYSTERESIS_THRESHOLD,
     verbose: bool = True,
 ) -> BacktestResult:
     if verbose:
         print("\n-- Phase 7 / Backtest ----------------------------------------------")
-        print("  Strategy: Capa 1 FX Macro G10 — monthly rebalance")
+        print(f"  Strategy: Capa 1 FX Macro G10 — {rebalance_freq}-month rebalance")
         mode = "rolling walk-forward" if rolling_betas else "static full-sample"
         print(f"  Beta mode: {mode}")
         print(f"  Weighting: Risk Parity (inverse-vol)")
+        print(f"  Hysteresis band: {hysteresis * 100:.1f}%")
         print(f"  Costs:     half-turn spread + turnover penalty on reversals")
 
     result = simulate(
@@ -649,6 +675,8 @@ def run_backtest(
         beta_static=beta_static,
         fx_pairs=fx_pairs,
         rolling_betas=rolling_betas,
+        rebalance_freq=rebalance_freq,
+        hysteresis=hysteresis,
         verbose=verbose,
     )
     metrics = compute_metrics(result)
