@@ -27,8 +27,6 @@ const CATEGORY_MAP = {
 const INDICATORS = BASE_INDICATORS.map(i => ({ ...i, beta: i.betaDoc, category: CATEGORY_MAP[i.key] ?? i.key.toUpperCase() }))
 
 // Labels por indicador y país — alineados con lo que está realmente en dataSources.js
-const CFTC_OWN = new Set(['eur', 'jpn', 'gbr', 'che', 'can', 'aus', 'nzl'])
-const CB_BAL_WIRED = new Set(['usa', 'eur', 'jpn'])
 
 function getIndLabel(key, prefix) {
   switch (key) {
