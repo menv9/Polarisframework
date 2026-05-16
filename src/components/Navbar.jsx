@@ -113,12 +113,14 @@ export default function Navbar() {
 
   return (
     <nav data-app-navbar className={`fixed top-0 left-0 right-0 z-50 border-b-2 border-[#333] bg-black ${scrolled ? 'border-white' : ''}`}>
-      <div className="max-w-6xl mx-auto px-4 h-12 grid items-center" style={{ gridTemplateColumns: 'auto 1fr auto' }}>
-        <Link to="/" className="flex items-center">
+      <div className="w-full px-4 h-12 flex items-center">
+        {/* Logo — izquierda */}
+        <Link to="/" className="flex items-center flex-none">
           <span className="text-sm font-bold tracking-widest text-white">POLARIS</span>
         </Link>
 
-        <div className="hidden md:flex items-center justify-center gap-5">
+        {/* Nav links — centro */}
+        <div className="hidden md:flex items-center gap-5 flex-1 justify-center">
           {GROUPS.map(group => (
             <NavDropdown key={group.label} group={group} location={location} />
           ))}
@@ -149,7 +151,8 @@ export default function Navbar() {
           )}
         </div>
 
-        <div className="hidden md:flex items-center justify-end gap-3">
+        {/* Derecha — email + salir + UI toggle, pegados al borde */}
+        <div className="hidden md:flex items-center gap-3 flex-none ml-auto">
           {user && (
             <div className="flex items-center gap-3">
               <span className="text-xs text-[#555] max-w-[140px] truncate">{user.email}</span>
