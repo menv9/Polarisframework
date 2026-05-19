@@ -131,6 +131,32 @@ def run(
         start_date=start_date,
         verbose=verbose,
     )
+
+    # ── SPF surprise vectors ─────────────────────────────────────────────────
+    # surprise = actual(transformed, same units as consensus) − consensus(level)
+    # Computed post-transform so both sides are in df_trans at compatible units:
+    #   spf_usa_cpi_consensus   → % annual CPI forecast  | endo_usa_cpi → YoY%
+    #   spf_usa_rgdp_consensus  → % annual GDP forecast   | wv_gdp_usa  → QoQ%
+    #   spf_eur_hicp_consensus  → % annual HICP forecast  | endo_eur_cpi → YoY%
+    # Positive surprise = data beat consensus → typically currency-supportive.
+    _SPF_SURPRISE_MAP = {
+        "spf_usa_cpi_consensus":  "endo_usa_cpi",
+        "spf_usa_rgdp_consensus": "wv_gdp_usa",
+        "spf_eur_hicp_consensus": "endo_eur_cpi",
+    }
+    _surprises_added: list[str] = []
+    for consensus_col, actual_col in _SPF_SURPRISE_MAP.items():
+        if consensus_col in df_trans.columns and actual_col in df_trans.columns:
+            surprise_col = consensus_col.replace("_consensus", "_surprise")
+            df_trans[surprise_col] = (
+                df_trans[actual_col] - df_trans[consensus_col]
+            ).astype("float64")
+            _surprises_added.append(surprise_col)
+    if verbose and _surprises_added:
+        print(f"  SPF surprises computed: {_surprises_added}")
+    elif verbose:
+        print("  SPF surprises: skipped (consensus or actual columns missing)")
+
     print(f"  Phases 2-3 time: {_elapsed(phase_start)}")
 
     phase_start = time.time()
@@ -256,7 +282,9 @@ def run(
         rolling_for_backtest = {}
         for pair, pair_df in rolling_betas.items():
             keep = _filter_cols(pair, pair_df)
-            rolling_for_backtest[pair] = pair_df[keep] if keep else pair_df
+            # Use empty DataFrame (not pair_df) when no significant indicators survive —
+            # falling back to all columns would bypass the MIN_INDICATORS guard.
+            rolling_for_backtest[pair] = pair_df[keep] if keep else pd.DataFrame(index=pair_df.index)
 
     # Kalman betas: filter to significant indicators, then blend with rolling
     # in the backtest (50/50 ensemble reduces noise from either method alone).
@@ -265,18 +293,20 @@ def run(
         kalman_for_backtest = {}
         for pair, pair_df in kalman_betas.items():
             keep = _filter_cols(pair, pair_df)
-            kalman_for_backtest[pair] = pair_df[keep] if keep else pair_df
+            kalman_for_backtest[pair] = pair_df[keep] if keep else pd.DataFrame(index=pair_df.index)
 
     backtest_result = bt.run_backtest(
         df_aligned=df_aligned,
         df_trans=df_trans,
         beta_static=beta_static,
         run_path=run_path,
+        fx_pairs=active_fx,
         rolling_betas=rolling_for_backtest,
         kalman_betas=kalman_for_backtest,
         kalman_weight=0.5,
         rebalance_freq=bt.REBALANCE_FREQ,
         hysteresis=bt.HYSTERESIS_THRESHOLD,
+        min_indicators=bt.MIN_INDICATORS,
         verbose=verbose,
     )
 

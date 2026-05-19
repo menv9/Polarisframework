@@ -51,7 +51,7 @@ DEFAULT_FEATURE_LAG = 1
 DEFAULT_TRAIN_WINDOW = 84
 DEFAULT_MIN_TRAIN_OBS = 36
 DEFAULT_MIN_OOS_OBS = 24
-DEFAULT_Q_THRESHOLD = 0.10
+DEFAULT_Q_THRESHOLD = 0.15
 DEFAULT_WATCHLIST_Q_THRESHOLD = 0.25
 DEFAULT_MIN_DIRECTIONAL_ACC = 0.52
 
@@ -309,7 +309,9 @@ def compute_robust_candidates(
         (result["q_value"] <= q_threshold)
         & (result["wf_n"] >= min_oos_obs)
         & (result["wf_ic"] > 0)
-        & (result["wf_oos_r2"] > 0)          # NEW: R² OOS > 0
+        # wf_oos_r2 > 0 removed: R² OOS can be negative even when directional accuracy
+        # is good (large errors on a few outlier months sink R² while direction holds).
+        # wf_directional_acc already captures predictive usefulness for trading.
         & (result["wf_directional_acc"] >= min_directional_acc)
     )
     result["watchlist"] = (
@@ -326,7 +328,7 @@ def compute_robust_candidates(
     if verbose:
         _log(f"Candidates tested: {len(result)}")
         _log(f"Accepted q<={q_threshold:.2f}, WF IC>0, dir>={min_directional_acc:.0%}: {int(result['accepted'].sum())}")
-        _log(f"Watchlist q<={watchlist_q_threshold:.2f}, WF IC>0: {int(result['watchlist'].sum())}")
+        _log(f"Watchlist q<={watchlist_q_threshold:.2f}, WF IC>0 (not accepted): {int(result['watchlist'].sum())}")
     return result
 
 

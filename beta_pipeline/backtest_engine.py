@@ -39,18 +39,20 @@ from scipy import stats as scipy_stats
 
 # ── Configuración ────────────────────────────────────────────────────────────
 
-# Solo pares G10 vs USD con datos gratuitos disponibles
+# Todos los pares G10 del pipeline (7 majors + 3 cruces)
 FX_PAIRS = [
     "eurusd", "usdjpy", "gbpusd", "audusd", "usdcad",
-    "nzdusd", "usdchf",
+    "nzdusd", "usdchf", "eurgbp", "eurjpy", "gbpjpy",
 ]
 
 # Costes: half-turn spread (entrada única) en % del notional
-# Valores del frontend ExecutionOpsPage, conservadores.
+# Majors: valores del frontend ExecutionOpsPage.
+# Cruces: spreads algo más amplios (~50% más que el major más caro de cada leg).
 COSTS = {
     "eurusd": 0.00020, "usdjpy": 0.00025, "gbpusd": 0.00030,
     "audusd": 0.00030, "usdcad": 0.00035, "nzdusd": 0.00050,
     "usdchf": 0.00035,
+    "eurgbp": 0.00035, "eurjpy": 0.00040, "gbpjpy": 0.00045,
 }
 
 UMBRAL_PREDICCION = 0.0125   # 1.25 % mensual predicho para entrar — higher conviction threshold
@@ -60,8 +62,10 @@ MIN_SIGNAL_IMPROVEMENT   = 1.5   # signal must be 1.5× cost to justify a switch
 
 ZSCORE_CONVICTION = 1.25   # dead-zone: only trade when |pred| > 1.25σ of its own history
 
-REBALANCE_FREQ      = 3     # rebalance every N months (3 = quarterly)
-HYSTERESIS_THRESHOLD = 0.02  # minimum |signed-weight change| to execute a trade
+REBALANCE_FREQ          = 3     # rebalance every N months (3 = quarterly)
+HYSTERESIS_THRESHOLD    = 0.02  # minimum |signed-weight change| to execute a trade
+MIN_INDICATORS          = 3     # skip pair when fewer valid rolling/Kalman betas available
+CARRY_MIN_DIFFERENTIAL  = 0.50  # minimum annual rate differential (%) to trade carry fallback
 
 
 def _log(msg: str) -> None:
@@ -205,6 +209,7 @@ def simulate(
     kalman_weight: float = 0.5,
     rebalance_freq: int = REBALANCE_FREQ,
     hysteresis: float = HYSTERESIS_THRESHOLD,
+    min_indicators: int = MIN_INDICATORS,
     verbose: bool = True,
 ) -> BacktestResult:
     """Backtest walk-forward con Risk Parity, rebalanceo N-mensual e histéresis.
@@ -263,6 +268,38 @@ def simulate(
             for pair in fx_pairs:
                 if pair not in df_aligned.columns:
                     continue
+
+                # Minimum indicator guard: skip pair when too few valid betas available.
+                # Carry fallback: pairs with sparse macro signal (e.g. USDJPY after
+                # REER/DXY exclusion) can still trade via the interest rate differential.
+                # Carry is economically sound and already computed in df_trans as carry_{pair}.
+                if rolling_betas or kalman_betas:
+                    n_roll = 0
+                    n_kalman = 0
+                    if rolling_betas and pair in rolling_betas:
+                        rb_df = rolling_betas[pair]
+                        if t_open in rb_df.index:
+                            n_roll = int(rb_df.loc[t_open].notna().sum())
+                    if kalman_betas and pair in kalman_betas:
+                        kb_df = kalman_betas[pair]
+                        if t_open in kb_df.index:
+                            n_kalman = int(kb_df.loc[t_open].notna().sum())
+                    if max(n_roll, n_kalman) < min_indicators:
+                        # Try carry fallback before giving up on this pair
+                        carry_col = f"carry_{pair}"
+                        if carry_col in df_trans.columns and t_open in df_trans.index:
+                            carry_val = df_trans[carry_col].loc[t_open]
+                            if (
+                                not pd.isna(carry_val)
+                                and abs(float(carry_val)) >= CARRY_MIN_DIFFERENTIAL
+                            ):
+                                # Annual rate differential → monthly carry signal (fraction).
+                                # positive carry_col = base rate > quote rate → long signal.
+                                pred = float(carry_val) / 1200.0
+                                pred_history[pair].append(pred)
+                                active_for_rp.append(pair)
+                                raw_signals[pair] = pred
+                        continue  # skip full beta path regardless
 
                 # Compute rolling and/or Kalman predictions, then blend
                 pred_roll   = None
@@ -742,6 +779,7 @@ def run_backtest(
     kalman_weight: float = 0.5,
     rebalance_freq: int = REBALANCE_FREQ,
     hysteresis: float = HYSTERESIS_THRESHOLD,
+    min_indicators: int = MIN_INDICATORS,
     verbose: bool = True,
 ) -> BacktestResult:
     if verbose:
@@ -758,6 +796,7 @@ def run_backtest(
         print(f"  Beta mode: {mode}")
         print(f"  Weighting: Risk Parity (inverse-vol)")
         print(f"  Hysteresis band: {hysteresis * 100:.1f}%")
+        print(f"  Min indicators:  {min_indicators} valid betas required to trade a pair")
         print(f"  Costs:     half-turn spread + turnover penalty on reversals")
 
     result = simulate(
@@ -770,6 +809,7 @@ def run_backtest(
         kalman_weight=kalman_weight,
         rebalance_freq=rebalance_freq,
         hysteresis=hysteresis,
+        min_indicators=min_indicators,
         verbose=verbose,
     )
     metrics = compute_metrics(result)

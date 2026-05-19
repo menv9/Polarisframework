@@ -188,7 +188,7 @@ FRED_SERIES = {
     "exo_us_2y": "DGS2",
     "exo_term_premium": "THREEFYTP10",
     "exo_embi": "BAMLEMCBPIOAS",       # was JPEMSOSD (discontinued) → EM Corp OAS proxy
-    "exo_ted": "TEDRATE",
+    # exo_ted removed: FRED discontinued TEDRATE on 2023-03-17 → always fails
     # exo_chn_pmi removed: CHNFKINDPMIMANMEI not available on FRED
 }
 
@@ -275,7 +275,7 @@ TRANSFORM_RULES = {
         "exo_us_real",
         "exo_us_2y",
         "exo_term_premium",
-        "exo_ted",
+        # exo_ted removed: TEDRATE discontinued 2023-03-17
         "endo_usa_empl",
         "endo_eur_unempl",
         "endo_gbr_unempl",
@@ -312,7 +312,9 @@ TRANSFORM_RULES = {
         "spf_eur_hicp_consensus",
         "spf_eur_rgdp_consensus",
         "spf_eur_unemp_consensus",
-        # SPF surprise vectors (actual - consensus, computed in consensus_merger)
+        # SPF surprise vectors: actual(YoY%) − consensus(%)
+        # Computed post-transform in run.py (after df_trans is available).
+        # Positive = data beat forecast → typically currency-supportive.
         "spf_usa_cpi_surprise",
         "spf_usa_rgdp_surprise",
         "spf_eur_hicp_surprise",
@@ -357,7 +359,7 @@ CARRY_PAIRS: dict[str, tuple[str, str]] = {
 # WB country codes: ISO2 for G10 + "EMU" for Euro Area aggregate
 WORLDBANK_CA_SERIES: dict[str, tuple[str, str]] = {
     "endo_usa_ca": ("US",  "BN.CAB.XOKA.GD.ZS"),
-    "endo_eur_ca": ("EMU", "BN.CAB.XOKA.GD.ZS"),
+    "endo_eur_ca": ("XC",  "BN.CAB.XOKA.GD.ZS"),   # "XC" = Euro Area in World Bank API
     "endo_gbr_ca": ("GB",  "BN.CAB.XOKA.GD.ZS"),
     "endo_jpn_ca": ("JP",  "BN.CAB.XOKA.GD.ZS"),
     "endo_aus_ca": ("AU",  "BN.CAB.XOKA.GD.ZS"),
