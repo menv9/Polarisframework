@@ -22,7 +22,7 @@ import output as outputter
 import pca_factors as pca_mod
 import robust_beta as robust_beta_mod
 import transform as transformer
-from config import CACHE_DIR, FRED_API_KEY, FX_PAIRS, OUTPUT_DIR, START_DATE
+from config import CACHE_DIR, FRED_API_KEY, FX_PAIRS, OUTPUT_DIR, START_DATE, EXCLUDE_REER_ROLLING, EXCLUDE_DXY_ROLLING
 
 
 CACHE_FILE = CACHE_DIR / "last_raw.pkl"
@@ -224,12 +224,57 @@ def run(
     print(f"  Phase 6 time: {_elapsed(phase_start)}")
 
     # Phase 7: Backtest
+    # Filter rolling and Kalman betas to statistically significant indicators (p<0.05).
+    # With 108+ features, aggregating all series produces noisy signals.
+    # Keeping only significant pair-indicator combinations reduces noise substantially
+    # without losing the economically meaningful drivers.
+    sig_pairs = set(
+        zip(
+            beta_static.loc[beta_static["significant"], "fx_pair"],
+            beta_static.loc[beta_static["significant"], "indicator"],
+        )
+    )
+
+    # Circularity guards for rolling/Kalman signals:
+    #   REER: built from trade-weighted nominal FX rates → lagged autocorrelation artifact
+    #   DXY:  weighted basket of the modelled USD pairs (57% EUR, 14% JPY, 12% GBP…)
+    #         → regressing EURUSD on DXY gives R²≈0.90, a near-tautology
+    # Both stay in the static analysis for research; removed only from adaptive signals.
+    _CIRCULAR_PATTERNS = []
+    if EXCLUDE_REER_ROLLING:
+        _CIRCULAR_PATTERNS.append("_reer")
+    if EXCLUDE_DXY_ROLLING:
+        _CIRCULAR_PATTERNS.append("wv_dxy")
+
+    def _filter_cols(pair: str, pair_df: pd.DataFrame) -> list[str]:
+        keep = [col for col in pair_df.columns if (pair, col) in sig_pairs]
+        keep = [col for col in keep if not any(pat in col for pat in _CIRCULAR_PATTERNS)]
+        return keep
+
+    rolling_for_backtest: dict[str, pd.DataFrame] | None = None
+    if not no_rolling and rolling_betas:
+        rolling_for_backtest = {}
+        for pair, pair_df in rolling_betas.items():
+            keep = _filter_cols(pair, pair_df)
+            rolling_for_backtest[pair] = pair_df[keep] if keep else pair_df
+
+    # Kalman betas: filter to significant indicators, then blend with rolling
+    # in the backtest (50/50 ensemble reduces noise from either method alone).
+    kalman_for_backtest: dict[str, pd.DataFrame] | None = None
+    if kalman_betas:
+        kalman_for_backtest = {}
+        for pair, pair_df in kalman_betas.items():
+            keep = _filter_cols(pair, pair_df)
+            kalman_for_backtest[pair] = pair_df[keep] if keep else pair_df
+
     backtest_result = bt.run_backtest(
         df_aligned=df_aligned,
         df_trans=df_trans,
         beta_static=beta_static,
         run_path=run_path,
-        rolling_betas=rolling_betas if not no_rolling else None,
+        rolling_betas=rolling_for_backtest,
+        kalman_betas=kalman_for_backtest,
+        kalman_weight=0.5,
         rebalance_freq=bt.REBALANCE_FREQ,
         hysteresis=bt.HYSTERESIS_THRESHOLD,
         verbose=verbose,

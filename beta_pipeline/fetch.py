@@ -11,6 +11,7 @@ import yfinance as yf
 from config import (
     CACHE_DIR, FRED_API_KEY, FRED_SERIES, FRED_SLEEP, START_DATE,
     YAHOO_TICKERS, WORLDBANK_CA_SERIES,
+    ENABLE_CONSENSUS,
 )
 
 
@@ -174,23 +175,45 @@ def fetch_worldbank(
     return df, {"wb_ok": ok, "wb_failed": failed}
 
 
-def fetch_all(start_date: str = START_DATE, verbose: bool = True) -> tuple[pd.DataFrame, dict]:
-    """Fetch FRED, Yahoo Finance, and World Bank data, then combine into one raw frame."""
-    print("\n-- Phase 1 / Ingestion ---------------------------------------------")
-    fred_df, fred_failed = fetch_fred(start_date=start_date, verbose=verbose)
-    yahoo_df, yahoo_failed = fetch_yahoo(start_date=start_date, verbose=verbose)
-    wb_df, wb_report = fetch_worldbank(start_date=start_date, verbose=verbose)
+def fetch_consensus(verbose: bool = True) -> tuple[pd.DataFrame, dict]:
+    """Fetch consensus & positioning data (Philly SPF, ECB SPF, CFTC COT).
 
-    frames = [df for df in (fred_df, yahoo_df, wb_df) if not df.empty]
+    Enabled only when ENABLE_CONSENSUS=True in config (default: False until
+    the scrapers dependencies are installed).
+    """
+    if not ENABLE_CONSENSUS:
+        if verbose:
+            _log("Consensus data disabled (set ENABLE_CONSENSUS=True to enable)")
+        return pd.DataFrame(), {"sources_ok": [], "sources_failed": [], "columns": []}
+
+    from scrapers.consensus_merger import fetch_consensus as _fetch_consensus
+    cache_dir = CACHE_DIR / "scrapers"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    df, report = _fetch_consensus(cache_dir=cache_dir, verbose=verbose)
+    return df, report
+
+
+def fetch_all(start_date: str = START_DATE, verbose: bool = True) -> tuple[pd.DataFrame, dict]:
+    """Fetch FRED, Yahoo Finance, World Bank and consensus data into one raw frame."""
+    print("\n-- Phase 1 / Ingestion ---------------------------------------------")
+    fred_df, fred_failed   = fetch_fred(start_date=start_date, verbose=verbose)
+    yahoo_df, yahoo_failed = fetch_yahoo(start_date=start_date, verbose=verbose)
+    wb_df, wb_report       = fetch_worldbank(start_date=start_date, verbose=verbose)
+    consensus_df, consensus_report = fetch_consensus(verbose=verbose)
+
+    frames = [df for df in (fred_df, yahoo_df, wb_df, consensus_df) if not df.empty]
     df_raw = pd.concat(frames, axis=1).sort_index()
     report = {
-        "sources": ["FRED", "Yahoo Finance", "World Bank"],
+        "sources": ["FRED", "Yahoo Finance", "World Bank", "Consensus/COT"],
         "fred_ok": [col for col in FRED_SERIES if col in fred_df.columns],
         "fred_failed": fred_failed,
         "yahoo_ok": [col for col in YAHOO_TICKERS if col in yahoo_df.columns],
         "yahoo_failed": yahoo_failed,
         "wb_ok": wb_report["wb_ok"],
         "wb_failed": wb_report["wb_failed"],
+        "consensus_ok": consensus_report.get("sources_ok", []),
+        "consensus_failed": consensus_report.get("sources_failed", []),
+        "consensus_columns": consensus_report.get("columns", []),
         "total_series": int(df_raw.shape[1]),
         "start_date": start_date,
     }

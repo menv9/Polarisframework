@@ -6,9 +6,33 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import numpy as np
 import pandas as pd
-from scipy.stats import linregress
+from scipy.stats import t as _t_dist
 
 from config import FX_PAIRS, MIN_OBS, MIN_OBS_ROLL, ROLLING_WIN
+
+
+def _ols(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, float, float]:
+    """Manual OLS — avoids scipy.stats.linregress crash on numpy 2.x / Python 3.14."""
+    n = len(x)
+    if n < 3:
+        return float("nan"), float("nan"), float("nan"), float("nan"), float("nan")
+    xm = x - x.mean()
+    ym = y - y.mean()
+    ssxx = float((xm * xm).sum())
+    if ssxx < 1e-30:
+        return 0.0, float(y.mean()), 0.0, 1.0, float("nan")
+    ssxy = float((xm * ym).sum())
+    slope = ssxy / ssxx
+    intercept = float(y.mean()) - slope * float(x.mean())
+    resid = y - (intercept + slope * x)
+    ss_res = float((resid * resid).sum())
+    ss_tot = float((ym * ym).sum())
+    r2 = 1.0 - ss_res / ss_tot if ss_tot > 1e-30 else 0.0
+    r_value = float(np.sign(slope) * np.sqrt(max(0.0, r2)))
+    se = float(np.sqrt(max(0.0, ss_res / (n - 2)) / ssxx)) if n > 2 else float("nan")
+    t_stat = slope / se if (se > 1e-12) else float("nan")
+    p_value = float(2.0 * (1.0 - _t_dist.cdf(abs(t_stat), df=n - 2))) if np.isfinite(t_stat) else 1.0
+    return slope, intercept, r_value, p_value, se
 
 
 def _log(message: str) -> None:
@@ -60,7 +84,7 @@ def compute_static(
             if np.var(x) < 1e-12 or np.var(y) < 1e-12:
                 continue
 
-            slope, intercept, r_value, p_value, std_err = linregress(x, y)
+            slope, intercept, r_value, p_value, std_err = _ols(x, y)
             records.append(
                 {
                     "fx_pair": fx,

@@ -72,24 +72,30 @@ def transform(df_aligned: pd.DataFrame, verbose: bool = True) -> tuple[pd.DataFr
     """Apply pct_change, pct_change_yoy, diff, or level transformations before regression."""
     print("\n-- Phase 3 / Transformation ----------------------------------------")
     transform_map = build_transform_map(df_aligned.columns.tolist())
-    result = pd.DataFrame(index=df_aligned.index)
     counts: dict[str, int] = {}
 
+    # Build all transformed series in one dict then concat — avoids DataFrame fragmentation
+    series: dict[str, pd.Series] = {}
     for col in df_aligned.columns:
         rule = transform_map[col]
         counts[rule] = counts.get(rule, 0) + 1
         if rule == "pct_change":
-            result[col] = df_aligned[col].pct_change()
+            series[col] = df_aligned[col].pct_change()
         elif rule == "pct_change_yoy":
-            result[col] = df_aligned[col].pct_change(12)   # YoY%: what central banks target
+            series[col] = df_aligned[col].pct_change(12)   # YoY%: what central banks target
         elif rule == "diff":
-            result[col] = df_aligned[col].diff()
+            series[col] = df_aligned[col].diff()
         elif rule == "level":
-            result[col] = df_aligned[col]
+            series[col] = df_aligned[col]
         else:
             raise ValueError(f"Unknown transform rule for {col}: {rule}")
 
+    result = pd.concat(series, axis=1)
     result = result.replace([float("inf"), float("-inf")], pd.NA).dropna(how="all")
+    # Ensure all columns are float64 — pd.concat can produce object or nullable
+    # integer dtypes when source series contain pd.NA (e.g. from CESI columns
+    # with sparse monthly data).  Downstream numpy/scipy code requires float64.
+    result = result.apply(pd.to_numeric, errors="coerce").astype("float64")
     if verbose:
         parts = ", ".join(f"{k}={v}" for k, v in sorted(counts.items()))
         _log(f"Rules: {parts}")

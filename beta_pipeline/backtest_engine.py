@@ -179,6 +179,20 @@ def predict_return_rolling(
     return pred if counted > 0 else None
 
 
+def predict_return_kalman(
+    kalman_betas: dict[str, pd.DataFrame],
+    fx_pair: str,
+    date: pd.Timestamp,
+    df_trans: pd.DataFrame,
+) -> float | None:
+    """Predict using Kalman-filtered betas at *date*.
+
+    Kalman betas are computed recursively forward — no look-ahead.  The state
+    estimate at *t* uses only observations up to *t*.
+    """
+    return predict_return_rolling(kalman_betas, fx_pair, date, df_trans)
+
+
 def simulate(
     df_aligned: pd.DataFrame,
     df_trans: pd.DataFrame,
@@ -187,6 +201,8 @@ def simulate(
     min_obs: int = 24,
     threshold: float = UMBRAL_PREDICCION,
     rolling_betas: dict | None = None,
+    kalman_betas: dict | None = None,
+    kalman_weight: float = 0.5,
     rebalance_freq: int = REBALANCE_FREQ,
     hysteresis: float = HYSTERESIS_THRESHOLD,
     verbose: bool = True,
@@ -196,10 +212,22 @@ def simulate(
     rebalance_freq : months between signal evaluations (1=monthly, 3=quarterly).
     hysteresis     : minimum |signed-weight change| required to execute a trade.
                      Positions within the band are carried forward at zero cost.
+    kalman_betas   : optional Kalman-filtered betas (same structure as rolling_betas).
+                     When provided alongside rolling_betas, predictions are blended
+                     using kalman_weight (0=rolling only, 1=kalman only, 0.5=equal blend).
+                     When rolling_betas is None, kalman_betas acts as the adaptive signal.
+    kalman_weight  : blend weight for Kalman prediction (default 0.5 = 50/50 ensemble).
     """
     if verbose:
         print("\n-- Backtest / Simulation -------------------------------------------")
-        mode = "rolling betas (walk-forward)" if rolling_betas else "static betas (full-sample)"
+        if rolling_betas and kalman_betas:
+            mode = f"rolling+Kalman blend (w_kalman={kalman_weight:.1f})"
+        elif kalman_betas:
+            mode = "Kalman betas (walk-forward)"
+        elif rolling_betas:
+            mode = "rolling betas (walk-forward)"
+        else:
+            mode = "static betas (full-sample)"
         print(f"  Beta mode:   {mode}")
         print(f"  Rebalance:   every {rebalance_freq} month(s)")
         print(f"  Hysteresis:  {hysteresis * 100:.1f}% minimum weight change")
@@ -236,10 +264,20 @@ def simulate(
                 if pair not in df_aligned.columns:
                     continue
 
+                # Compute rolling and/or Kalman predictions, then blend
+                pred_roll   = None
+                pred_kalman = None
                 if rolling_betas and pair in rolling_betas:
-                    pred = predict_return_rolling(rolling_betas, pair, t_open, df_trans)
-                    if pred is None:
-                        pred = predict_return(df_trans, beta_static, pair, t_open)
+                    pred_roll = predict_return_rolling(rolling_betas, pair, t_open, df_trans)
+                if kalman_betas and pair in kalman_betas:
+                    pred_kalman = predict_return_kalman(kalman_betas, pair, t_open, df_trans)
+
+                if pred_roll is not None and pred_kalman is not None:
+                    pred = (1.0 - kalman_weight) * pred_roll + kalman_weight * pred_kalman
+                elif pred_kalman is not None:
+                    pred = pred_kalman
+                elif pred_roll is not None:
+                    pred = pred_roll
                 else:
                     pred = predict_return(df_trans, beta_static, pair, t_open)
 
@@ -700,6 +738,8 @@ def run_backtest(
     run_path: Path | str,
     fx_pairs: list[str] = FX_PAIRS,
     rolling_betas: dict | None = None,
+    kalman_betas: dict | None = None,
+    kalman_weight: float = 0.5,
     rebalance_freq: int = REBALANCE_FREQ,
     hysteresis: float = HYSTERESIS_THRESHOLD,
     verbose: bool = True,
@@ -707,7 +747,14 @@ def run_backtest(
     if verbose:
         print("\n-- Phase 7 / Backtest ----------------------------------------------")
         print(f"  Strategy: Capa 1 FX Macro G10 — {rebalance_freq}-month rebalance")
-        mode = "rolling walk-forward" if rolling_betas else "static full-sample"
+        if rolling_betas and kalman_betas:
+            mode = f"rolling+Kalman blend (w_kalman={kalman_weight:.1f})"
+        elif kalman_betas:
+            mode = "Kalman walk-forward"
+        elif rolling_betas:
+            mode = "rolling walk-forward"
+        else:
+            mode = "static full-sample"
         print(f"  Beta mode: {mode}")
         print(f"  Weighting: Risk Parity (inverse-vol)")
         print(f"  Hysteresis band: {hysteresis * 100:.1f}%")
@@ -719,6 +766,8 @@ def run_backtest(
         beta_static=beta_static,
         fx_pairs=fx_pairs,
         rolling_betas=rolling_betas,
+        kalman_betas=kalman_betas,
+        kalman_weight=kalman_weight,
         rebalance_freq=rebalance_freq,
         hysteresis=hysteresis,
         verbose=verbose,

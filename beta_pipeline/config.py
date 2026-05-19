@@ -45,6 +45,25 @@ FFILL_LIMIT = int(os.getenv("BETA_FFILL_LIMIT", "3"))
 COVERAGE_MIN = float(os.getenv("BETA_COVERAGE_MIN", "0.60"))
 FRED_SLEEP = float(os.getenv("BETA_FRED_SLEEP", "0.25"))
 
+# Set ENABLE_CONSENSUS=True (in .env or environment) to activate the free consensus
+# stack (Philly SPF, ECB SPF, CFTC COT). Disabled by default so existing runs are
+# unaffected until the scrapers dependencies (openpyxl, requests) are confirmed.
+ENABLE_CONSENSUS = os.getenv("ENABLE_CONSENSUS", "False").strip().lower() in ("true", "1", "yes")
+
+# Set EXCLUDE_REER_ROLLING=True to remove REER columns from rolling/Kalman betas
+# before the backtest.  REER is computed from trade-weighted nominal FX rates so the
+# lag-1 beta can capture lagged autocorrelation (circularity) rather than fundamental
+# mean-reversion.  Static betas keep REER for research purposes.
+# Default: True — excluded from adaptive signals, kept in full-sample analysis.
+EXCLUDE_REER_ROLLING = os.getenv("EXCLUDE_REER_ROLLING", "True").strip().lower() in ("true", "1", "yes")
+
+# Set EXCLUDE_DXY_ROLLING=True to remove wv_dxy from rolling/Kalman betas.
+# DXY is a weighted basket of the exact FX pairs we model (57% EUR, 14% JPY, 12% GBP…),
+# so regressing EURUSD on DXY gives R²≈0.90 — a near-tautology that inflates IS
+# performance and obscures genuine macro drivers.  DXY stays in static betas.
+# Default: True.
+EXCLUDE_DXY_ROLLING = os.getenv("EXCLUDE_DXY_ROLLING", "True").strip().lower() in ("true", "1", "yes")
+
 CACHE_DIR = ROOT_DIR / "cache"
 OUTPUT_DIR = ROOT_DIR / "output"
 
@@ -80,6 +99,7 @@ YAHOO_TICKERS = {
     "exo_natgas": "NG=F",
     "exo_iron_yf": "TIO=F",
     "exo_silver": "SI=F",
+    "wv_gold_yf": "GC=F",   # Gold futures — FRED LBMA gold (GOLDPMGBD228NLBM) gave 400
 }
 
 FRED_SERIES = {
@@ -87,18 +107,18 @@ FRED_SERIES = {
     "wv_vix": "VIXCLS",
     "wv_hy_oas": "BAMLH0A0HYM2",
     "wv_ig_oas": "BAMLC0A0CM",
-    "wv_embi": "JPEMSOSD",
-    "wv_cpi_usa": "CPIAUCSL",
+    "wv_embi": "BAMLEMCBPIOAS",        # was JPEMSOSD (discontinued) → EM Corp OAS proxy
+    # wv_cpi_usa removed: duplicate of endo_usa_cpi (both CPIAUCSL) → use endo_usa_cpi
     "wv_cpi_eur": "CP0000EZ19M086NEST",
     "wv_breakevens": "T10YIE",
-    "wv_gold_fred": "GOLDAMGBD228NLBM",
+    # wv_gold_fred removed: LBMA gold series not available on FRED → use wv_gold_yf (Yahoo GC=F)
     "wv_gdp_usa": "GDP",
     "wv_gdp_eur": "CLVMNACSCAB1GQEA19",
     # USA
-    "endo_usa_real_2y": "DFII2",
-    "endo_usa_10y_real": "DFII10",
-    "endo_usa_2y_nom": "DGS2",
-    "endo_usa_10y_nom": "DGS10",
+    "endo_usa_real_2y": "DFII5",        # was DFII2 (2Y TIPS not issued regularly) → 5Y TIPS
+    # endo_usa_10y_real removed: duplicate of exo_us_real (both DFII10) → exo_ applies to all pairs
+    # endo_usa_2y_nom removed: duplicate of exo_us_2y (both DGS2) → exo_ applies to all pairs
+    # endo_usa_10y_nom removed: duplicate of exo_us10y (both DGS10) → exo_ applies to all pairs
     "endo_usa_2s10s": "T10Y2Y",
     "endo_usa_policy": "FEDFUNDS",
     "endo_usa_cpi": "CPIAUCSL",
@@ -118,42 +138,42 @@ FRED_SERIES = {
     # EUR
     "endo_eur_policy": "ECBDFR",
     "endo_eur_cpi": "CP0000EZ19M086NEST",
-    "endo_eur_core_cpi": "CPGRLE01EZM659N",
-    "endo_eur_reer": "RNEURBIS",
-    "endo_eur_debt_gdp": "GGGDTAEZAQ188N",
+    "endo_eur_core_cpi": "TOTNRGFOODEA20MI15XM", # was CPGRLE01EZM659N (discontinued)
+    "endo_eur_reer": "RNXMBIS",                  # was RNEURBIS (BIS uses XM for Euro area)
+    "endo_eur_debt_gdp": "GGGDTAEZA188N",        # was GGGDTAEZAQ188N (quarterly not on FRED)
     "endo_eur_cb_balance": "ECBASSETSW",
     "endo_eur_unempl": "LRHUTTTTEZM156S",
     "endo_eur_m3": "MABMM301EZM189S",
     # GBP
-    "endo_gbr_policy": "BOEBR",
+    "endo_gbr_policy": "IRSTCI01GBM156N",        # was BOEBR (not on FRED) → OECD call rate
     "endo_gbr_cpi": "GBRCPIALLMINMEI",
     "endo_gbr_core_cpi": "GBRCPICORMINMEI",
-    "endo_gbr_reer": "RNGBRBIS",
+    "endo_gbr_reer": "RNGBBIS",                  # was RNGBRBIS (BIS uses GB not GBR)
     "endo_gbr_unempl": "LRHUTTTTGBM156S",
     # JPY
     "endo_jpn_policy": "IRSTCI01JPM156N",
     "endo_jpn_cpi": "JPNCPIALLMINMEI",
     "endo_jpn_core_cpi": "JPNCPICORMINMEI",
-    "endo_jpn_reer": "RNJPNBIS",
+    "endo_jpn_reer": "RNJPBIS",                  # was RNJPNBIS (BIS uses JP not JPN)
     "endo_jpn_unempl": "LRHUTTTTJPM156S",
     "endo_jpn_cb_balance": "JPNASSETS",
     # AUD / NZD / CAD / CHF / Scandies
     "endo_aus_policy": "IRSTCI01AUM156N",
     "endo_aus_cpi": "AUSCPIALLQINMEI",
-    "endo_aus_reer": "RNAUSBIS",
+    "endo_aus_reer": "RNAUBIS",                  # was RNAUSBIS (BIS uses AU not AUS)
     "endo_aus_unempl": "LRHUTTTTAUM156S",
     "endo_nzl_policy": "IRSTCI01NZM156N",
     "endo_nzl_cpi": "NZLCPIALLQINMEI",
-    "endo_nzl_reer": "RNNZLBIS",
-    "endo_nzl_unempl": "LRHUTTTTNZM156S",
+    "endo_nzl_reer": "RNNZBIS",                  # was RNNZLBIS (BIS uses NZ not NZL)
+    "endo_nzl_unempl": "LRHUTTTTNZQ156S",        # was LRHUTTTTNZM156S (NZ is quarterly)
     "endo_cad_policy": "IRSTCI01CAM156N",
     "endo_cad_cpi": "CANCPIALLMINMEI",
-    "endo_cad_reer": "RNCANBIS",
+    "endo_cad_reer": "RNCABIS",                  # was RNCANBIS (BIS uses CA not CAN)
     "endo_cad_unempl": "LRHUTTTTCAM156S",
     "endo_che_policy": "IRSTCI01CHM156N",
     "endo_che_cpi": "CHECPIALLMINMEI",
-    "endo_che_reer": "RNCHEBIS",
-    "endo_che_unempl": "LRHUTTTTCHM156S",
+    "endo_che_reer": "RNCHBIS",                  # was RNCHEBIS (BIS uses CH not CHE)
+    "endo_che_unempl": "LRHUTTTTCHQ156S",        # was LRHUTTTTCHM156S (CH is quarterly)
     "endo_swe_policy": "IRSTCI01SEM156N",
     "endo_swe_cpi": "SWECPIALLMINMEI",
     "endo_nor_policy": "IRSTCI01NOM156N",
@@ -161,15 +181,15 @@ FRED_SERIES = {
     # Exogenous
     "exo_brent": "DCOILBRENTEU",
     "exo_wti": "DCOILWTICO",
-    "exo_gold": "GOLDAMGBD228NLBM",
+    # exo_gold removed: LBMA FRED series unavailable → covered by wv_gold_yf (Yahoo GC=F)
     "exo_copper": "PCOPPUSDM",
     "exo_us10y": "DGS10",
     "exo_us_real": "DFII10",
     "exo_us_2y": "DGS2",
     "exo_term_premium": "THREEFYTP10",
-    "exo_embi": "JPEMSOSD",
+    "exo_embi": "BAMLEMCBPIOAS",       # was JPEMSOSD (discontinued) → EM Corp OAS proxy
     "exo_ted": "TEDRATE",
-    "exo_chn_pmi": "CHNFKINDPMIMANMEI",
+    # exo_chn_pmi removed: CHNFKINDPMIMANMEI not available on FRED
 }
 
 TRANSFORM_RULES = {
@@ -185,9 +205,8 @@ TRANSFORM_RULES = {
         "exo_silver",
         "exo_brent",
         "exo_wti",
-        "exo_gold",
         "exo_copper",
-        "wv_gold_fred",
+        "wv_gold_yf",     # Yahoo gold futures (replaces FRED LBMA series)
         "wv_gdp_usa",
         "wv_gdp_eur",
         "endo_usa_cb_balance",
@@ -211,7 +230,7 @@ TRANSFORM_RULES = {
     "pct_change_yoy": [
         # Inflation series: YoY% is what central banks target and markets price
         # (MoM% is too noisy; level is non-stationary → spurious betas)
-        "wv_cpi_usa",
+        # wv_cpi_usa removed: duplicate of endo_usa_cpi
         "wv_cpi_eur",
         "endo_usa_cpi",
         "endo_usa_core_cpi",
@@ -238,9 +257,9 @@ TRANSFORM_RULES = {
         "wv_embi",
         "exo_embi",
         "endo_usa_real_2y",
-        "endo_usa_10y_real",
-        "endo_usa_2y_nom",
-        "endo_usa_10y_nom",
+        # endo_usa_10y_real removed: duplicate of exo_us_real
+        # endo_usa_2y_nom removed: duplicate of exo_us_2y
+        # endo_usa_10y_nom removed: duplicate of exo_us10y
         "endo_usa_2s10s",
         "endo_usa_policy",
         "endo_eur_policy",
@@ -266,11 +285,11 @@ TRANSFORM_RULES = {
         "endo_cad_unempl",
         "endo_che_unempl",
         "endo_usa_niip",
-        "exo_chn_pmi",
         # Change in debt/GDP ratio and sentiment (slow-moving levels → diff for stationarity)
         "endo_usa_debt_gdp",
         "endo_eur_debt_gdp",
         "endo_usa_conf",
+        # exo_chn_pmi removed: CHNFKINDPMIMANMEI not available on FRED
     ],
     "level": [
         # Current account % GDP: annual data forwarded monthly; level is a structural
@@ -283,6 +302,38 @@ TRANSFORM_RULES = {
         "endo_nzl_ca",
         "endo_cad_ca",
         "endo_che_ca",
+        # Philadelphia Fed SPF consensus: already in % or rate units — use level directly.
+        # Change in consensus (signal for regime shifts) is captured by diff() in beta tests.
+        "spf_usa_cpi_consensus",
+        "spf_usa_rgdp_consensus",
+        "spf_usa_unemp_consensus",
+        "spf_usa_tbond_consensus",
+        # ECB SPF consensus (same rationale)
+        "spf_eur_hicp_consensus",
+        "spf_eur_rgdp_consensus",
+        "spf_eur_unemp_consensus",
+        # SPF surprise vectors (actual - consensus, computed in consensus_merger)
+        "spf_usa_cpi_surprise",
+        "spf_usa_rgdp_surprise",
+        "spf_eur_hicp_surprise",
+        # CFTC COT Z-scores: already standardised; level carries the positioning signal
+        "cot_zscore_eur",
+        "cot_zscore_jpy",
+        "cot_zscore_gbp",
+        "cot_zscore_aud",
+        "cot_zscore_cad",
+        "cot_zscore_nzd",
+        "cot_zscore_chf",
+        # Forex Factory CESI: monthly sum of normalised surprises (Z-score space)
+        # Positive = data beat consensus → currency-supportive signal
+        "cesi_usd",
+        "cesi_eur",
+        "cesi_gbp",
+        "cesi_jpy",
+        "cesi_aud",
+        "cesi_cad",
+        "cesi_nzd",
+        "cesi_chf",
     ],
 }
 

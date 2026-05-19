@@ -13,9 +13,38 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from scipy.stats import linregress, pearsonr
+from scipy.stats import pearsonr, t as _t_dist
 
 from config import FX_PAIRS, MIN_OBS
+
+
+def _ols(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, float, float]:
+    """Simple OLS: returns (slope, intercept, r_value, p_value, std_err).
+
+    Replaces scipy.stats.linregress which crashes on numpy 2.x (Python 3.14)
+    due to an incompatibility in np.cov(..., bias=1) returning a float scalar
+    instead of an array when given 1-D inputs.
+    """
+    n = len(x)
+    if n < 3:
+        return float("nan"), float("nan"), float("nan"), float("nan"), float("nan")
+    xm = x - x.mean()
+    ym = y - y.mean()
+    ssxx = float((xm * xm).sum())
+    if ssxx < 1e-30:
+        return 0.0, float(y.mean()), 0.0, 1.0, float("nan")
+    ssxy = float((xm * ym).sum())
+    slope = ssxy / ssxx
+    intercept = float(y.mean()) - slope * float(x.mean())
+    resid = y - (intercept + slope * x)
+    ss_res = float((resid * resid).sum())
+    ss_tot = float((ym * ym).sum())
+    r2 = 1.0 - ss_res / ss_tot if ss_tot > 1e-30 else 0.0
+    r_value = float(np.sign(slope) * np.sqrt(max(0.0, r2)))
+    se = float(np.sqrt(max(0.0, ss_res / (n - 2)) / ssxx)) if n > 2 else float("nan")
+    t_stat = slope / se if (se > 1e-12) else float("nan")
+    p_value = float(2.0 * (1.0 - _t_dist.cdf(abs(t_stat), df=n - 2))) if np.isfinite(t_stat) else 1.0
+    return slope, intercept, r_value, p_value, se
 
 
 DEFAULT_FEATURE_LAG = 1
@@ -40,6 +69,36 @@ _PAIR_COUNTRIES = {
     "gbpjpy": {"gbr", "jpn"},
 }
 
+# SPF source → which country token it covers
+# spf_usa_* → pairs containing "usa"; spf_eur_* → pairs containing "eur"
+_SPF_SOURCE_COUNTRY = {
+    "spf_usa": "usa",
+    "spf_eur": "eur",
+}
+
+# COT currency token → how it appears in pair country sets
+_COT_CURRENCY_MAP = {
+    "eur": "eur",
+    "jpy": "jpn",
+    "gbp": "gbr",
+    "aud": "aus",
+    "cad": "cad",
+    "nzd": "nzl",
+    "chf": "che",
+}
+
+# CESI currency suffix → country token used in _PAIR_COUNTRIES
+_CESI_CURRENCY_MAP: dict[str, str] = {
+    "usd": "usa",
+    "eur": "eur",
+    "gbp": "gbr",
+    "jpy": "jpn",
+    "aud": "aus",
+    "cad": "cad",
+    "nzd": "nzl",
+    "chf": "che",
+}
+
 
 def _log(message: str) -> None:
     print(f"  {message}")
@@ -55,12 +114,46 @@ def is_economically_relevant(fx_pair: str, indicator: str) -> bool:
     Global World View / Exogenous drivers are allowed for all pairs. Endogenous
     country drivers are restricted to the currencies present in the pair.
     Carry factors (carry_pair) are only relevant for their exact pair.
+    SPF consensus/surprise columns are relevant when the country they cover is
+    present in the pair. COT Z-scores are relevant when the currency is in the pair.
     """
     if indicator.startswith(_GLOBAL_PREFIXES):
         return True
+
     # Carry factor: pair-specific — only relevant for the exact FX pair
     if indicator.startswith("carry_"):
         return indicator == f"carry_{fx_pair}"
+
+    # Philadelphia Fed / ECB SPF consensus and surprise columns
+    # e.g. spf_usa_cpi_consensus → relevant for pairs containing "usa"
+    #      spf_eur_hicp_surprise → relevant for pairs containing "eur"
+    if indicator.startswith("spf_"):
+        pair_countries = _PAIR_COUNTRIES.get(fx_pair, set())
+        for prefix, country in _SPF_SOURCE_COUNTRY.items():
+            if indicator.startswith(prefix + "_") and country in pair_countries:
+                return True
+        return False
+
+    # CFTC COT Z-scores: relevant when that currency is in the pair
+    # e.g. cot_zscore_eur → relevant for eurusd, eurgbp, eurjpy
+    #      cot_zscore_jpy → relevant for usdjpy, eurjpy, gbpjpy
+    if indicator.startswith("cot_zscore_"):
+        cot_token = indicator.replace("cot_zscore_", "")          # e.g. "eur"
+        country   = _COT_CURRENCY_MAP.get(cot_token)              # e.g. "eur"
+        if country is None:
+            return False
+        return country in _PAIR_COUNTRIES.get(fx_pair, set())
+
+    # Forex Factory CESI: relevant when that currency is in the pair
+    # e.g. cesi_eur → relevant for eurusd, eurgbp, eurjpy
+    #      cesi_usd → relevant for eurusd, usdjpy, gbpusd, audusd, usdcad, nzdusd, usdchf
+    if indicator.startswith("cesi_"):
+        cesi_token = indicator.replace("cesi_", "")               # e.g. "eur"
+        country    = _CESI_CURRENCY_MAP.get(cesi_token)
+        if country is None:
+            return False
+        return country in _PAIR_COUNTRIES.get(fx_pair, set())
+
     if not indicator.startswith("endo_"):
         return False
     parts = indicator.split("_")
@@ -95,7 +188,7 @@ def _fit_beta(x: np.ndarray, y: np.ndarray) -> tuple[float, float] | None:
     y_clean = y[mask]
     if np.var(x_clean) < 1e-12 or np.var(y_clean) < 1e-12:
         return None
-    slope, intercept, *_ = linregress(x_clean, y_clean)
+    slope, intercept, *_ = _ols(x_clean, y_clean)
     return float(slope), float(intercept)
 
 
@@ -105,7 +198,12 @@ def _walk_forward_stats(
     train_window: int,
     min_train_obs: int,
 ) -> dict:
-    aligned = pd.concat({"x": x, "y": y}, axis=1)
+    # Force float64 dtype — pd.concat can produce object dtype when pd.NA is present
+    # (nullable integer/string columns), causing rolling functions to crash.
+    # pd.to_numeric converts pd.NA → np.nan which rolling can handle.
+    x_f = pd.to_numeric(x, errors="coerce")
+    y_f = pd.to_numeric(y, errors="coerce")
+    aligned = pd.concat({"x": x_f, "y": y_f}, axis=1)
     rolling = aligned.rolling(train_window, min_periods=min_train_obs)
     mean_x = rolling["x"].mean().shift(1)
     mean_y = rolling["y"].mean().shift(1)
@@ -170,15 +268,19 @@ def compute_robust_candidates(
             if not relevant:
                 continue
 
-            x = df_trans[indicator].shift(feature_lag)
-            common = pd.concat({"x": x, "y": y}, axis=1).dropna()
+            x = pd.to_numeric(df_trans[indicator].shift(feature_lag), errors="coerce")
+            y_num = pd.to_numeric(y, errors="coerce")
+            common = pd.concat({"x": x, "y": y_num}, axis=1).dropna()
             if len(common) < MIN_OBS:
                 continue
             if common["x"].var() < 1e-12 or common["y"].var() < 1e-12:
                 continue
 
-            slope, intercept, r_value, p_value, std_err = linregress(common["x"], common["y"])
-            wf = _walk_forward_stats(x, y, train_window=train_window, min_train_obs=min_train_obs)
+            slope, intercept, r_value, p_value, std_err = _ols(
+                common["x"].to_numpy(dtype=float),
+                common["y"].to_numpy(dtype=float),
+            )
+            wf = _walk_forward_stats(x, y_num, train_window=train_window, min_train_obs=min_train_obs)
             rows.append({
                 "fx_pair": fx,
                 "indicator": indicator,
