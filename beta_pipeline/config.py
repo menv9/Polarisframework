@@ -50,12 +50,12 @@ FRED_SLEEP = float(os.getenv("BETA_FRED_SLEEP", "0.25"))
 # unaffected until the scrapers dependencies (openpyxl, requests) are confirmed.
 ENABLE_CONSENSUS = os.getenv("ENABLE_CONSENSUS", "False").strip().lower() in ("true", "1", "yes")
 
-# Set EXCLUDE_REER_ROLLING=True to remove REER columns from rolling/Kalman betas
-# before the backtest.  REER is computed from trade-weighted nominal FX rates so the
-# lag-1 beta can capture lagged autocorrelation (circularity) rather than fundamental
-# mean-reversion.  Static betas keep REER for research purposes.
-# Default: True — excluded from adaptive signals, kept in full-sample analysis.
-EXCLUDE_REER_ROLLING = os.getenv("EXCLUDE_REER_ROLLING", "True").strip().lower() in ("true", "1", "yes")
+# Set EXCLUDE_REER_ROLLING=True to remove REER columns from rolling/Kalman betas.
+# REER carries a valid mean-reversion signal (overvalued REER → future FX depreciation)
+# and empirically improves Sharpe when included.  It is trade-weighted FX — correlated
+# with the pairs we model but NOT an identity (≠ circular).  DXY is the circular one.
+# Default: False — REER included in adaptive signals.
+EXCLUDE_REER_ROLLING = os.getenv("EXCLUDE_REER_ROLLING", "False").strip().lower() in ("true", "1", "yes")
 
 # Set EXCLUDE_DXY_ROLLING=True to remove wv_dxy from rolling/Kalman betas.
 # DXY is a weighted basket of the exact FX pairs we model (57% EUR, 14% JPY, 12% GBP…),
@@ -65,10 +65,11 @@ EXCLUDE_REER_ROLLING = os.getenv("EXCLUDE_REER_ROLLING", "True").strip().lower()
 EXCLUDE_DXY_ROLLING = os.getenv("EXCLUDE_DXY_ROLLING", "True").strip().lower() in ("true", "1", "yes")
 
 # Pairs excluded from the live backtest signal (still included in static/robust/rolling analysis).
-# Default: empty — pre-filtering indicators per pair (economic relevance + no REER/DXY)
-# provides genuine macro signals for all pairs, eliminating the need for manual exclusions.
-# Override via env: BACKTEST_EXCLUDE_PAIRS=eurgbp,usdjpy  (comma-separated, lowercase)
-_exclude_env = os.getenv("BACKTEST_EXCLUDE_PAIRS", "").strip()
+# EURGBP: IC = -0.82 — signal systematically inverted regardless of indicator pool.
+# USDJPY: safe-haven unwind dynamics (2008/2020/2022) dominate macro signals; macro
+#         framework consistently wrong on JPY direction (WinRate ~37%).
+# Override via env: BACKTEST_EXCLUDE_PAIRS=  (empty string to include all pairs)
+_exclude_env = os.getenv("BACKTEST_EXCLUDE_PAIRS", "eurgbp,usdjpy").strip()
 BACKTEST_EXCLUDE_PAIRS: list[str] = [p.strip() for p in _exclude_env.split(",") if p.strip()]
 
 CACHE_DIR = ROOT_DIR / "cache"

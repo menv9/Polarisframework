@@ -159,10 +159,14 @@ def run(
 
     # ── Per-pair indicator pool (pre-filtered) ───────────────────────────────
     # Build the indicator list each pair will use for rolling and Kalman betas.
-    # Pre-filtering here — not post-hoc — avoids REER/DXY dominating the OLS
-    # significance test and then being stripped out, leaving pairs indicator-starved.
+    # Pre-filtering ensures each pair uses only its own economically relevant indicators,
+    # reducing noise and preventing irrelevant cross-country indicators from inflating
+    # static significance counts.
+    # REER: valid mean-reversion signal (overvalued REER → future depreciation) — included
+    #       by default (EXCLUDE_REER_ROLLING=False).
+    # DXY: truly circular (57% EUR + 14% JPY + 12% GBP = modelled pairs) — excluded by default.
     # Criteria:  (1) economically relevant to the pair's countries
-    #            (2) not circular (no REER, no DXY — configurable via env flags)
+    #            (2) not in _CIRCULAR_PATTERNS (DXY by default; REER if configured)
     _CIRCULAR_PATTERNS: list[str] = []
     if EXCLUDE_REER_ROLLING:
         _CIRCULAR_PATTERNS.append("_reer")
