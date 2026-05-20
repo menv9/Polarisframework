@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -5,6 +6,8 @@ import {
   Brain,
   Calendar,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   ClipboardList,
   Clock,
   FileText,
@@ -107,6 +110,312 @@ function DataTable({ headers, rows }) {
   )
 }
 
+// ── G9 Tool ──────────────────────────────────────────────────────────────────
+
+const G9_CHECKLIST_KEY = 'polaris_g9_checklists'
+const G9_BIAS_KEY = 'polaris_g9_bias_log'
+
+const PRE_TRADE_ITEMS = [
+  '≥7h de sueño, sin sustancias que alteren el juicio',
+  'Estado emocional ≥6 sobre 10',
+  'P&L semanal: DD acumulado <50% del límite semanal',
+  'Setup presente: señal + filtros + timing confirmados',
+  'Sizing calculado y documentado antes de lanzar la orden',
+  'No hay posición abierta pendiente de decisión activa',
+]
+
+const BIAS_TYPES = [
+  'Overconfidence', 'Revenge trading', 'Loss aversion',
+  'Recency bias', 'FOMO', 'Anchoring', 'Confirmation bias', 'Otro',
+]
+
+const TRADE_CLASSIFICATIONS = ['', 'Ganador-sistema', 'Ganador-suerte', 'Perdedor-sistema', 'Perdedor-error']
+
+function loadChecklists() {
+  try { return JSON.parse(localStorage.getItem(G9_CHECKLIST_KEY) || '{}') } catch { return {} }
+}
+function loadBiasLog() {
+  try { return JSON.parse(localStorage.getItem(G9_BIAS_KEY) || '[]') } catch { return [] }
+}
+
+function BehavioralTool() {
+  const today = new Date().toISOString().split('T')[0]
+  const [date, setDate] = useState(today)
+  const [checklists, setChecklists] = useState(loadChecklists)
+  const [biasLog, setBiasLog] = useState(loadBiasLog)
+  const [showBiasForm, setShowBiasForm] = useState(false)
+  const [biasForm, setBiasForm] = useState({ date: today, bias: BIAS_TYPES[0], tradeRef: '', notes: '' })
+  const [confirmDeleteBias, setConfirmDeleteBias] = useState(null)
+
+  const dayData = checklists[date] || { preTrade: {}, emotionScore: '', postTrade: {} }
+
+  function updateDay(patch) {
+    const updated = { ...checklists, [date]: { ...dayData, ...patch } }
+    setChecklists(updated)
+    localStorage.setItem(G9_CHECKLIST_KEY, JSON.stringify(updated))
+  }
+
+  function togglePreTrade(idx) {
+    const preTrade = { ...dayData.preTrade, [idx]: !dayData.preTrade[idx] }
+    updateDay({ preTrade })
+  }
+
+  function setEmotion(v) { updateDay({ emotionScore: v }) }
+
+  function setPostTrade(k, v) {
+    const postTrade = { ...dayData.postTrade, [k]: v }
+    updateDay({ postTrade })
+  }
+
+  function saveBias() {
+    if (!biasForm.bias) return
+    const entry = { id: Date.now(), ...biasForm }
+    const updated = [entry, ...biasLog]
+    setBiasLog(updated)
+    localStorage.setItem(G9_BIAS_KEY, JSON.stringify(updated))
+    setShowBiasForm(false)
+    setBiasForm({ date: today, bias: BIAS_TYPES[0], tradeRef: '', notes: '' })
+  }
+
+  function deleteBias(id) {
+    if (confirmDeleteBias !== id) { setConfirmDeleteBias(id); return }
+    const updated = biasLog.filter(b => b.id !== id)
+    setBiasLog(updated)
+    localStorage.setItem(G9_BIAS_KEY, JSON.stringify(updated))
+    setConfirmDeleteBias(null)
+  }
+
+  const preTradeCount = PRE_TRADE_ITEMS.filter((_, i) => dayData.preTrade[i]).length
+  const emotionNum = parseFloat(dayData.emotionScore) || 0
+  const emotionOk = emotionNum >= 6
+  const allChecked = preTradeCount === PRE_TRADE_ITEMS.length && emotionOk
+
+  const emotionColor = emotionNum >= 8 ? 'text-[#4ade80]' : emotionNum >= 6 ? 'text-[#ecd987]' : emotionNum > 0 ? 'text-[#ef4444]' : 'text-[#555]'
+
+  // Monthly bias stats
+  const monthKey = today.slice(0, 7)
+  const monthBiases = useMemo(() => biasLog.filter(b => b.date?.startsWith(monthKey)), [biasLog, monthKey])
+  const biasFreq = useMemo(() => {
+    const freq = {}
+    for (const b of monthBiases) freq[b.bias] = (freq[b.bias] || 0) + 1
+    return Object.entries(freq).sort((a, b) => b[1] - a[1])
+  }, [monthBiases])
+
+  return (
+    <div className="space-y-3">
+      {/* Daily checklist */}
+      <div className="border-2 border-[#a78bfa]">
+        <div className="bg-[#0f0a1a] border-b border-[#a78bfa]/40 px-3 py-1.5 flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-widest text-[#a78bfa]">
+            Checklist Diario
+            {allChecked && <span className="ml-2 text-[#4ade80]">— APTO PARA OPERAR</span>}
+            {!allChecked && preTradeCount > 0 && <span className="ml-2 text-[#f59e0b]">— INCOMPLETO</span>}
+          </span>
+          <input
+            type="date"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            className="bg-[#111] border border-[#333] text-[#777] text-xs font-mono px-2 py-0.5 focus:outline-none focus:border-[#a78bfa]"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] divide-y lg:divide-y-0 lg:divide-x divide-[#222]">
+          {/* Pre-trade */}
+          <div className="p-3">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-[#555] mb-2">
+              Pre-trade ({preTradeCount}/{PRE_TRADE_ITEMS.length})
+            </div>
+            <div className="space-y-2">
+              {PRE_TRADE_ITEMS.map((item, i) => (
+                <label key={i} className="flex items-start gap-2.5 cursor-pointer group">
+                  <div
+                    onClick={() => togglePreTrade(i)}
+                    className={`mt-0.5 h-4 w-4 shrink-0 border flex items-center justify-center cursor-pointer transition-colors ${
+                      dayData.preTrade[i]
+                        ? 'border-[#4ade80] bg-[#4ade80]/20'
+                        : 'border-[#444] group-hover:border-[#666]'
+                    }`}
+                  >
+                    {dayData.preTrade[i] && <span className="text-[#4ade80] text-[10px] font-bold">✓</span>}
+                  </div>
+                  <span className={`text-xs leading-relaxed ${dayData.preTrade[i] ? 'text-[#555] line-through' : 'text-[#aaa]'}`}>
+                    {item}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Emotion + post-trade */}
+          <div className="p-3 min-w-[220px]">
+            <div className="mb-3">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-[#555] mb-1">Estado emocional (1-10)</div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1" max="10" step="1"
+                  value={dayData.emotionScore}
+                  onChange={e => setEmotion(e.target.value)}
+                  className="bg-[#111] border border-[#333] text-[#e5e5e5] font-mono text-lg px-2 py-1 w-16 focus:outline-none focus:border-[#a78bfa]"
+                  placeholder="—"
+                />
+                <span className={`text-sm font-bold ${emotionColor}`}>
+                  {emotionNum >= 8 ? 'Bueno' : emotionNum >= 6 ? 'Apto' : emotionNum > 0 ? 'NO OPERAR' : '—'}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-[#555] mb-1">Post-trade (último)</div>
+              <label className="block">
+                <span className="text-[9px] text-[#444] uppercase tracking-wider">Clasificación</span>
+                <select
+                  value={dayData.postTrade.classification || ''}
+                  onChange={e => setPostTrade('classification', e.target.value)}
+                  className="mt-0.5 bg-[#111] border border-[#333] text-[#e5e5e5] text-xs px-1.5 py-1 w-full focus:outline-none focus:border-[#a78bfa]"
+                >
+                  {TRADE_CLASSIFICATIONS.map(c => <option key={c}>{c}</option>)}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-[9px] text-[#444] uppercase tracking-wider">Sesgo detectado (si aplica)</span>
+                <select
+                  value={dayData.postTrade.bias || ''}
+                  onChange={e => setPostTrade('bias', e.target.value)}
+                  className="mt-0.5 bg-[#111] border border-[#333] text-[#e5e5e5] text-xs px-1.5 py-1 w-full focus:outline-none focus:border-[#a78bfa]"
+                >
+                  <option value="">—</option>
+                  {BIAS_TYPES.map(b => <option key={b}>{b}</option>)}
+                </select>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bias log + monthly stats */}
+      <div className="grid gap-3 lg:grid-cols-[1fr_260px]">
+        <div className="border-2 border-[#333]">
+          <div className="bg-[#1a1a0d] border-b border-[#333] px-3 py-1.5 flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">
+              Registro de Sesgos ({biasLog.length})
+            </span>
+            <button
+              onClick={() => setShowBiasForm(v => !v)}
+              className="text-[10px] font-bold uppercase tracking-wider bg-[#ecd987] text-black px-2 py-0.5 hover:bg-white"
+            >
+              {showBiasForm ? 'Cancelar' : '+ Registrar sesgo'}
+            </button>
+          </div>
+
+          {showBiasForm && (
+            <div className="border-b border-[#222] grid grid-cols-2 sm:grid-cols-4">
+              {[
+                ['Fecha', 'date', 'date', biasForm.date],
+                ['Trade ref.', 'tradeRef', 'text', biasForm.tradeRef],
+              ].map(([label, key, type, val]) => (
+                <label key={key} className="block p-2 border-r border-b border-[#222]">
+                  <span className="block text-[9px] text-[#555] uppercase tracking-wider mb-1">{label}</span>
+                  <input type={type} value={val} onChange={e => setBiasForm(f => ({ ...f, [key]: e.target.value }))}
+                    className="bg-[#0a0a0a] border border-[#333] text-[#e5e5e5] text-xs font-mono px-1.5 py-1 w-full focus:outline-none focus:border-[#a78bfa]" />
+                </label>
+              ))}
+              <label className="block p-2 border-r border-b border-[#222]">
+                <span className="block text-[9px] text-[#555] uppercase tracking-wider mb-1">Tipo de sesgo</span>
+                <select value={biasForm.bias} onChange={e => setBiasForm(f => ({ ...f, bias: e.target.value }))}
+                  className="bg-[#0a0a0a] border border-[#333] text-[#e5e5e5] text-xs px-1.5 py-1 w-full focus:outline-none focus:border-[#a78bfa]">
+                  {BIAS_TYPES.map(b => <option key={b}>{b}</option>)}
+                </select>
+              </label>
+              <label className="block p-2 border-r border-b border-[#222] col-span-2 sm:col-span-1">
+                <span className="block text-[9px] text-[#555] uppercase tracking-wider mb-1">Notas</span>
+                <input type="text" value={biasForm.notes} onChange={e => setBiasForm(f => ({ ...f, notes: e.target.value }))}
+                  className="bg-[#0a0a0a] border border-[#333] text-[#e5e5e5] text-xs px-1.5 py-1 w-full focus:outline-none focus:border-[#a78bfa]" />
+              </label>
+              <div className="p-2 border-b border-[#222] flex items-end">
+                <button onClick={saveBias} className="w-full px-2 py-1.5 text-xs font-bold uppercase bg-[#a78bfa] text-black hover:bg-[#c4b5fd]">
+                  Guardar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {biasLog.length === 0 ? (
+            <div className="p-6 text-center text-[#444] text-xs uppercase tracking-wider">
+              Sin sesgos registrados
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-[#111] border-b border-[#222] text-[#555]">
+                    <th className="px-3 py-1.5 text-left font-bold uppercase tracking-widest">Fecha</th>
+                    <th className="px-3 py-1.5 text-left font-bold uppercase tracking-widest">Sesgo</th>
+                    <th className="px-3 py-1.5 text-left font-bold uppercase tracking-widest">Trade</th>
+                    <th className="px-3 py-1.5 text-left font-bold uppercase tracking-widest">Notas</th>
+                    <th className="px-3 py-1.5 w-10"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {biasLog.map(b => (
+                    <tr key={b.id} className="border-b border-[#111] hover:bg-[#0a0a0a]">
+                      <td className="px-3 py-1.5 font-mono text-[#555]">{b.date}</td>
+                      <td className="px-3 py-1.5 font-bold text-[#a78bfa]">{b.bias}</td>
+                      <td className="px-3 py-1.5 font-mono text-[#666]">{b.tradeRef || '—'}</td>
+                      <td className="px-3 py-1.5 text-[#777] truncate max-w-[200px]">{b.notes || '—'}</td>
+                      <td className="px-3 py-1.5 text-right">
+                        {confirmDeleteBias === b.id ? (
+                          <span className="flex gap-1 justify-end">
+                            <button onClick={() => deleteBias(b.id)} className="text-[9px] text-[#ef4444] border border-[#ef4444] px-1">OK</button>
+                            <button onClick={() => setConfirmDeleteBias(null)} className="text-[9px] text-[#555]">No</button>
+                          </span>
+                        ) : (
+                          <button onClick={() => deleteBias(b.id)} className="text-[9px] text-[#333] hover:text-[#ef4444]">✕</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Monthly stats */}
+        <div className="border-2 border-[#333]">
+          <div className="bg-[#1a1a0d] border-b border-[#333] px-3 py-1.5">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Este mes</span>
+          </div>
+          <div className="p-3 space-y-3">
+            <div>
+              <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Sesgos registrados</div>
+              <div className="font-mono text-2xl font-bold text-[#a78bfa]">{monthBiases.length}</div>
+            </div>
+            {biasFreq.length > 0 && (
+              <div>
+                <div className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Top sesgos</div>
+                <div className="space-y-1">
+                  {biasFreq.slice(0, 4).map(([bias, count]) => (
+                    <div key={bias} className="flex justify-between text-xs">
+                      <span className="text-[#aaa] truncate">{bias}</span>
+                      <span className="font-mono text-[#a78bfa] ml-2">{count}×</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {biasFreq.some(([, c]) => c >= 3) && (
+              <div className="border border-[#ef4444]/40 bg-[#1a0000] px-2 py-1.5 text-[10px] text-[#ef4444]">
+                ≥3 instancias del mismo sesgo — revisar protocolo
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Module data ──────────────────────────────────────────────────────────────
 
 const MODULES = {
@@ -114,7 +423,6 @@ const MODULES = {
     code: 'G9',
     title: 'Behavioral Finance / Psicologia del Operador',
     subtitle: 'Disciplina, sesgos y control del estado del operador como variable del sistema.',
-    status: 'Documented / not automated',
     horizon: 'Continuo',
     accent: 'text-[#a78bfa]',
     border: 'border-[#a78bfa]',
@@ -129,21 +437,6 @@ const MODULES = {
       ['FOMO', 'Entrar sin setup por miedo a perder el movimiento', 'Ningun setup documentado en la entrada'],
       ['Anchoring', 'Decisiones referenciadas al precio de entrada, no al mercado', '"Precio de entrada" aparece en la justificacion'],
       ['Confirmation bias', 'Buscar solo fuentes que confirmen la tesis activa', 'Una sola fuente citada en el analisis'],
-    ],
-    preTradeChecklist: [
-      'Estado fisico: ≥7h de sueño, sin sustancias que alteren el juicio.',
-      'Estado emocional: escala 1-10, minimo 6 para operar.',
-      'P&L semanal: si DD acumulado >50% del limite semanal, no operar.',
-      'Setup presente: señal + filtros + timing todos confirmados antes de abrir orden.',
-      'Sizing calculado y documentado antes de lanzar la orden.',
-      'No hay ninguna posicion abierta pendiente de decision activa (no dividir la atencion).',
-    ],
-    postTradeRitual: [
-      'Registrar resultado en Journal inmediatamente, no al final del dia.',
-      'Clasificar: ganador-sistema / ganador-suerte / perdedor-sistema / perdedor-error.',
-      'Si error: identificar el sesgo especifico del inventario.',
-      'Si 3 errores del mismo tipo en 1 mes: activar protocolo de revision de ese sesgo.',
-      'Verificar que el criterio de salida fue seguido exactamente; si no, documentar la desviacion.',
     ],
     cooldowns: [
       ['2 stops consecutivos en el dia', 'Pausa operativa', 'Resto del dia sin nuevas entradas'],
@@ -184,7 +477,6 @@ const MODULES = {
     code: 'G16',
     title: 'Decision Log Estrategico',
     subtitle: 'Registro auditado de decisiones estructurales del framework con contexto, hipotesis y revision posterior.',
-    status: 'Documented / not automated',
     horizon: 'Continuo',
     accent: 'text-[#818cf8]',
     border: 'border-[#818cf8]',
@@ -240,7 +532,6 @@ const MODULES = {
     code: 'G17',
     title: 'Knowledge Transfer Protocol',
     subtitle: 'Documentacion, handoff y continuidad del conocimiento operativo del sistema.',
-    status: 'Documented / not automated',
     horizon: 'Continuo',
     accent: 'text-[#60a5fa]',
     border: 'border-[#60a5fa]',
@@ -311,43 +602,19 @@ const MODULES = {
   },
 }
 
-// ── Module-specific content sections ────────────────────────────────────────
+// ── Reference content ────────────────────────────────────────────────────────
 
-function BehavioralFinanceContent({ mod }) {
+function BehavioralFinanceRef({ mod }) {
   return (
     <>
       <Section title="Inventario de sesgos" icon={Brain}>
-        <DataTable
-          headers={['Sesgo', 'Descripcion', 'Señal de alerta']}
-          rows={mod.biases}
-        />
+        <DataTable headers={['Sesgo', 'Descripcion', 'Señal de alerta']} rows={mod.biases} />
       </Section>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Section title="Pre-trade checklist" icon={ListChecks}>
-          <div className="p-3">
-            <BulletList items={mod.preTradeChecklist} />
-          </div>
-        </Section>
-        <Section title="Post-trade ritual" icon={CheckCircle2}>
-          <div className="p-3">
-            <BulletList items={mod.postTradeRitual} />
-          </div>
-        </Section>
-      </div>
-
       <Section title="Cooldown triggers" icon={ShieldAlert} className="mt-4">
-        <DataTable
-          headers={['Condicion', 'Accion', 'Duracion']}
-          rows={mod.cooldowns}
-        />
+        <DataTable headers={['Condicion', 'Accion', 'Duracion']} rows={mod.cooldowns} />
       </Section>
-
       <Section title="Metricas de disciplina" icon={SlidersHorizontal} className="mt-4">
-        <DataTable
-          headers={['Metrica', 'Objetivo', 'Nivel de alerta']}
-          rows={mod.metrics}
-        />
+        <DataTable headers={['Metrica', 'Objetivo', 'Nivel de alerta']} rows={mod.metrics} />
       </Section>
     </>
   )
@@ -357,17 +624,11 @@ function DecisionLogContent({ mod }) {
   return (
     <>
       <Section title="Categorias de decision" icon={ClipboardList}>
-        <DataTable
-          headers={['Categoria', 'Ejemplos', 'Prioridad']}
-          rows={mod.categories}
-        />
+        <DataTable headers={['Categoria', 'Ejemplos', 'Prioridad']} rows={mod.categories} />
       </Section>
-
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_0.8fr]">
         <Section title="Template: campos obligatorios" icon={FileText}>
-          <div className="p-3">
-            <BulletList items={mod.templateFields} />
-          </div>
+          <div className="p-3"><BulletList items={mod.templateFields} /></div>
         </Section>
         <Section title="Cadencia de revision" icon={Calendar}>
           <div className="grid gap-0">
@@ -391,17 +652,11 @@ function KnowledgeTransferContent({ mod }) {
   return (
     <>
       <Section title="Inventario documental" icon={FileText}>
-        <DataTable
-          headers={['Documento', 'Descripcion', 'Actualizar cuando']}
-          rows={mod.documents}
-        />
+        <DataTable headers={['Documento', 'Descripcion', 'Actualizar cuando']} rows={mod.documents} />
       </Section>
-
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Section title="Estructura de runbook" icon={ListChecks}>
-          <div className="p-3">
-            <BulletList items={mod.runbookStructure} />
-          </div>
+          <div className="p-3"><BulletList items={mod.runbookStructure} /></div>
         </Section>
         <Section title="Protocolo de onboarding" icon={Users}>
           <div className="grid gap-0">
@@ -414,7 +669,6 @@ function KnowledgeTransferContent({ mod }) {
           </div>
         </Section>
       </div>
-
       <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <Section title="Handoff checklist" icon={CheckCircle2}>
           <div className="grid gap-0 sm:grid-cols-2">
@@ -427,46 +681,111 @@ function KnowledgeTransferContent({ mod }) {
           </div>
         </Section>
         <Section title="Cadencia de mantenimiento" icon={Clock}>
-          <DataTable
-            headers={['Documento', 'Frecuencia', 'Responsable']}
-            rows={mod.maintenance}
-          />
+          <DataTable headers={['Documento', 'Frecuencia', 'Responsable']} rows={mod.maintenance} />
         </Section>
       </div>
     </>
   )
 }
 
-// ── Main page component ──────────────────────────────────────────────────────
+// ── Page components ──────────────────────────────────────────────────────────
 
-const CONTENT_COMPONENTS = {
-  behavioralFinance: BehavioralFinanceContent,
-  decisionLog: DecisionLogContent,
-  knowledgeTransfer: KnowledgeTransferContent,
+function PageHeader({ mod, children }) {
+  return (
+    <div className="mb-4 flex flex-col gap-3 border-b-2 border-[#333] pb-3 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <h1 className="text-2xl font-bold uppercase tracking-widest">{mod.title}</h1>
+        <p className="mt-1 max-w-4xl text-sm text-[#888]">{mod.subtitle}</p>
+      </div>
+      {children}
+    </div>
+  )
 }
 
-function GovernanceModulePage({ moduleKey }) {
-  const mod = MODULES[moduleKey]
-  const ContentComponent = CONTENT_COMPONENTS[moduleKey]
+function RefToggle({ open, onToggle }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#555] hover:text-[#ecd987] transition-colors mt-4"
+    >
+      {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      {open ? 'Ocultar referencia' : 'Ver referencia completa'}
+    </button>
+  )
+}
+
+// ── Named exports ────────────────────────────────────────────────────────────
+
+export function BehavioralFinancePage() {
+  const mod = MODULES.behavioralFinance
+  const [showRef, setShowRef] = useState(false)
 
   return (
     <div className="min-h-screen pt-12">
       <div className="mx-auto max-w-7xl px-4 py-4">
-        <div className="mb-4 flex flex-col gap-3 border-b-2 border-[#333] pb-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold uppercase tracking-widest">{mod.title}</h1>
-            <p className="mt-1 max-w-4xl text-sm text-[#888]">{mod.subtitle}</p>
-          </div>
+        <PageHeader mod={mod}>
           <div className={`shrink-0 border px-3 py-2 text-[10px] font-bold uppercase tracking-widest ${mod.border} ${mod.accent}`}>
-            {mod.status} / {mod.horizon}
+            Operativo / {mod.horizon}
           </div>
-        </div>
+        </PageHeader>
 
-        <section className="mb-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <BehavioralTool />
+
+        <RefToggle open={showRef} onToggle={() => setShowRef(v => !v)} />
+
+        {showRef && (
+          <div className="mt-4 space-y-4">
+            <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="border-2 border-[#333] p-4">
+                <div className={`mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${mod.accent}`}>
+                  <BookOpen size={15} />
+                  Principio central
+                </div>
+                <p className="text-sm leading-relaxed text-white">{mod.principle}</p>
+              </div>
+              <div className="grid grid-rows-2 border-2 border-[#333]">
+                <div className="border-b border-[#222] p-3">
+                  <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Input</div>
+                  <div className="text-xs leading-relaxed text-[#aaa]">{mod.input}</div>
+                </div>
+                <div className="p-3">
+                  <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Output</div>
+                  <div className="text-xs leading-relaxed text-[#aaa]">{mod.output}</div>
+                </div>
+              </div>
+            </div>
+            <BehavioralFinanceRef mod={mod} />
+            <Section title="Pipeline operativo" icon={Route}>
+              <Pipeline steps={mod.pipeline} accent={mod.accent} />
+            </Section>
+            <Section title="Errores especificos a evitar" icon={AlertTriangle}>
+              <div className="p-3"><BulletList items={mod.errors} /></div>
+            </Section>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function DecisionLogPage() {
+  const mod = MODULES.decisionLog
+  return (
+    <div className="min-h-screen pt-12">
+      <div className="mx-auto max-w-7xl px-4 py-4">
+        <PageHeader mod={mod}>
+          <div className={`shrink-0 border px-3 py-2 text-[10px] font-bold uppercase tracking-widest ${mod.border} ${mod.accent}`}>
+            Supabase pendiente / {mod.horizon}
+          </div>
+        </PageHeader>
+        <div className="border border-[#818cf8]/40 bg-[#0a0a1a] px-4 py-3 mb-4 text-xs text-[#818cf8]">
+          Este módulo tendrá CRUD completo con Supabase (Grupo 1). Por ahora la referencia está disponible abajo.
+        </div>
+        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] mb-4">
           <div className="border-2 border-[#333] p-4">
             <div className={`mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${mod.accent}`}>
-              <BookOpen size={15} />
-              Principio central
+              <BookOpen size={15} /> Principio central
             </div>
             <p className="text-sm leading-relaxed text-white">{mod.principle}</p>
           </div>
@@ -480,47 +799,58 @@ function GovernanceModulePage({ moduleKey }) {
               <div className="text-xs leading-relaxed text-[#aaa]">{mod.output}</div>
             </div>
           </div>
-        </section>
-
-        <ContentComponent mod={mod} />
-
+        </div>
+        <DecisionLogContent mod={mod} />
         <Section title="Pipeline operativo" icon={Route} className="mt-4">
           <Pipeline steps={mod.pipeline} accent={mod.accent} />
         </Section>
-
-        {mod.parameters && (
-          <Section title="Parametros default" icon={SlidersHorizontal} className="mt-4">
-            <ParamTable rows={mod.parameters} />
-          </Section>
-        )}
-
         <Section title="Errores especificos a evitar" icon={AlertTriangle} className="mt-4">
-          <div className="p-3">
-            <BulletList items={mod.errors} />
-          </div>
+          <div className="p-3"><BulletList items={mod.errors} /></div>
         </Section>
-
-        <div className="mt-4 border-2 border-[#333] p-3 text-xs text-[#777]">
-          Pantalla operativa basada en la documentacion del framework. No ejecuta calculos automaticamente todavia.
-          <Link to="/dashboard" className="ml-2 font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">
-            Volver al dashboard
-          </Link>
-        </div>
       </div>
     </div>
   )
 }
 
-// ── Named exports ────────────────────────────────────────────────────────────
-
-export function BehavioralFinancePage() {
-  return <GovernanceModulePage moduleKey="behavioralFinance" />
-}
-
-export function DecisionLogPage() {
-  return <GovernanceModulePage moduleKey="decisionLog" />
-}
-
 export function KnowledgeTransferPage() {
-  return <GovernanceModulePage moduleKey="knowledgeTransfer" />
+  const mod = MODULES.knowledgeTransfer
+  return (
+    <div className="min-h-screen pt-12">
+      <div className="mx-auto max-w-7xl px-4 py-4">
+        <PageHeader mod={mod}>
+          <div className={`shrink-0 border px-3 py-2 text-[10px] font-bold uppercase tracking-widest ${mod.border} ${mod.accent}`}>
+            Supabase pendiente / {mod.horizon}
+          </div>
+        </PageHeader>
+        <div className="border border-[#60a5fa]/40 bg-[#0a0f1a] px-4 py-3 mb-4 text-xs text-[#60a5fa]">
+          Este módulo tendrá inventario documental CRUD con Supabase (Grupo 1). Por ahora la referencia está disponible abajo.
+        </div>
+        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] mb-4">
+          <div className="border-2 border-[#333] p-4">
+            <div className={`mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${mod.accent}`}>
+              <BookOpen size={15} /> Principio central
+            </div>
+            <p className="text-sm leading-relaxed text-white">{mod.principle}</p>
+          </div>
+          <div className="grid grid-rows-2 border-2 border-[#333]">
+            <div className="border-b border-[#222] p-3">
+              <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Input</div>
+              <div className="text-xs leading-relaxed text-[#aaa]">{mod.input}</div>
+            </div>
+            <div className="p-3">
+              <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Output</div>
+              <div className="text-xs leading-relaxed text-[#aaa]">{mod.output}</div>
+            </div>
+          </div>
+        </div>
+        <KnowledgeTransferContent mod={mod} />
+        <Section title="Pipeline operativo" icon={Route} className="mt-4">
+          <Pipeline steps={mod.pipeline} accent={mod.accent} />
+        </Section>
+        <Section title="Errores especificos a evitar" icon={AlertTriangle} className="mt-4">
+          <div className="p-3"><BulletList items={mod.errors} /></div>
+        </Section>
+      </div>
+    </div>
+  )
 }

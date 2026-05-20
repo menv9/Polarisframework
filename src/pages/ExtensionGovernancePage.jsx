@@ -1,20 +1,26 @@
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
-  BookOpen,
   BarChart3,
+  BookOpen,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   ClipboardCheck,
+  Database,
   FileText,
   GitBranch,
   Layers,
+  Plus,
   Route,
   ShieldCheck,
   SlidersHorizontal,
+  Trash2,
   Users,
 } from 'lucide-react'
 
-// ── Shared components ────────────────────────────────────────────────────────
+// ── Shared UI components ─────────────────────────────────────────────────────
 
 function Section({ title, icon: Icon, children, className = '' }) {
   return (
@@ -133,14 +139,241 @@ function MetricTable({ rows, accent }) {
   )
 }
 
-// ── Module data ──────────────────────────────────────────────────────────────
+function RefToggle({ children }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mt-4">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 border border-[#333] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#777] hover:border-[#ecd987] hover:text-[#ecd987]"
+      >
+        {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        {open ? 'Ocultar referencia documental' : 'Ver referencia documental'}
+      </button>
+      {open && <div className="mt-4 space-y-4">{children}</div>}
+    </div>
+  )
+}
+
+function SupabasePending({ label }) {
+  return (
+    <div className="flex items-start gap-3 border-2 border-[#333] bg-[#0a0a0a] p-4">
+      <Database size={16} className="mt-0.5 shrink-0 text-[#555]" />
+      <div>
+        <p className="text-xs font-bold uppercase tracking-widest text-[#555]">Funcionalidad pendiente — Supabase</p>
+        <p className="mt-1 text-xs leading-relaxed text-[#444]">
+          {label} requiere persistencia en base de datos para ser util entre sesiones y dispositivos.
+          Esta pantalla actualmente muestra la referencia documental. La funcionalidad operativa se conectara a Supabase en el Grupo 1.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ── G13 Multi-Broker Tool ────────────────────────────────────────────────────
+
+const G13_TOTAL_KEY = 'polaris_g13_total'
+const G13_BROKERS_KEY = 'polaris_g13_brokers'
+
+const BROKER_ROLES = ['Principal (Core)', 'Capa 2 / 3', 'Emergencia / Failover', 'Testing']
+
+function fmt(n) {
+  return n.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+}
+
+function MultiBrokerTool() {
+  const [totalCapital, setTotalCapital] = useState(() => {
+    return localStorage.getItem(G13_TOTAL_KEY) || ''
+  })
+  const [brokers, setBrokers] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(G13_BROKERS_KEY)) || [] } catch { return [] }
+  })
+  const [newName, setNewName] = useState('')
+  const [newRole, setNewRole] = useState(BROKER_ROLES[0])
+  const [newTargetPct, setNewTargetPct] = useState('')
+
+  const total = parseFloat(totalCapital) || 0
+
+  const totalPct = useMemo(() => brokers.reduce((s, b) => s + b.targetPct, 0), [brokers])
+
+  function saveBrokers(next) {
+    setBrokers(next)
+    localStorage.setItem(G13_BROKERS_KEY, JSON.stringify(next))
+  }
+
+  function saveTotal(val) {
+    setTotalCapital(val)
+    localStorage.setItem(G13_TOTAL_KEY, val)
+  }
+
+  function addBroker() {
+    const pct = parseFloat(newTargetPct)
+    if (!newName || isNaN(pct) || pct <= 0) return
+    const entry = { id: Date.now(), name: newName, role: newRole, targetPct: pct }
+    saveBrokers([...brokers, entry])
+    setNewName('')
+    setNewTargetPct('')
+  }
+
+  function deleteBroker(id) {
+    saveBrokers(brokers.filter((b) => b.id !== id))
+  }
+
+  function brokerStatus(b) {
+    if (!b.role.includes('Emergencia') && b.targetPct > 60) {
+      return { ok: false, msg: `${b.targetPct}% > limite 60%` }
+    }
+    if (b.role.includes('Emergencia') && b.targetPct < 10) {
+      return { ok: false, msg: `${b.targetPct}% < minimo emergencia 10%` }
+    }
+    return { ok: true, msg: 'OK' }
+  }
+
+  return (
+    <div className="border-2 border-[#34d39933]">
+      <div className="flex items-center gap-2 border-b border-[#333] bg-[#001a0d] px-3 py-1.5">
+        <BarChart3 size={14} className="text-[#34d399]" />
+        <span className="text-xs font-bold uppercase tracking-widest text-[#34d399]">Asignacion de Capital Multi-Broker</span>
+      </div>
+      <div className="p-4">
+        {/* Total capital */}
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase tracking-widest text-[#555]">Capital total del sistema (€ / $)</span>
+            <input
+              type="number"
+              value={totalCapital}
+              onChange={(e) => saveTotal(e.target.value)}
+              placeholder="100000"
+              className="w-44 border border-[#333] bg-black px-3 py-2 font-mono text-sm text-white placeholder-[#333] focus:border-[#34d399] focus:outline-none"
+            />
+          </label>
+          {total > 0 && (
+            <div className="pb-2 text-xs text-[#555]">
+              Asignado: <span className={`font-mono font-bold ${totalPct > 100 ? 'text-[#f87171]' : totalPct === 100 ? 'text-[#4ade80]' : 'text-[#fbbf24]'}`}>{totalPct.toFixed(1)}%</span>
+              {totalPct !== 100 && (
+                <span className="ml-2 text-[#444]">({totalPct < 100 ? `${(100 - totalPct).toFixed(1)}% sin asignar` : `${(totalPct - 100).toFixed(1)}% exceso`})</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Add broker form */}
+        <div className="mt-4 flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase tracking-widest text-[#555]">Broker</span>
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Interactive Brokers"
+              className="w-48 border border-[#333] bg-black px-3 py-2 text-sm text-white placeholder-[#333] focus:border-[#34d399] focus:outline-none"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase tracking-widest text-[#555]">Rol</span>
+            <select
+              value={newRole}
+              onChange={(e) => setNewRole(e.target.value)}
+              className="border border-[#333] bg-black px-3 py-2 text-sm text-white focus:border-[#34d399] focus:outline-none"
+            >
+              {BROKER_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase tracking-widest text-[#555]">Target %</span>
+            <input
+              type="number"
+              value={newTargetPct}
+              onChange={(e) => setNewTargetPct(e.target.value)}
+              placeholder="55"
+              min="1"
+              max="100"
+              className="w-24 border border-[#333] bg-black px-3 py-2 font-mono text-sm text-white placeholder-[#333] focus:border-[#34d399] focus:outline-none"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={addBroker}
+            className="flex items-center gap-1 border border-[#34d399] px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#34d399] hover:bg-[#34d399] hover:text-black"
+          >
+            <Plus size={13} /> Agregar
+          </button>
+        </div>
+
+        {/* Broker table */}
+        {brokers.length > 0 ? (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="bg-[#111] text-left">
+                  {['Broker', 'Rol', 'Target %', 'Capital asignado', 'Estado', ''].map((h) => (
+                    <th key={h} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {brokers.map((b) => {
+                  const assigned = total > 0 ? total * (b.targetPct / 100) : null
+                  const status = brokerStatus(b)
+                  return (
+                    <tr key={b.id} className="border-t border-[#111]">
+                      <td className="px-3 py-2 font-bold text-[#ddd]">{b.name}</td>
+                      <td className="px-3 py-2 text-xs text-[#aaa]">{b.role}</td>
+                      <td className={`px-3 py-2 font-mono text-sm font-bold ${status.ok ? 'text-[#34d399]' : 'text-[#f87171]'}`}>
+                        {b.targetPct}%
+                      </td>
+                      <td className="px-3 py-2 font-mono text-xs text-white">
+                        {assigned !== null ? fmt(assigned) : '—'}
+                      </td>
+                      <td className={`px-3 py-2 text-xs font-bold ${status.ok ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>
+                        {status.msg}
+                      </td>
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => deleteBroker(b.id)}
+                          className="text-[#444] hover:text-[#f87171]"
+                          aria-label="Eliminar"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-[#333] bg-[#0a0a0a]">
+                  <td colSpan={2} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">Total</td>
+                  <td className={`px-3 py-2 font-mono text-sm font-bold ${totalPct > 100 ? 'text-[#f87171]' : totalPct === 100 ? 'text-[#4ade80]' : 'text-[#fbbf24]'}`}>
+                    {totalPct.toFixed(1)}%
+                  </td>
+                  <td className="px-3 py-2 font-mono text-xs font-bold text-white">
+                    {total > 0 ? fmt(total * (totalPct / 100)) : '—'}
+                  </td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        ) : (
+          <p className="mt-4 text-xs text-[#444]">Sin brokers configurados. Agrega tus cuentas y su asignacion objetivo.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Module reference data ────────────────────────────────────────────────────
 
 const MODULES = {
   multiBroker: {
     code: 'G13',
     title: 'Multi-Broker / Multi-Account Management',
     subtitle: 'Gestion agregada de capital, exposicion y operativa a traves de varios brokers y cuentas.',
-    status: 'Documented / not automated',
+    status: 'Operativo',
     horizon: 'Continuo',
     accent: 'text-[#34d399]',
     border: 'border-[#34d399]',
@@ -165,7 +398,7 @@ const MODULES = {
       'Margen utilizado total vs capital total del sistema — no por broker individual.',
       'Drawdown del sistema = drawdown sobre capital total, no sobre cada cuenta por separado.',
       'P&L por broker para detectar diferencias de ejecucion entre brokers en el mismo par.',
-      'Verificar que no hay posiciones duplicadas en el mismo par en distintos brokers sin intención.',
+      'Verificar que no hay posiciones duplicadas en el mismo par en distintos brokers sin intencion.',
       'Si el P&L redistribuye capital entre brokers, revisar que los porcentajes no superen los limites de G8.',
     ],
     pipeline: [
@@ -190,7 +423,7 @@ const MODULES = {
     code: 'G15',
     title: 'Model Governance / Audit Trail',
     subtitle: 'Control de versiones, proceso de cambio auditado y trazabilidad completa de cada decision de diseño del sistema.',
-    status: 'Documented / not automated',
+    status: 'Documented / Supabase pendiente',
     horizon: 'Continuo',
     accent: 'text-[#818cf8]',
     border: 'border-[#818cf8]',
@@ -248,7 +481,7 @@ const MODULES = {
     code: 'G18',
     title: 'External Validation Framework',
     subtitle: 'Revision externa, benchmarks y validacion independiente del sistema para detectar sesgos que el propio operador no puede ver.',
-    status: 'Documented / not automated',
+    status: 'Documented / Supabase pendiente',
     horizon: 'Trimestral / anual',
     accent: 'text-[#67e8f9]',
     border: 'border-[#67e8f9]',
@@ -303,9 +536,9 @@ const MODULES = {
   },
 }
 
-// ── Module-specific content sections ────────────────────────────────────────
+// ── Reference content sections ───────────────────────────────────────────────
 
-function MultiBrokerContent({ mod }) {
+function MultiBrokerRef({ mod }) {
   return (
     <>
       <Section title="Roles de broker en el sistema" icon={Layers}>
@@ -314,15 +547,12 @@ function MultiBrokerContent({ mod }) {
           rows={mod.brokerRoles}
         />
       </Section>
-
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_0.9fr]">
         <Section title="Reglas de asignacion de capital" icon={SlidersHorizontal}>
           <ParamTable rows={mod.allocationRules} />
         </Section>
         <Section title="Tracking de exposicion agregada" icon={BarChart3}>
-          <div className="p-3">
-            <BulletList items={mod.aggregatedTracking} />
-          </div>
+          <div className="p-3"><BulletList items={mod.aggregatedTracking} /></div>
         </Section>
       </div>
     </>
@@ -340,19 +570,15 @@ function ModelGovernanceContent({ mod }) {
           />
         </Section>
         <Section title="Criterios de aprobacion de cambio" icon={CheckCircle2}>
-          <div className="p-3">
-            <BulletList items={mod.approvalCriteria} />
-          </div>
+          <div className="p-3"><BulletList items={mod.approvalCriteria} /></div>
         </Section>
       </div>
-
       <Section title="Requisitos de validacion por tipo de cambio" icon={ClipboardCheck} className="mt-4">
         <DataTable
           headers={['Tipo de cambio', 'Backtest requerido', 'Shadow period', 'Sizing durante shadow']}
           rows={mod.validationRequirements}
         />
       </Section>
-
       <Section title="Cadencia de revision" icon={FileText} className="mt-4">
         <div className="grid gap-0 md:grid-cols-3">
           {mod.reviewCadence.map(([freq, action, note]) => (
@@ -377,7 +603,6 @@ function ExternalValidationContent({ mod }) {
           rows={mod.validationTypes}
         />
       </Section>
-
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Section title="Seleccion de benchmarks" icon={BarChart3}>
           <DataTable
@@ -389,7 +614,6 @@ function ExternalValidationContent({ mod }) {
           <MetricTable rows={mod.metrics} accent={mod.accent} />
         </Section>
       </div>
-
       <Section title="Umbrales de accion ante hallazgos" icon={AlertTriangle} className="mt-4">
         <DataTable
           headers={['Hallazgo', 'Urgencia', 'Accion requerida']}
@@ -400,84 +624,123 @@ function ExternalValidationContent({ mod }) {
   )
 }
 
-// ── Main page component ──────────────────────────────────────────────────────
+// ── Page header ──────────────────────────────────────────────────────────────
 
-const CONTENT_COMPONENTS = {
-  multiBroker: MultiBrokerContent,
-  modelGovernance: ModelGovernanceContent,
-  externalValidation: ExternalValidationContent,
-}
-
-function ExtensionGovernancePage({ moduleKey }) {
-  const mod = MODULES[moduleKey]
-  const ContentComponent = CONTENT_COMPONENTS[moduleKey]
-
+function PageHeader({ mod }) {
   return (
-    <div className="min-h-screen pt-12">
-      <div className="mx-auto max-w-7xl px-4 py-4">
-        <div className="mb-4 flex flex-col gap-3 border-b-2 border-[#333] pb-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold uppercase tracking-widest">{mod.title}</h1>
-            <p className="mt-1 max-w-4xl text-sm text-[#888]">{mod.subtitle}</p>
-          </div>
-          <div className={`shrink-0 border px-3 py-2 text-[10px] font-bold uppercase tracking-widest ${mod.border} ${mod.accent}`}>
-            {mod.status} / {mod.horizon}
-          </div>
-        </div>
-
-        <section className="mb-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="border-2 border-[#333] p-4">
-            <div className={`mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${mod.accent}`}>
-              <BookOpen size={15} />
-              Principio central
-            </div>
-            <p className="text-sm leading-relaxed text-white">{mod.principle}</p>
-          </div>
-          <div className="grid grid-rows-2 border-2 border-[#333]">
-            <div className="border-b border-[#222] p-3">
-              <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Input</div>
-              <div className="text-xs leading-relaxed text-[#aaa]">{mod.input}</div>
-            </div>
-            <div className="p-3">
-              <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Output</div>
-              <div className="text-xs leading-relaxed text-[#aaa]">{mod.output}</div>
-            </div>
-          </div>
-        </section>
-
-        <ContentComponent mod={mod} />
-
-        <Section title="Pipeline operativo" icon={Route} className="mt-4">
-          <Pipeline steps={mod.pipeline} accent={mod.accent} />
-        </Section>
-
-        <Section title="Errores especificos a evitar" icon={AlertTriangle} className="mt-4">
-          <div className="p-3">
-            <BulletList items={mod.errors} />
-          </div>
-        </Section>
-
-        <div className="mt-4 border-2 border-[#333] p-3 text-xs text-[#555]">
-          Pantalla operativa basada en la documentacion del framework. No ejecuta calculos automaticamente todavia.
-          <Link to="/dashboard" className="ml-2 font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">
-            Volver al dashboard
-          </Link>
-        </div>
+    <div className="mb-4 flex flex-col gap-3 border-b-2 border-[#333] pb-3 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <p className={`font-mono text-[10px] font-bold uppercase tracking-widest ${mod.accent}`}>{mod.code}</p>
+        <h1 className="mt-0.5 text-2xl font-bold uppercase tracking-widest">{mod.title}</h1>
+        <p className="mt-1 max-w-4xl text-sm text-[#888]">{mod.subtitle}</p>
+      </div>
+      <div className={`shrink-0 border px-3 py-2 text-[10px] font-bold uppercase tracking-widest ${mod.border} ${mod.accent}`}>
+        {mod.status} / {mod.horizon}
       </div>
     </div>
+  )
+}
+
+function PrincipleIO({ mod }) {
+  return (
+    <section className="mb-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+      <div className="border-2 border-[#333] p-4">
+        <div className={`mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${mod.accent}`}>
+          <BookOpen size={15} />
+          Principio central
+        </div>
+        <p className="text-sm leading-relaxed text-white">{mod.principle}</p>
+      </div>
+      <div className="grid grid-rows-2 border-2 border-[#333]">
+        <div className="border-b border-[#222] p-3">
+          <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Input</div>
+          <div className="text-xs leading-relaxed text-[#aaa]">{mod.input}</div>
+        </div>
+        <div className="p-3">
+          <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Output</div>
+          <div className="text-xs leading-relaxed text-[#aaa]">{mod.output}</div>
+        </div>
+      </div>
+    </section>
   )
 }
 
 // ── Named exports ────────────────────────────────────────────────────────────
 
 export function MultiBrokerPage() {
-  return <ExtensionGovernancePage moduleKey="multiBroker" />
+  const mod = MODULES.multiBroker
+  return (
+    <div className="min-h-screen pt-12">
+      <div className="mx-auto max-w-7xl px-4 py-4">
+        <PageHeader mod={mod} />
+        <PrincipleIO mod={mod} />
+        <MultiBrokerTool />
+        <RefToggle>
+          <MultiBrokerRef mod={mod} />
+          <Section title="Pipeline operativo" icon={Route} className="mt-4">
+            <Pipeline steps={mod.pipeline} accent={mod.accent} />
+          </Section>
+          <Section title="Errores especificos a evitar" icon={AlertTriangle} className="mt-4">
+            <div className="p-3"><BulletList items={mod.errors} /></div>
+          </Section>
+        </RefToggle>
+        <div className="mt-4 border-2 border-[#333] p-3 text-xs text-[#777]">
+          Datos persistidos en localStorage del navegador.
+          <Link to="/dashboard" className="ml-2 font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">Volver al dashboard</Link>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function ModelGovernancePage() {
-  return <ExtensionGovernancePage moduleKey="modelGovernance" />
+  const mod = MODULES.modelGovernance
+  return (
+    <div className="min-h-screen pt-12">
+      <div className="mx-auto max-w-7xl px-4 py-4">
+        <PageHeader mod={mod} />
+        <SupabasePending label="G15 Model Governance / Audit Trail" />
+        <div className="mt-4">
+          <PrincipleIO mod={mod} />
+          <ModelGovernanceContent mod={mod} />
+          <Section title="Pipeline operativo" icon={Route} className="mt-4">
+            <Pipeline steps={mod.pipeline} accent={mod.accent} />
+          </Section>
+          <Section title="Errores especificos a evitar" icon={AlertTriangle} className="mt-4">
+            <div className="p-3"><BulletList items={mod.errors} /></div>
+          </Section>
+        </div>
+        <div className="mt-4 border-2 border-[#333] p-3 text-xs text-[#777]">
+          Pantalla de referencia operativa.
+          <Link to="/dashboard" className="ml-2 font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">Volver al dashboard</Link>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function ExternalValidationPage() {
-  return <ExtensionGovernancePage moduleKey="externalValidation" />
+  const mod = MODULES.externalValidation
+  return (
+    <div className="min-h-screen pt-12">
+      <div className="mx-auto max-w-7xl px-4 py-4">
+        <PageHeader mod={mod} />
+        <SupabasePending label="G18 External Validation Framework" />
+        <div className="mt-4">
+          <PrincipleIO mod={mod} />
+          <ExternalValidationContent mod={mod} />
+          <Section title="Pipeline operativo" icon={Route} className="mt-4">
+            <Pipeline steps={mod.pipeline} accent={mod.accent} />
+          </Section>
+          <Section title="Errores especificos a evitar" icon={AlertTriangle} className="mt-4">
+            <div className="p-3"><BulletList items={mod.errors} /></div>
+          </Section>
+        </div>
+        <div className="mt-4 border-2 border-[#333] p-3 text-xs text-[#777]">
+          Pantalla de referencia operativa.
+          <Link to="/dashboard" className="ml-2 font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">Volver al dashboard</Link>
+        </div>
+      </div>
+    </div>
+  )
 }

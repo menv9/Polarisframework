@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -5,17 +6,21 @@ import {
   Calculator,
   Calendar,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   FileText,
   Phone,
+  Plus,
   Route,
   ShieldAlert,
   ShieldCheck,
   SlidersHorizontal,
   TrendingDown,
+  Trash2,
   Zap,
 } from 'lucide-react'
 
-// ── Shared components ────────────────────────────────────────────────────────
+// ── Shared UI components ─────────────────────────────────────────────────────
 
 function Section({ title, icon: Icon, children, className = '' }) {
   return (
@@ -123,14 +128,718 @@ function TriggerTable({ rows, accent }) {
   )
 }
 
-// ── Module data ──────────────────────────────────────────────────────────────
+function RefToggle({ children }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mt-4">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 border border-[#333] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#777] hover:border-[#ecd987] hover:text-[#ecd987]"
+      >
+        {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        {open ? 'Ocultar referencia documental' : 'Ver referencia documental'}
+      </button>
+      {open && <div className="mt-4 space-y-4">{children}</div>}
+    </div>
+  )
+}
+
+// ── IRPF ahorro Spain 2024 ───────────────────────────────────────────────────
+
+function calcIRPF(base) {
+  if (base <= 0) return 0
+  const brackets = [
+    [6000, 0.19],
+    [44000, 0.21],
+    [150000, 0.23],
+    [100000, 0.27],
+    [Infinity, 0.28],
+  ]
+  let tax = 0
+  let remaining = base
+  for (const [limit, rate] of brackets) {
+    const chunk = Math.min(remaining, limit)
+    tax += chunk * rate
+    remaining -= chunk
+    if (remaining <= 0) break
+  }
+  return tax
+}
+
+function fmt(n) {
+  return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+// ── G3 Fiscal Tool ───────────────────────────────────────────────────────────
+
+const G3_EVENTS_KEY = 'polaris_g3_events'
+
+function FiscalTool() {
+  const [gross, setGross] = useState('')
+  const [costs, setCosts] = useState('')
+  const [events, setEvents] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(G3_EVENTS_KEY)) || [] } catch { return [] }
+  })
+  const [newDate, setNewDate] = useState(today())
+  const [newDesc, setNewDesc] = useState('')
+  const [newGross, setNewGross] = useState('')
+  const [newCosts, setNewCosts] = useState('')
+
+  const calc = useMemo(() => {
+    const g = parseFloat(gross) || 0
+    const c = parseFloat(costs) || 0
+    const net = g - c
+    const tax = calcIRPF(Math.max(0, net))
+    const afterTax = net - tax
+    const effectiveRate = net > 0 ? (tax / net) * 100 : 0
+    return { net, tax, afterTax, effectiveRate }
+  }, [gross, costs])
+
+  const totals = useMemo(() => {
+    let totalGross = 0, totalCosts = 0, totalTax = 0, totalAfterTax = 0
+    for (const e of events) {
+      const net = e.gross - e.costs
+      const tax = calcIRPF(Math.max(0, net))
+      totalGross += e.gross
+      totalCosts += e.costs
+      totalTax += tax
+      totalAfterTax += net - tax
+    }
+    return { totalGross, totalCosts, totalTax, totalAfterTax }
+  }, [events])
+
+  function saveEvents(next) {
+    setEvents(next)
+    localStorage.setItem(G3_EVENTS_KEY, JSON.stringify(next))
+  }
+
+  function addEvent() {
+    const g = parseFloat(newGross)
+    const c = parseFloat(newCosts) || 0
+    if (!newDate || isNaN(g)) return
+    const entry = { id: Date.now(), date: newDate, desc: newDesc || '—', gross: g, costs: c }
+    saveEvents([entry, ...events])
+    setNewDesc('')
+    setNewGross('')
+    setNewCosts('')
+  }
+
+  function deleteEvent(id) {
+    saveEvents(events.filter((e) => e.id !== id))
+  }
+
+  const accent = 'text-[#f59e0b]'
+
+  return (
+    <div className="space-y-4">
+      {/* Calculator */}
+      <div className="border-2 border-[#f59e0b33]">
+        <div className="flex items-center gap-2 border-b border-[#333] bg-[#1a1200] px-3 py-1.5">
+          <Calculator size={14} className="text-[#f59e0b]" />
+          <span className="text-xs font-bold uppercase tracking-widest text-[#f59e0b]">Calculadora After-Tax (IRPF Ahorro España 2024)</span>
+        </div>
+        <div className="p-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">P&L Bruto (€)</span>
+              <input
+                type="number"
+                value={gross}
+                onChange={(e) => setGross(e.target.value)}
+                placeholder="0.00"
+                className="w-40 border border-[#333] bg-black px-3 py-2 font-mono text-sm text-white placeholder-[#333] focus:border-[#f59e0b] focus:outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">Costes Operativos (€)</span>
+              <input
+                type="number"
+                value={costs}
+                onChange={(e) => setCosts(e.target.value)}
+                placeholder="0.00"
+                className="w-40 border border-[#333] bg-black px-3 py-2 font-mono text-sm text-white placeholder-[#333] focus:border-[#f59e0b] focus:outline-none"
+              />
+            </label>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[
+              ['Neto (antes impuesto)', calc.net, calc.net < 0 ? 'text-[#f87171]' : 'text-white'],
+              ['IRPF estimado', calc.tax, 'text-[#f59e0b]'],
+              ['After-Tax', calc.afterTax, calc.afterTax < 0 ? 'text-[#f87171]' : 'text-[#4ade80]'],
+              ['Tipo efectivo', null, ''],
+            ].map(([label, val, cls], i) => (
+              <div key={label} className="border border-[#222] bg-[#080808] p-3">
+                <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">{label}</div>
+                {i < 3 ? (
+                  <div className={`font-mono text-lg font-bold ${cls}`}>{fmt(val)} €</div>
+                ) : (
+                  <div className={`font-mono text-lg font-bold ${calc.effectiveRate > 27 ? 'text-[#f59e0b]' : 'text-white'}`}>
+                    {fmt(calc.effectiveRate)}%
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          {calc.net <= 0 && (parseFloat(gross) || 0) !== 0 && (
+            <p className="mt-2 text-[10px] text-[#777]">
+              Perdida — compensable con ganancias del mismo año o en los 4 ejercicios siguientes.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Event log */}
+      <div className="border-2 border-[#333]">
+        <div className="flex items-center gap-2 border-b border-[#333] bg-[#1a1200] px-3 py-1.5">
+          <FileText size={14} className="text-[#f59e0b]" />
+          <span className="text-xs font-bold uppercase tracking-widest text-[#f59e0b]">Registro Anual de Eventos P&L</span>
+        </div>
+        <div className="p-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">Fecha</span>
+              <input
+                type="date"
+                value={newDate}
+                onChange={(e) => setNewDate(e.target.value)}
+                className="border border-[#333] bg-black px-3 py-2 font-mono text-sm text-white focus:border-[#f59e0b] focus:outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">Descripcion</span>
+              <input
+                type="text"
+                value={newDesc}
+                onChange={(e) => setNewDesc(e.target.value)}
+                placeholder="Ej: Trade EUR/USD"
+                className="w-48 border border-[#333] bg-black px-3 py-2 text-sm text-white placeholder-[#333] focus:border-[#f59e0b] focus:outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">Bruto (€)</span>
+              <input
+                type="number"
+                value={newGross}
+                onChange={(e) => setNewGross(e.target.value)}
+                placeholder="0.00"
+                className="w-32 border border-[#333] bg-black px-3 py-2 font-mono text-sm text-white placeholder-[#333] focus:border-[#f59e0b] focus:outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">Costes (€)</span>
+              <input
+                type="number"
+                value={newCosts}
+                onChange={(e) => setNewCosts(e.target.value)}
+                placeholder="0.00"
+                className="w-32 border border-[#333] bg-black px-3 py-2 font-mono text-sm text-white placeholder-[#333] focus:border-[#f59e0b] focus:outline-none"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={addEvent}
+              className="flex items-center gap-1 border border-[#f59e0b] px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#f59e0b] hover:bg-[#f59e0b] hover:text-black"
+            >
+              <Plus size={13} /> Registrar
+            </button>
+          </div>
+
+          {events.length > 0 ? (
+            <>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead>
+                    <tr className="bg-[#111] text-left">
+                      {['Fecha', 'Descripcion', 'Bruto', 'Costes', 'Neto', 'After-Tax', ''].map((h) => (
+                        <th key={h} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {events.map((e) => {
+                      const net = e.gross - e.costs
+                      const tax = calcIRPF(Math.max(0, net))
+                      const afterTax = net - tax
+                      return (
+                        <tr key={e.id} className="border-t border-[#111]">
+                          <td className="px-3 py-2 font-mono text-xs text-[#777]">{e.date}</td>
+                          <td className="px-3 py-2 text-xs text-[#ddd]">{e.desc}</td>
+                          <td className="px-3 py-2 font-mono text-xs text-white">{fmt(e.gross)}</td>
+                          <td className="px-3 py-2 font-mono text-xs text-[#777]">{fmt(e.costs)}</td>
+                          <td className={`px-3 py-2 font-mono text-xs ${net < 0 ? 'text-[#f87171]' : 'text-white'}`}>{fmt(net)}</td>
+                          <td className={`px-3 py-2 font-mono text-xs font-bold ${afterTax < 0 ? 'text-[#f87171]' : 'text-[#4ade80]'}`}>{fmt(afterTax)}</td>
+                          <td className="px-3 py-2">
+                            <button
+                              type="button"
+                              onClick={() => deleteEvent(e.id)}
+                              className="text-[#444] hover:text-[#f87171]"
+                              aria-label="Eliminar"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-[#333] bg-[#0a0a0a]">
+                      <td colSpan={2} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">Total acumulado</td>
+                      <td className="px-3 py-2 font-mono text-xs font-bold text-white">{fmt(totals.totalGross)}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-[#777]">{fmt(totals.totalCosts)}</td>
+                      <td className={`px-3 py-2 font-mono text-xs font-bold ${(totals.totalGross - totals.totalCosts) < 0 ? 'text-[#f87171]' : 'text-white'}`}>
+                        {fmt(totals.totalGross - totals.totalCosts)}
+                      </td>
+                      <td className={`px-3 py-2 font-mono text-xs font-bold ${totals.totalAfterTax < 0 ? 'text-[#f87171]' : 'text-[#4ade80]'}`}>
+                        {fmt(totals.totalAfterTax)}
+                      </td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="mt-4 text-xs text-[#444]">Sin eventos registrados. Añade el primer evento P&L del año.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── G7 Tail Risk Tool ────────────────────────────────────────────────────────
+
+const G7_HEDGES_KEY = 'polaris_g7_hedges'
+
+function getProtocol(vix, dd) {
+  const protocols = []
+  if (vix >= 50) protocols.push({ level: 'CRITICO', color: 'text-[#f87171]', border: 'border-[#f87171]', bg: 'bg-[#1a0505]', msg: `VIX ${vix} ≥ 50 — Cierre total excepto stops muy ajustados (<0.5R)` })
+  else if (vix >= 35) protocols.push({ level: 'ALERTA', color: 'text-[#fb923c]', border: 'border-[#fb923c]', bg: 'bg-[#140900]', msg: `VIX ${vix} ≥ 35 — Solo cierres y gestión de abiertas. Sin nuevas entradas hasta VIX < 30` })
+  else if (vix >= 25) protocols.push({ level: 'PRECAUCION', color: 'text-[#fbbf24]', border: 'border-[#fbbf24]', bg: 'bg-[#141000]', msg: `VIX ${vix} ≥ 25 — Reducir sizing total al 50%. Revisar correlaciones` })
+  if (dd >= 12) protocols.push({ level: 'ALERTA DD', color: 'text-[#fb923c]', border: 'border-[#fb923c]', bg: 'bg-[#140900]', msg: `DD ${dd}% ≥ 12% — Solo gestionar abiertas. Sin nuevas entradas en ningún par` })
+  else if (dd >= 8) protocols.push({ level: 'PRECAUCION DD', color: 'text-[#fbbf24]', border: 'border-[#fbbf24]', bg: 'bg-[#141000]', msg: `DD ${dd}% ≥ 8% — Reducir sizing al 50%. Revisar validez de posiciones abiertas` })
+  if (protocols.length === 0) protocols.push({ level: 'NORMAL', color: 'text-[#4ade80]', border: 'border-[#4ade80]', bg: 'bg-[#011a05]', msg: `VIX ${vix || '—'} / DD ${dd || '—'}% — Sin protocolos activos. Operativa normal` })
+  return protocols
+}
+
+function TailRiskTool() {
+  const [vix, setVix] = useState('')
+  const [dd, setDd] = useState('')
+  const [hedges, setHedges] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(G7_HEDGES_KEY)) || [] } catch { return [] }
+  })
+  const [newInstrument, setNewInstrument] = useState('')
+  const [newNotional, setNewNotional] = useState('')
+  const [newReason, setNewReason] = useState('')
+
+  const protocols = useMemo(() => getProtocol(parseFloat(vix) || 0, parseFloat(dd) || 0), [vix, dd])
+
+  function saveHedges(next) {
+    setHedges(next)
+    localStorage.setItem(G7_HEDGES_KEY, JSON.stringify(next))
+  }
+
+  function addHedge() {
+    if (!newInstrument) return
+    const entry = {
+      id: Date.now(),
+      instrument: newInstrument,
+      notional: newNotional || '—',
+      reason: newReason || '—',
+      activatedAt: today(),
+      active: true,
+    }
+    saveHedges([entry, ...hedges])
+    setNewInstrument('')
+    setNewNotional('')
+    setNewReason('')
+  }
+
+  function toggleHedge(id) {
+    saveHedges(hedges.map((h) => h.id === id ? { ...h, active: !h.active } : h))
+  }
+
+  function deleteHedge(id) {
+    saveHedges(hedges.filter((h) => h.id !== id))
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Protocol checker */}
+      <div className="border-2 border-[#fb718533]">
+        <div className="flex items-center gap-2 border-b border-[#333] bg-[#140505] px-3 py-1.5">
+          <ShieldAlert size={14} className="text-[#fb7185]" />
+          <span className="text-xs font-bold uppercase tracking-widest text-[#fb7185]">Estado del Protocolo Tail Risk</span>
+        </div>
+        <div className="p-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">VIX actual</span>
+              <input
+                type="number"
+                value={vix}
+                onChange={(e) => setVix(e.target.value)}
+                placeholder="0"
+                className="w-28 border border-[#333] bg-black px-3 py-2 font-mono text-sm text-white placeholder-[#333] focus:border-[#fb7185] focus:outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">DD Portfolio (%)</span>
+              <input
+                type="number"
+                value={dd}
+                onChange={(e) => setDd(e.target.value)}
+                placeholder="0.0"
+                className="w-28 border border-[#333] bg-black px-3 py-2 font-mono text-sm text-white placeholder-[#333] focus:border-[#fb7185] focus:outline-none"
+              />
+            </label>
+          </div>
+          <div className="mt-4 space-y-2">
+            {protocols.map((p) => (
+              <div key={p.level} className={`border ${p.border} ${p.bg} p-3`}>
+                <div className="flex items-center gap-3">
+                  <span className={`font-mono text-sm font-black ${p.color}`}>{p.level}</span>
+                  <span className="text-xs text-[#ccc]">{p.msg}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Hedge tracker */}
+      <div className="border-2 border-[#333]">
+        <div className="flex items-center gap-2 border-b border-[#333] bg-[#140505] px-3 py-1.5">
+          <ShieldCheck size={14} className="text-[#fb7185]" />
+          <span className="text-xs font-bold uppercase tracking-widest text-[#fb7185]">Coberturas Activas</span>
+        </div>
+        <div className="p-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">Instrumento</span>
+              <input
+                type="text"
+                value={newInstrument}
+                onChange={(e) => setNewInstrument(e.target.value)}
+                placeholder="Long JPY / Reduccion sizing"
+                className="w-52 border border-[#333] bg-black px-3 py-2 text-sm text-white placeholder-[#333] focus:border-[#fb7185] focus:outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">Tamaño / Notional</span>
+              <input
+                type="text"
+                value={newNotional}
+                onChange={(e) => setNewNotional(e.target.value)}
+                placeholder="50,000 / −50% sizing"
+                className="w-40 border border-[#333] bg-black px-3 py-2 text-sm text-white placeholder-[#333] focus:border-[#fb7185] focus:outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">Razon</span>
+              <input
+                type="text"
+                value={newReason}
+                onChange={(e) => setNewReason(e.target.value)}
+                placeholder="VIX 28 > 25"
+                className="w-40 border border-[#333] bg-black px-3 py-2 text-sm text-white placeholder-[#333] focus:border-[#fb7185] focus:outline-none"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={addHedge}
+              className="flex items-center gap-1 border border-[#fb7185] px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#fb7185] hover:bg-[#fb7185] hover:text-black"
+            >
+              <Plus size={13} /> Agregar
+            </button>
+          </div>
+
+          {hedges.length > 0 ? (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[600px] text-sm">
+                <thead>
+                  <tr className="bg-[#111] text-left">
+                    {['Instrumento', 'Tamaño', 'Razon', 'Activado', 'Estado', ''].map((h) => (
+                      <th key={h} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {hedges.map((h) => (
+                    <tr key={h.id} className={`border-t border-[#111] ${!h.active ? 'opacity-40' : ''}`}>
+                      <td className="px-3 py-2 font-bold text-[#ddd]">{h.instrument}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-[#aaa]">{h.notional}</td>
+                      <td className="px-3 py-2 text-xs text-[#aaa]">{h.reason}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-[#777]">{h.activatedAt}</td>
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleHedge(h.id)}
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 border ${h.active ? 'border-[#4ade80] text-[#4ade80] hover:bg-[#4ade80] hover:text-black' : 'border-[#555] text-[#555] hover:border-[#aaa] hover:text-[#aaa]'}`}
+                        >
+                          {h.active ? 'Activa' : 'Inactiva'}
+                        </button>
+                      </td>
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => deleteHedge(h.id)}
+                          className="text-[#444] hover:text-[#f87171]"
+                          aria-label="Eliminar"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="mt-4 text-xs text-[#444]">Sin coberturas registradas. Agrega una cuando actives un protocolo.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── G8 Counterparty Risk Tool ────────────────────────────────────────────────
+
+const G8_TOTAL_KEY = 'polaris_g8_total'
+const G8_BROKERS_KEY = 'polaris_g8_brokers'
+
+function CounterpartyTool() {
+  const [totalCapital, setTotalCapital] = useState(() => {
+    return localStorage.getItem(G8_TOTAL_KEY) || ''
+  })
+  const [brokers, setBrokers] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(G8_BROKERS_KEY)) || [] } catch { return [] }
+  })
+  const [newName, setNewName] = useState('')
+  const [newRegulator, setNewRegulator] = useState('')
+  const [newAssigned, setNewAssigned] = useState('')
+  const [newInUse, setNewInUse] = useState('')
+  const [newSegregated, setNewSegregated] = useState(true)
+
+  const total = parseFloat(totalCapital) || 0
+
+  const totalAssigned = useMemo(() => brokers.reduce((s, b) => s + b.assigned, 0), [brokers])
+
+  function saveBrokers(next) {
+    setBrokers(next)
+    localStorage.setItem(G8_BROKERS_KEY, JSON.stringify(next))
+  }
+
+  function saveTotal(val) {
+    setTotalCapital(val)
+    localStorage.setItem(G8_TOTAL_KEY, val)
+  }
+
+  function addBroker() {
+    const assigned = parseFloat(newAssigned)
+    const inUse = parseFloat(newInUse) || 0
+    if (!newName || isNaN(assigned)) return
+    const entry = { id: Date.now(), name: newName, regulator: newRegulator || '—', assigned, inUse, segregated: newSegregated }
+    saveBrokers([...brokers, entry])
+    setNewName('')
+    setNewRegulator('')
+    setNewAssigned('')
+    setNewInUse('')
+    setNewSegregated(true)
+  }
+
+  function deleteBroker(id) {
+    saveBrokers(brokers.filter((b) => b.id !== id))
+  }
+
+  function brokerStatus(b) {
+    if (!b.segregated) return { ok: false, msg: 'Sin segregacion — limite 0%' }
+    if (total > 0 && (b.assigned / total) > 0.6) return { ok: false, msg: `${((b.assigned / total) * 100).toFixed(1)}% > limite 60%` }
+    return { ok: true, msg: 'OK' }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="border-2 border-[#fb923c33]">
+        <div className="flex items-center gap-2 border-b border-[#333] bg-[#140a00] px-3 py-1.5">
+          <CheckCircle2 size={14} className="text-[#fb923c]" />
+          <span className="text-xs font-bold uppercase tracking-widest text-[#fb923c]">Exposicion por Broker / Contraparte</span>
+        </div>
+        <div className="p-4">
+          {/* Total capital input */}
+          <div className="flex items-end gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">Capital total del sistema (€ / $)</span>
+              <input
+                type="number"
+                value={totalCapital}
+                onChange={(e) => saveTotal(e.target.value)}
+                placeholder="100000"
+                className="w-44 border border-[#333] bg-black px-3 py-2 font-mono text-sm text-white placeholder-[#333] focus:border-[#fb923c] focus:outline-none"
+              />
+            </label>
+            {total > 0 && (
+              <div className="pb-2 text-xs text-[#555]">
+                Asignado: <span className={`font-mono font-bold ${totalAssigned > total ? 'text-[#f87171]' : 'text-white'}`}>{fmt(totalAssigned)}</span>
+                {' / '}
+                <span className="text-[#777]">{fmt(total)}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Add broker form */}
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">Broker</span>
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Interactive Brokers"
+                className="w-44 border border-[#333] bg-black px-3 py-2 text-sm text-white placeholder-[#333] focus:border-[#fb923c] focus:outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">Regulador</span>
+              <input
+                type="text"
+                value={newRegulator}
+                onChange={(e) => setNewRegulator(e.target.value)}
+                placeholder="FCA / BaFin"
+                className="w-28 border border-[#333] bg-black px-3 py-2 text-sm text-white placeholder-[#333] focus:border-[#fb923c] focus:outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">Asignado</span>
+              <input
+                type="number"
+                value={newAssigned}
+                onChange={(e) => setNewAssigned(e.target.value)}
+                placeholder="60000"
+                className="w-28 border border-[#333] bg-black px-3 py-2 font-mono text-sm text-white placeholder-[#333] focus:border-[#fb923c] focus:outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">En uso (margen)</span>
+              <input
+                type="number"
+                value={newInUse}
+                onChange={(e) => setNewInUse(e.target.value)}
+                placeholder="0"
+                className="w-28 border border-[#333] bg-black px-3 py-2 font-mono text-sm text-white placeholder-[#333] focus:border-[#fb923c] focus:outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-widest text-[#555]">Segregado</span>
+              <div className="flex h-[38px] items-center gap-3 border border-[#333] bg-black px-3">
+                <button
+                  type="button"
+                  onClick={() => setNewSegregated(true)}
+                  className={`text-xs font-bold uppercase tracking-wider ${newSegregated ? 'text-[#4ade80]' : 'text-[#555]'}`}
+                >
+                  Si
+                </button>
+                <span className="text-[#333]">/</span>
+                <button
+                  type="button"
+                  onClick={() => setNewSegregated(false)}
+                  className={`text-xs font-bold uppercase tracking-wider ${!newSegregated ? 'text-[#f87171]' : 'text-[#555]'}`}
+                >
+                  No
+                </button>
+              </div>
+            </label>
+            <button
+              type="button"
+              onClick={addBroker}
+              className="flex items-center gap-1 border border-[#fb923c] px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#fb923c] hover:bg-[#fb923c] hover:text-black"
+            >
+              <Plus size={13} /> Agregar
+            </button>
+          </div>
+
+          {/* Broker table */}
+          {brokers.length > 0 ? (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[640px] text-sm">
+                <thead>
+                  <tr className="bg-[#111] text-left">
+                    {['Broker', 'Regulador', 'Asignado', '% Total', 'En uso', 'Segregado', 'Estado', ''].map((h) => (
+                      <th key={h} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {brokers.map((b) => {
+                    const pct = total > 0 ? (b.assigned / total) * 100 : 0
+                    const status = brokerStatus(b)
+                    return (
+                      <tr key={b.id} className="border-t border-[#111]">
+                        <td className="px-3 py-2 font-bold text-[#ddd]">{b.name}</td>
+                        <td className="px-3 py-2 text-xs text-[#aaa]">{b.regulator}</td>
+                        <td className="px-3 py-2 font-mono text-xs text-white">{fmt(b.assigned)}</td>
+                        <td className={`px-3 py-2 font-mono text-xs font-bold ${pct > 60 ? 'text-[#f87171]' : 'text-[#fb923c]'}`}>
+                          {pct.toFixed(1)}%
+                        </td>
+                        <td className="px-3 py-2 font-mono text-xs text-[#777]">{fmt(b.inUse)}</td>
+                        <td className={`px-3 py-2 text-xs font-bold ${b.segregated ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>
+                          {b.segregated ? 'Si' : 'No'}
+                        </td>
+                        <td className={`px-3 py-2 text-xs font-bold ${status.ok ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>
+                          {status.msg}
+                        </td>
+                        <td className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => deleteBroker(b.id)}
+                            className="text-[#444] hover:text-[#f87171]"
+                            aria-label="Eliminar"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                {total > 0 && (
+                  <tfoot>
+                    <tr className="border-t-2 border-[#333] bg-[#0a0a0a]">
+                      <td colSpan={2} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">Total asignado</td>
+                      <td className={`px-3 py-2 font-mono text-xs font-bold ${totalAssigned > total ? 'text-[#f87171]' : 'text-white'}`}>{fmt(totalAssigned)}</td>
+                      <td className={`px-3 py-2 font-mono text-xs font-bold ${totalAssigned > total ? 'text-[#f87171]' : 'text-[#fb923c]'}`}>
+                        {((totalAssigned / total) * 100).toFixed(1)}%
+                      </td>
+                      <td colSpan={4} />
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          ) : (
+            <p className="mt-4 text-xs text-[#444]">Sin brokers registrados. Agrega tus cuentas activas.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Module reference data ────────────────────────────────────────────────────
 
 const MODULES = {
   fiscal: {
     code: 'G3',
     title: 'Modulo Fiscal',
     subtitle: 'Fiscalidad, P&L after-tax, obligaciones de reporte y criterios de optimizacion para el operador en España.',
-    status: 'Documented / not automated',
+    status: 'Operativo',
     horizon: 'Anual + continuo',
     accent: 'text-[#f59e0b]',
     border: 'border-[#f59e0b]',
@@ -263,7 +972,7 @@ const MODULES = {
     code: 'G7',
     title: 'Hedging / Tail Risk Module',
     subtitle: 'Coberturas y proteccion frente a eventos extremos, gaps y shocks de volatilidad.',
-    status: 'Documented / not automated',
+    status: 'Operativo',
     horizon: 'Continuo',
     accent: 'text-[#fb7185]',
     border: 'border-[#fb7185]',
@@ -324,7 +1033,7 @@ const MODULES = {
     code: 'G8',
     title: 'Counterparty Risk Framework',
     subtitle: 'Riesgo de broker, custodio y contraparte: exposicion, limites, señales de alerta y diversificacion.',
-    status: 'Documented / not automated',
+    status: 'Operativo',
     horizon: 'Continuo',
     accent: 'text-[#fb923c]',
     border: 'border-[#fb923c]',
@@ -383,9 +1092,9 @@ const MODULES = {
   },
 }
 
-// ── Module-specific content sections ────────────────────────────────────────
+// ── Reference-only content sections ─────────────────────────────────────────
 
-function FiscalContent({ mod }) {
+function FiscalRef({ mod }) {
   return (
     <>
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
@@ -416,17 +1125,12 @@ function FiscalContent({ mod }) {
           </div>
         </Section>
       </div>
-
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Section title="Calculo P&L after-tax" icon={Calculator}>
-          <div className="p-3">
-            <BulletList items={mod.aftertaxFormula} />
-          </div>
+          <div className="p-3"><BulletList items={mod.aftertaxFormula} /></div>
         </Section>
         <Section title="Decisiones de operativa afectadas por fiscal" icon={SlidersHorizontal}>
-          <div className="p-3">
-            <BulletList items={mod.keyDecisions} />
-          </div>
+          <div className="p-3"><BulletList items={mod.keyDecisions} /></div>
         </Section>
       </div>
     </>
@@ -442,12 +1146,9 @@ function DisasterRecoveryContent({ mod }) {
           rows={mod.failureModes}
         />
       </Section>
-
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Section title="Protocolos de failover" icon={Zap}>
-          <div className="p-3">
-            <BulletList items={mod.failoverProtocols} />
-          </div>
+          <div className="p-3"><BulletList items={mod.failoverProtocols} /></div>
         </Section>
         <Section title="Contactos de emergencia" icon={Phone}>
           <DataTable
@@ -456,7 +1157,6 @@ function DisasterRecoveryContent({ mod }) {
           />
         </Section>
       </div>
-
       <Section title="Runbook de emergencia — posicion abierta en riesgo" icon={FileText} className="mt-4">
         <div className="grid gap-0 md:grid-cols-2 xl:grid-cols-4">
           {mod.emergencyRunbook.map((step, i) => (
@@ -467,7 +1167,6 @@ function DisasterRecoveryContent({ mod }) {
           ))}
         </div>
       </Section>
-
       <Section title="Cadencia de simulacros" icon={Calendar} className="mt-4">
         <DataTable
           headers={['Frecuencia', 'Que se prueba', 'Resultado esperado']}
@@ -478,7 +1177,7 @@ function DisasterRecoveryContent({ mod }) {
   )
 }
 
-function TailRiskContent({ mod }) {
+function TailRiskRef({ mod }) {
   return (
     <>
       <Section title="Taxonomia de eventos extremos" icon={TrendingDown}>
@@ -487,14 +1186,12 @@ function TailRiskContent({ mod }) {
           rows={mod.tailEvents}
         />
       </Section>
-
       <Section title="Instrumentos de cobertura" icon={ShieldCheck} className="mt-4">
         <DataTable
           headers={['Instrumento', 'Uso', 'Coste tipico', 'Cuando activar']}
           rows={mod.hedgeInstruments}
         />
       </Section>
-
       <Section title="Niveles de trigger" icon={ShieldAlert} className="mt-4">
         <TriggerTable rows={mod.triggers} accent={mod.accent} />
       </Section>
@@ -502,7 +1199,7 @@ function TailRiskContent({ mod }) {
   )
 }
 
-function CounterpartyContent({ mod }) {
+function CounterpartyRef({ mod }) {
   return (
     <>
       <Section title="Criterios de evaluacion de broker" icon={CheckCircle2}>
@@ -511,7 +1208,6 @@ function CounterpartyContent({ mod }) {
           rows={mod.evaluationCriteria}
         />
       </Section>
-
       <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <Section title="Limites de exposicion" icon={SlidersHorizontal}>
           <DataTable
@@ -520,18 +1216,13 @@ function CounterpartyContent({ mod }) {
           />
         </Section>
         <Section title="Señales de alerta a monitorizar" icon={AlertTriangle}>
-          <div className="p-3">
-            <BulletList items={mod.warningSignals} />
-          </div>
+          <div className="p-3"><BulletList items={mod.warningSignals} /></div>
         </Section>
       </div>
-
       <Section title="Reglas de diversificacion" icon={ShieldCheck} className="mt-4">
         <div className="grid gap-0 md:grid-cols-2 xl:grid-cols-3">
           {mod.diversificationRules.map((rule) => (
-            <div key={rule} className="border-b border-r border-[#222] p-3 text-xs leading-relaxed text-[#aaa]">
-              {rule}
-            </div>
+            <div key={rule} className="border-b border-r border-[#222] p-3 text-xs leading-relaxed text-[#aaa]">{rule}</div>
           ))}
         </div>
       </Section>
@@ -539,95 +1230,152 @@ function CounterpartyContent({ mod }) {
   )
 }
 
-// ── Main page component ──────────────────────────────────────────────────────
+// ── Page header ──────────────────────────────────────────────────────────────
 
-const CONTENT_COMPONENTS = {
-  fiscal: FiscalContent,
-  disasterRecovery: DisasterRecoveryContent,
-  tailRisk: TailRiskContent,
-  counterpartyRisk: CounterpartyContent,
-}
-
-function RiskContinuityModulePage({ moduleKey }) {
-  const mod = MODULES[moduleKey]
-  const ContentComponent = CONTENT_COMPONENTS[moduleKey]
-
+function PageHeader({ mod }) {
   return (
-    <div className="min-h-screen pt-12">
-      <div className="mx-auto max-w-7xl px-4 py-4">
-        <div className="mb-4 flex flex-col gap-3 border-b-2 border-[#333] pb-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold uppercase tracking-widest">{mod.title}</h1>
-            <p className="mt-1 max-w-4xl text-sm text-[#888]">{mod.subtitle}</p>
-          </div>
-          <div className={`shrink-0 border px-3 py-2 text-[10px] font-bold uppercase tracking-widest ${mod.border} ${mod.accent}`}>
-            {mod.status} / {mod.horizon}
-          </div>
-        </div>
-
-        <section className="mb-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="border-2 border-[#333] p-4">
-            <div className={`mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${mod.accent}`}>
-              <BookOpen size={15} />
-              Principio central
-            </div>
-            <p className="text-sm leading-relaxed text-white">{mod.principle}</p>
-          </div>
-          <div className="grid grid-rows-2 border-2 border-[#333]">
-            <div className="border-b border-[#222] p-3">
-              <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Input</div>
-              <div className="text-xs leading-relaxed text-[#aaa]">{mod.input}</div>
-            </div>
-            <div className="p-3">
-              <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Output</div>
-              <div className="text-xs leading-relaxed text-[#aaa]">{mod.output}</div>
-            </div>
-          </div>
-        </section>
-
-        <ContentComponent mod={mod} />
-
-        <Section title="Pipeline operativo" icon={Route} className="mt-4">
-          <Pipeline steps={mod.pipeline} accent={mod.accent} />
-        </Section>
-
-        {mod.parameters && (
-          <Section title="Parametros default" icon={SlidersHorizontal} className="mt-4">
-            <ParamTable rows={mod.parameters} />
-          </Section>
-        )}
-
-        <Section title="Errores especificos a evitar" icon={AlertTriangle} className="mt-4">
-          <div className="p-3">
-            <BulletList items={mod.errors} />
-          </div>
-        </Section>
-
-        <div className="mt-4 border-2 border-[#333] p-3 text-xs text-[#777]">
-          Pantalla operativa basada en la documentacion del framework. No ejecuta calculos automaticamente todavia.
-          <Link to="/dashboard" className="ml-2 font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">
-            Volver al dashboard
-          </Link>
-        </div>
+    <div className="mb-4 flex flex-col gap-3 border-b-2 border-[#333] pb-3 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <p className={`font-mono text-[10px] font-bold uppercase tracking-widest ${mod.accent}`}>{mod.code}</p>
+        <h1 className="mt-0.5 text-2xl font-bold uppercase tracking-widest">{mod.title}</h1>
+        <p className="mt-1 max-w-4xl text-sm text-[#888]">{mod.subtitle}</p>
+      </div>
+      <div className={`shrink-0 border px-3 py-2 text-[10px] font-bold uppercase tracking-widest ${mod.border} ${mod.accent}`}>
+        {mod.status} / {mod.horizon}
       </div>
     </div>
+  )
+}
+
+function PrincipleIO({ mod }) {
+  return (
+    <section className="mb-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+      <div className="border-2 border-[#333] p-4">
+        <div className={`mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${mod.accent}`}>
+          <BookOpen size={15} />
+          Principio central
+        </div>
+        <p className="text-sm leading-relaxed text-white">{mod.principle}</p>
+      </div>
+      <div className="grid grid-rows-2 border-2 border-[#333]">
+        <div className="border-b border-[#222] p-3">
+          <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Input</div>
+          <div className="text-xs leading-relaxed text-[#aaa]">{mod.input}</div>
+        </div>
+        <div className="p-3">
+          <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Output</div>
+          <div className="text-xs leading-relaxed text-[#aaa]">{mod.output}</div>
+        </div>
+      </div>
+    </section>
   )
 }
 
 // ── Named exports ────────────────────────────────────────────────────────────
 
 export function FiscalPage() {
-  return <RiskContinuityModulePage moduleKey="fiscal" />
+  const mod = MODULES.fiscal
+  return (
+    <div className="min-h-screen pt-12">
+      <div className="mx-auto max-w-7xl px-4 py-4">
+        <PageHeader mod={mod} />
+        <PrincipleIO mod={mod} />
+        <FiscalTool />
+        <RefToggle>
+          <FiscalRef mod={mod} />
+          <Section title="Pipeline operativo" icon={Route} className="mt-4">
+            <Pipeline steps={mod.pipeline} accent={mod.accent} />
+          </Section>
+          <Section title="Parametros default" icon={SlidersHorizontal} className="mt-4">
+            <ParamTable rows={mod.parameters} />
+          </Section>
+          <Section title="Errores especificos a evitar" icon={AlertTriangle} className="mt-4">
+            <div className="p-3"><BulletList items={mod.errors} /></div>
+          </Section>
+        </RefToggle>
+        <div className="mt-4 border-2 border-[#333] p-3 text-xs text-[#777]">
+          Datos persistidos en localStorage del navegador.
+          <Link to="/dashboard" className="ml-2 font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">Volver al dashboard</Link>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function DisasterRecoveryPage() {
-  return <RiskContinuityModulePage moduleKey="disasterRecovery" />
+  const mod = MODULES.disasterRecovery
+  return (
+    <div className="min-h-screen pt-12">
+      <div className="mx-auto max-w-7xl px-4 py-4">
+        <PageHeader mod={mod} />
+        <PrincipleIO mod={mod} />
+        <DisasterRecoveryContent mod={mod} />
+        <Section title="Pipeline operativo" icon={Route} className="mt-4">
+          <Pipeline steps={mod.pipeline} accent={mod.accent} />
+        </Section>
+        <Section title="Errores especificos a evitar" icon={AlertTriangle} className="mt-4">
+          <div className="p-3"><BulletList items={mod.errors} /></div>
+        </Section>
+        <div className="mt-4 border-2 border-[#333] p-3 text-xs text-[#777]">
+          Pantalla de referencia operativa.
+          <Link to="/dashboard" className="ml-2 font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">Volver al dashboard</Link>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function TailRiskPage() {
-  return <RiskContinuityModulePage moduleKey="tailRisk" />
+  const mod = MODULES.tailRisk
+  return (
+    <div className="min-h-screen pt-12">
+      <div className="mx-auto max-w-7xl px-4 py-4">
+        <PageHeader mod={mod} />
+        <PrincipleIO mod={mod} />
+        <TailRiskTool />
+        <RefToggle>
+          <TailRiskRef mod={mod} />
+          <Section title="Pipeline operativo" icon={Route} className="mt-4">
+            <Pipeline steps={mod.pipeline} accent={mod.accent} />
+          </Section>
+          <Section title="Parametros default" icon={SlidersHorizontal} className="mt-4">
+            <ParamTable rows={mod.parameters} />
+          </Section>
+          <Section title="Errores especificos a evitar" icon={AlertTriangle} className="mt-4">
+            <div className="p-3"><BulletList items={mod.errors} /></div>
+          </Section>
+        </RefToggle>
+        <div className="mt-4 border-2 border-[#333] p-3 text-xs text-[#777]">
+          Datos persistidos en localStorage del navegador.
+          <Link to="/dashboard" className="ml-2 font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">Volver al dashboard</Link>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function CounterpartyRiskPage() {
-  return <RiskContinuityModulePage moduleKey="counterpartyRisk" />
+  const mod = MODULES.counterpartyRisk
+  return (
+    <div className="min-h-screen pt-12">
+      <div className="mx-auto max-w-7xl px-4 py-4">
+        <PageHeader mod={mod} />
+        <PrincipleIO mod={mod} />
+        <CounterpartyTool />
+        <RefToggle>
+          <CounterpartyRef mod={mod} />
+          <Section title="Pipeline operativo" icon={Route} className="mt-4">
+            <Pipeline steps={mod.pipeline} accent={mod.accent} />
+          </Section>
+          <Section title="Errores especificos a evitar" icon={AlertTriangle} className="mt-4">
+            <div className="p-3"><BulletList items={mod.errors} /></div>
+          </Section>
+        </RefToggle>
+        <div className="mt-4 border-2 border-[#333] p-3 text-xs text-[#777]">
+          Datos persistidos en localStorage del navegador.
+          <Link to="/dashboard" className="ml-2 font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">Volver al dashboard</Link>
+        </div>
+      </div>
+    </div>
+  )
 }
