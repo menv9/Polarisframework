@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, X } from 'lucide-react'
+import { Menu, Search, X } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { supabase } from '../lib/supabase'
 import { briefExtensionModules } from '../data/modules'
@@ -138,6 +138,111 @@ function NavDropdown({ group, location }) {
   )
 }
 
+const EXTRA_SEARCH_ITEMS = [
+  { to: '/info', label: 'Info', desc: 'Mapa visual' },
+  { to: '/settings', label: 'Settings', desc: 'Configuracion' },
+  { to: '/data', label: 'Data', desc: 'Data Hub', adminOnly: true },
+  { to: '/data/raw', label: 'Raw', desc: 'Raw Data', adminOnly: true },
+  { to: '/data/coverage-matrix', label: 'Coverage', desc: 'Coverage Matrix', adminOnly: true },
+  { to: '/data/history', label: 'History', desc: 'History', adminOnly: true },
+  { to: '/data/economic-calendar', label: 'Calendar', desc: 'Economic Calendar', adminOnly: true },
+  { to: '/data/notifications', label: 'Notifications', desc: 'Notifications', adminOnly: true },
+  { to: '/admin', label: 'Admin', desc: 'Panel de administracion', adminOnly: true },
+]
+
+function buildSearchItems(isAdmin) {
+  const items = [
+    ...GROUPS.flatMap((group) => group.items.map((item) => ({ ...item, group: group.label }))),
+    ...EXTRA_SEARCH_ITEMS.map((item) => ({ ...item, group: item.adminOnly ? 'Admin' : 'Sistema' })),
+  ].filter((item) => !item.adminOnly || isAdmin)
+
+  return [...new Map(items.map((item) => [item.to, item])).values()]
+}
+
+function NavbarSearch({ isAdmin }) {
+  const navigate = useNavigate()
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  const searchItems = buildSearchItems(isAdmin)
+  const normalizedQuery = query.trim().toLowerCase()
+  const results = normalizedQuery
+    ? searchItems
+        .filter((item) =>
+          `${item.label} ${item.desc} ${item.to} ${item.group}`.toLowerCase().includes(normalizedQuery)
+        )
+        .slice(0, 8)
+    : searchItems.slice(0, 6)
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  function goTo(item) {
+    navigate(item.to)
+    setQuery('')
+    setOpen(false)
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && results[0]) {
+      e.preventDefault()
+      goTo(results[0])
+    }
+    if (e.key === 'Escape') setOpen(false)
+  }
+
+  return (
+    <div ref={ref} className="relative w-[230px]">
+      <Search size={13} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[#555]" />
+      <input
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value)
+          setOpen(true)
+        }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={handleKeyDown}
+        placeholder="Buscar paginas"
+        className="h-8 w-full border border-[#333] bg-black pl-7 pr-2 text-xs font-bold uppercase tracking-wider text-[#ddd] outline-none placeholder:text-[#444] focus:border-[#ecd987]"
+      />
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 max-h-[360px] w-[360px] overflow-auto border border-[#333] bg-black shadow-2xl">
+          {results.length > 0 ? (
+            results.map((item) => (
+              <button
+                key={item.to}
+                type="button"
+                onClick={() => goTo(item)}
+                className="flex w-full items-center justify-between gap-3 border-b border-[#1a1a1a] px-3 py-2 text-left last:border-0 hover:bg-[#0a0a0a]"
+              >
+                <span>
+                  <span className="block text-xs font-bold uppercase tracking-wider text-[#ddd]">
+                    {item.desc}
+                  </span>
+                  <span className="block font-mono text-[10px] text-[#555]">{item.to}</span>
+                </span>
+                <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-[#777]">
+                  {item.group}
+                </span>
+              </button>
+            ))
+          ) : (
+            <div className="px-3 py-3 text-xs font-bold uppercase tracking-wider text-[#555]">
+              Sin resultados
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Navbar() {
   const scrolled = useAppStore((s) => s.scrolled)
   const user = useAppStore((s) => s.user)
@@ -217,6 +322,7 @@ export default function Navbar() {
 
         {/* Derecha — email + salir + UI toggle, pegados al borde */}
         <div className="hidden md:flex items-center gap-3 flex-none ml-auto">
+          <NavbarSearch isAdmin={isAdmin} />
           {user && (
             <div className="flex items-center gap-3">
               <span className="text-xs text-[#555] max-w-[140px] truncate">{user.email}</span>
