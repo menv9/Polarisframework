@@ -66,6 +66,7 @@ REBALANCE_FREQ          = 3     # rebalance every N months (3 = quarterly)
 HYSTERESIS_THRESHOLD    = 0.02  # minimum |signed-weight change| to execute a trade
 MIN_INDICATORS          = 3     # skip pair when fewer valid rolling/Kalman betas available
 CARRY_MIN_DIFFERENTIAL  = 0.50  # minimum annual rate differential (%) to trade carry fallback
+CARRY_VIX_THRESHOLD     = 25.0  # suppress carry trades when VIX > this level (risk-off filter)
 SPOT_VOL_WINDOW         = 3     # months of realized FX spot vol used for Risk Parity sizing
 
 
@@ -312,20 +313,29 @@ def simulate(
                         if t_open in kb_df.index:
                             n_kalman = int(kb_df.loc[t_open].notna().sum())
                     if max(n_roll, n_kalman) < min_indicators:
-                        # Try carry fallback before giving up on this pair
-                        carry_col = f"carry_{pair}"
-                        if carry_col in df_trans.columns and t_open in df_trans.index:
-                            carry_val = df_trans[carry_col].loc[t_open]
-                            if (
-                                not pd.isna(carry_val)
-                                and abs(float(carry_val)) >= CARRY_MIN_DIFFERENTIAL
-                            ):
-                                # Annual rate differential → monthly carry signal (fraction).
-                                # positive carry_col = base rate > quote rate → long signal.
-                                pred = float(carry_val) / 1200.0
-                                pred_history[pair].append(pred)
-                                active_for_rp.append(pair)
-                                raw_signals[pair] = pred
+                        # Try carry fallback before giving up on this pair.
+                        # VIX regime filter: suppress carry trades in risk-off episodes
+                        # (JPY safe-haven flows overwhelm rate differentials above VIX~25).
+                        vix_ok = True
+                        if "wv_vix" in df_aligned.columns and t_open in df_aligned.index:
+                            vix_val = df_aligned["wv_vix"].loc[t_open]
+                            if not pd.isna(vix_val) and float(vix_val) > CARRY_VIX_THRESHOLD:
+                                vix_ok = False
+
+                        if vix_ok:
+                            carry_col = f"carry_{pair}"
+                            if carry_col in df_trans.columns and t_open in df_trans.index:
+                                carry_val = df_trans[carry_col].loc[t_open]
+                                if (
+                                    not pd.isna(carry_val)
+                                    and abs(float(carry_val)) >= CARRY_MIN_DIFFERENTIAL
+                                ):
+                                    # Annual rate differential → monthly carry signal.
+                                    # positive carry = base rate > quote rate → long signal.
+                                    pred = float(carry_val) / 1200.0
+                                    pred_history[pair].append(pred)
+                                    active_for_rp.append(pair)
+                                    raw_signals[pair] = pred
                         continue  # skip full beta path regardless
 
                 # Compute rolling and/or Kalman predictions, then blend

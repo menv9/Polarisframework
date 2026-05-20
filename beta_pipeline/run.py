@@ -22,7 +22,7 @@ import output as outputter
 import pca_factors as pca_mod
 import robust_beta as robust_beta_mod
 import transform as transformer
-from config import CACHE_DIR, FRED_API_KEY, FX_PAIRS, OUTPUT_DIR, START_DATE, EXCLUDE_REER_ROLLING, EXCLUDE_DXY_ROLLING
+from config import CACHE_DIR, FRED_API_KEY, FX_PAIRS, OUTPUT_DIR, START_DATE, EXCLUDE_REER_ROLLING, EXCLUDE_DXY_ROLLING, BACKTEST_EXCLUDE_PAIRS
 
 
 CACHE_FILE = CACHE_DIR / "last_raw.pkl"
@@ -295,12 +295,19 @@ def run(
             keep = _filter_cols(pair, pair_df)
             kalman_for_backtest[pair] = pair_df[keep] if keep else pd.DataFrame(index=pair_df.index)
 
+    # Pairs with systematically inverted signals (negative backtest IC) are excluded
+    # from live trading but kept in all research outputs (static/robust/rolling betas).
+    backtest_fx = [p for p in active_fx if p not in BACKTEST_EXCLUDE_PAIRS]
+    if BACKTEST_EXCLUDE_PAIRS and verbose:
+        excluded_str = ", ".join(BACKTEST_EXCLUDE_PAIRS)
+        print(f"  Backtest excludes: {excluded_str} (set BACKTEST_EXCLUDE_PAIRS='' to include)")
+
     backtest_result = bt.run_backtest(
         df_aligned=df_aligned,
         df_trans=df_trans,
         beta_static=beta_static,
         run_path=run_path,
-        fx_pairs=active_fx,
+        fx_pairs=backtest_fx,
         rolling_betas=rolling_for_backtest,
         kalman_betas=kalman_for_backtest,
         kalman_weight=0.5,
