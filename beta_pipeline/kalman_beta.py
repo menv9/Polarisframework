@@ -66,6 +66,7 @@ def _kalman_beta(
 def compute_kalman(
     df_trans: pd.DataFrame,
     fx_pairs: list[str] | None = None,
+    pair_indicators: dict[str, list[str]] | None = None,
     Q: float = DEFAULT_Q,
     R: float = DEFAULT_R,
     min_obs: int = DEFAULT_MIN_OBS,
@@ -73,20 +74,27 @@ def compute_kalman(
 ) -> dict[str, pd.DataFrame]:
     """Compute Kalman betas for all FX pairs.
 
+    pair_indicators: optional per-pair indicator list (pre-filtered for economic
+    relevance and circularity). When provided each pair only tracks betas for its
+    own relevant indicators. Falls back to all non-FX columns when None.
+
     Returns dict: fx_pair -> DataFrame(index=dates, columns=indicators, values=beta_t).
     """
     print("\n-- Phase 4c / Kalman beta ------------------------------------------")
     active_fx = fx_pairs or FX_PAIRS
-    indicators = [col for col in df_trans.columns if col not in FX_PAIRS]
+    all_indicators = [col for col in df_trans.columns if col not in FX_PAIRS]
     result: dict[str, pd.DataFrame] = {}
 
     for fx in active_fx:
         if fx not in df_trans.columns:
             continue
+        indicators = pair_indicators.get(fx, all_indicators) if pair_indicators else all_indicators
         y_arr = df_trans[fx].to_numpy(dtype=float)
         rows: dict[str, np.ndarray] = {}
 
         for ind in indicators:
+            if ind not in df_trans.columns:
+                continue
             x_arr = df_trans[ind].to_numpy(dtype=float)
             valid = ~(np.isnan(x_arr) | np.isnan(y_arr))
             if valid.sum() < min_obs:

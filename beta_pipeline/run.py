@@ -157,6 +157,30 @@ def run(
     elif verbose:
         print("  SPF surprises: skipped (consensus or actual columns missing)")
 
+    # ── Per-pair indicator pool (pre-filtered) ───────────────────────────────
+    # Build the indicator list each pair will use for rolling and Kalman betas.
+    # Pre-filtering here — not post-hoc — avoids REER/DXY dominating the OLS
+    # significance test and then being stripped out, leaving pairs indicator-starved.
+    # Criteria:  (1) economically relevant to the pair's countries
+    #            (2) not circular (no REER, no DXY — configurable via env flags)
+    _CIRCULAR_PATTERNS: list[str] = []
+    if EXCLUDE_REER_ROLLING:
+        _CIRCULAR_PATTERNS.append("_reer")
+    if EXCLUDE_DXY_ROLLING:
+        _CIRCULAR_PATTERNS.append("wv_dxy")
+
+    _all_indicators = [col for col in df_trans.columns if col not in active_fx]
+    pair_indicators: dict[str, list[str]] = {}
+    for _pair in active_fx:
+        pair_indicators[_pair] = [
+            col for col in _all_indicators
+            if robust_beta_mod.is_economically_relevant(_pair, col)
+            and not any(pat in col for pat in _CIRCULAR_PATTERNS)
+        ]
+    if verbose:
+        counts_str = "  ".join(f"{p}={len(v)}" for p, v in pair_indicators.items())
+        print(f"  Pre-filtered indicator pool: {counts_str}")
+
     print(f"  Phases 2-3 time: {_elapsed(phase_start)}")
 
     phase_start = time.time()
@@ -170,7 +194,7 @@ def run(
     print(f"  Phase 4b time: {_elapsed(phase_start)}")
 
     phase_start = time.time()
-    kalman_betas = kalman_mod.compute_kalman(df_trans, fx_pairs=active_fx, verbose=verbose)
+    kalman_betas = kalman_mod.compute_kalman(df_trans, fx_pairs=active_fx, pair_indicators=pair_indicators, verbose=verbose)
     kalman_latest = kalman_mod.latest_kalman_betas(kalman_betas)
     print(f"  Phase 4c time: {_elapsed(phase_start)}")
 
@@ -196,7 +220,7 @@ def run(
         )
     else:
         phase_start = time.time()
-        rolling_betas = beta_mod.compute_rolling(df_trans, fx_pairs=active_fx, verbose=verbose)
+        rolling_betas = beta_mod.compute_rolling(df_trans, fx_pairs=active_fx, pair_indicators=pair_indicators, verbose=verbose)
         regime_flags = beta_mod.detect_regime_changes(rolling_betas, beta_static, verbose=verbose)
         print(f"  Phase 5 time: {_elapsed(phase_start)}")
 
@@ -261,29 +285,18 @@ def run(
         )
     )
 
-    # Circularity guards for rolling/Kalman signals:
-    #   REER: built from trade-weighted nominal FX rates → lagged autocorrelation artifact
-    #   DXY:  weighted basket of the modelled USD pairs (57% EUR, 14% JPY, 12% GBP…)
-    #         → regressing EURUSD on DXY gives R²≈0.90, a near-tautology
-    # Both stay in the static analysis for research; removed only from adaptive signals.
-    _CIRCULAR_PATTERNS = []
-    if EXCLUDE_REER_ROLLING:
-        _CIRCULAR_PATTERNS.append("_reer")
-    if EXCLUDE_DXY_ROLLING:
-        _CIRCULAR_PATTERNS.append("wv_dxy")
-
+    # Circularity and economic-relevance filtering is already applied upfront in
+    # pair_indicators (used during rolling/Kalman computation). Here we only apply
+    # the static significance filter as a secondary quality gate: keep indicators
+    # where full-sample OLS found a detectable relationship (p<0.05) for this pair.
     def _filter_cols(pair: str, pair_df: pd.DataFrame) -> list[str]:
-        keep = [col for col in pair_df.columns if (pair, col) in sig_pairs]
-        keep = [col for col in keep if not any(pat in col for pat in _CIRCULAR_PATTERNS)]
-        return keep
+        return [col for col in pair_df.columns if (pair, col) in sig_pairs]
 
     rolling_for_backtest: dict[str, pd.DataFrame] | None = None
     if not no_rolling and rolling_betas:
         rolling_for_backtest = {}
         for pair, pair_df in rolling_betas.items():
             keep = _filter_cols(pair, pair_df)
-            # Use empty DataFrame (not pair_df) when no significant indicators survive —
-            # falling back to all columns would bypass the MIN_INDICATORS guard.
             rolling_for_backtest[pair] = pair_df[keep] if keep else pd.DataFrame(index=pair_df.index)
 
     # Kalman betas: filter to significant indicators, then blend with rolling

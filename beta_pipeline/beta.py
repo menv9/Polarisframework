@@ -147,13 +147,20 @@ def _compute_rolling_for_pair(
 def compute_rolling(
     df_trans: pd.DataFrame,
     fx_pairs: list[str] | None = None,
+    pair_indicators: dict[str, list[str]] | None = None,
     verbose: bool = True,
 ) -> dict[str, pd.DataFrame]:
-    """Rolling beta for all selected FX pairs."""
+    """Rolling beta for all selected FX pairs.
+
+    pair_indicators: optional per-pair indicator list (pre-filtered for economic
+    relevance and circularity). When provided each pair only regresses against its
+    own relevant indicators, preventing REER/DXY from dominating the signal pool.
+    Falls back to all non-FX columns when None.
+    """
     print("\n-- Phase 5 / Rolling beta ------------------------------------------")
     active_fx = fx_pairs or FX_PAIRS
     available_fx = [fx for fx in active_fx if fx in df_trans.columns]
-    indicators = _get_indicators(df_trans, active_fx)
+    all_indicators = _get_indicators(df_trans, active_fx)   # fallback
     trans_values = {col: df_trans[col].to_numpy(dtype=float) for col in df_trans.columns}
     trans_index = df_trans.index
     rolling_betas: dict[str, pd.DataFrame] = {}
@@ -163,7 +170,7 @@ def compute_rolling(
             executor.submit(
                 _compute_rolling_for_pair,
                 fx,
-                indicators,
+                pair_indicators.get(fx, all_indicators) if pair_indicators else all_indicators,
                 trans_values,
                 trans_index,
                 ROLLING_WIN,
@@ -175,7 +182,8 @@ def compute_rolling(
             fx, frame = future.result()
             rolling_betas[fx] = frame
             if verbose:
-                _log(f"[{done}/{len(available_fx)}] rolling beta ready: {fx}")
+                n_ind = len(frame.columns) if not frame.empty else 0
+                _log(f"[{done}/{len(available_fx)}] rolling beta ready: {fx}  ({n_ind} indicators)")
 
     return rolling_betas
 
