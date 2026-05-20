@@ -184,7 +184,51 @@ mermaid.initialize({
 function MermaidDiagram({ chart }) {
   const id = useId().replaceAll(':', '')
   const ref = useRef(null)
+  const dragRef = useRef(null)
   const [error, setError] = useState('')
+  const [zoom, setZoom] = useState(1)
+  const [offset, setOffset] = useState({ x: 0, y: 0 })
+
+  function updateZoom(nextZoom) {
+    setZoom(Math.min(2.5, Math.max(0.45, nextZoom)))
+  }
+
+  function resetView() {
+    setZoom(1)
+    setOffset({ x: 0, y: 0 })
+  }
+
+  function handlePointerDown(event) {
+    if (event.button !== 0) return
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: offset.x,
+      originY: offset.y,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function handlePointerMove(event) {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+
+    setOffset({
+      x: drag.originX + event.clientX - drag.startX,
+      y: drag.originY + event.clientY - drag.startY,
+    })
+  }
+
+  function stopDrag(event) {
+    if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null
+  }
+
+  function handleWheel(event) {
+    if (!event.ctrlKey && !event.metaKey) return
+    event.preventDefault()
+    updateZoom(zoom + (event.deltaY > 0 ? -0.1 : 0.1))
+  }
 
   useEffect(() => {
     let mounted = true
@@ -206,11 +250,55 @@ function MermaidDiagram({ chart }) {
   }, [chart, id])
 
   return (
-    <div className="overflow-auto border border-[#222] bg-[#050505] p-4">
+    <div className="border border-[#222] bg-[#050505]">
+      <div className="flex items-center justify-end gap-2 border-b border-[#222] px-3 py-2">
+        <button
+          type="button"
+          onClick={() => updateZoom(zoom - 0.15)}
+          className="h-7 w-7 border border-[#333] text-sm font-bold text-[#ddd] hover:border-[#ecd987] hover:text-[#ecd987]"
+          aria-label="Reducir zoom"
+        >
+          -
+        </button>
+        <span className="w-14 text-center font-mono text-xs text-[#777]">
+          {Math.round(zoom * 100)}%
+        </span>
+        <button
+          type="button"
+          onClick={() => updateZoom(zoom + 0.15)}
+          className="h-7 w-7 border border-[#333] text-sm font-bold text-[#ddd] hover:border-[#ecd987] hover:text-[#ecd987]"
+          aria-label="Aumentar zoom"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          onClick={resetView}
+          className="h-7 border border-[#333] px-3 text-xs font-bold uppercase tracking-wider text-[#777] hover:border-[#ecd987] hover:text-[#ecd987]"
+        >
+          Reset
+        </button>
+      </div>
+
       {error ? (
-        <pre className="whitespace-pre-wrap font-mono text-xs text-red-300">{chart}</pre>
+        <pre className="whitespace-pre-wrap p-4 font-mono text-xs text-red-300">{chart}</pre>
       ) : (
-        <div ref={ref} className="min-w-[900px] [&_svg]:mx-auto [&_svg]:max-w-none" />
+        <div
+          className="h-[620px] cursor-grab overflow-hidden active:cursor-grabbing"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={stopDrag}
+          onPointerCancel={stopDrag}
+          onWheel={handleWheel}
+        >
+          <div
+            className="min-w-[900px] origin-top-left p-6 transition-transform duration-75 [&_svg]:mx-auto [&_svg]:max-w-none"
+            style={{
+              transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+            }}
+            ref={ref}
+          />
+        </div>
       )}
     </div>
   )
