@@ -1,12 +1,10 @@
 import { create } from 'zustand'
 
 const THEME_KEY = 'polaris_theme'
-const THEMES = ['default', 'mainframe', 'terminal']
-
 function loadTheme() {
   try {
     const t = localStorage.getItem(THEME_KEY)
-    if (THEMES.includes(t)) return t
+    if (t === 'mainframe' || t === 'default') return t
   } catch { /* ignore */ }
   return 'default'
 }
@@ -40,8 +38,7 @@ export const useAppStore = create((set, get) => ({
     set({ theme })
   },
   toggleTheme: () => {
-    const idx = THEMES.indexOf(get().theme)
-    const next = THEMES[(idx + 1) % THEMES.length]
+    const next = get().theme === 'mainframe' ? 'default' : 'mainframe'
     try { localStorage.setItem(THEME_KEY, next) } catch { /* ignore */ }
     applyTheme(next)
     set({ theme: next })

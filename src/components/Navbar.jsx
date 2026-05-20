@@ -6,16 +6,14 @@ import { supabase } from '../lib/supabase'
 
 function ThemeToggle() {
   const toggleTheme = useAppStore((s) => s.toggleTheme)
-  const theme = useAppStore((s) => s.theme)
-  const label = theme === 'mainframe' ? 'MAINFRAME' : theme === 'terminal' ? 'TERMINAL' : 'DEFAULT'
   return (
     <button
       type="button"
       onClick={toggleTheme}
       className="theme-toggle-btn"
-      title={`Switch theme (current: ${label})`}
+      title="Switch to 1994 mainframe UI"
     >
-      <span className="dot" />UI: {label}
+      <span className="dot" />UI: MAINFRAME
     </button>
   )
 }
