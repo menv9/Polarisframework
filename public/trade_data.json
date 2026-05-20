@@ -1,0 +1,88 @@
+{
+  "updated_at": "2026-05-20T17:14:24.375667Z",
+  "maritime": {
+    "bdi": {
+      "current": null,
+      "change_pct": null,
+      "history": []
+    },
+    "aud": {
+      "current": null,
+      "change_pct": null,
+      "history": []
+    },
+    "cad": {
+      "current": null,
+      "change_pct": null,
+      "history": []
+    },
+    "nok": {
+      "current": null,
+      "change_pct": null,
+      "history": []
+    },
+    "oil": {
+      "current": null,
+      "change_pct": null,
+      "history": []
+    },
+    "fbx": {
+      "current": null,
+      "change_pct": null,
+      "source": "Freightos FBX",
+      "updated": "N/A",
+      "note": "fetch failed \u2014 update manually"
+    }
+  },
+  "aviation": {
+    "routes": [
+      {
+        "origin": "FRA",
+        "destination": "SIN",
+        "min_price_usd": null,
+        "date_queried": null,
+        "error": "fli not installed \u2014 pip install fli"
+      },
+      {
+        "origin": "JFK",
+        "destination": "LHR",
+        "min_price_usd": null,
+        "date_queried": null,
+        "error": "fli not installed \u2014 pip install fli"
+      },
+      {
+        "origin": "DXB",
+        "destination": "HKG",
+        "min_price_usd": null,
+        "date_queried": null,
+        "error": "fli not installed \u2014 pip install fli"
+      },
+      {
+        "origin": "LAX",
+        "destination": "NRT",
+        "min_price_usd": null,
+        "date_queried": null,
+        "error": "fli not installed \u2014 pip install fli"
+      },
+      {
+        "origin": "FRA",
+        "destination": "JNB",
+        "min_price_usd": null,
+        "date_queried": null,
+        "error": "fli not installed \u2014 pip install fli"
+      },
+      {
+        "origin": "GRU",
+        "destination": "MIA",
+        "min_price_usd": null,
+        "date_queried": null,
+        "error": "fli not installed \u2014 pip install fli"
+      }
+    ],
+    "iata_note": "Datos IATA con lag ~6 semanas"
+  },
+  "macro_overlay": {
+    "bdi_vs_aud": [],
+    "bdi_vs_cad": []
+  }
+}

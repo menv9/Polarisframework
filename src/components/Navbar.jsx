@@ -27,6 +27,7 @@ const GROUPS = [
       { to: '/endogenous',          label: 'Endo', desc: 'Endogenous' },
       { to: '/exogenous/operativa', label: 'Exo',  desc: 'Exogenous' },
       { to: '/emerging-markets',    label: 'EM',   desc: 'Emerging Markets' },
+      { to: '/trade',               label: 'Trade', desc: 'Global Trade Monitor' },
     ],
   },
   {
