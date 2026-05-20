@@ -1,132 +1,224 @@
-import { Link } from 'react-router-dom'
+import { useEffect, useId, useRef, useState } from 'react'
+import mermaid from 'mermaid'
 
-const navigationGroups = [
-  {
-    title: 'Analisis',
-    items: [
-      ['/general', 'General'],
-      ['/world-view', 'World View'],
-      ['/endogenous', 'Endogenous'],
-      ['/exogenous/operativa', 'Exogenous'],
-      ['/emerging-markets', 'Emerging Markets'],
-      ['/trade', 'Trade Monitor'],
-      ['/fx-trend-layer', 'G10 FX Trend'],
-      ['/equities-macro-layer', 'G11 Equities Macro'],
-      ['/macro-nowcasting', 'G12 Nowcasting'],
-    ],
-  },
-  {
-    title: 'Ejecucion',
-    items: [
-      ['/timing/operativa', 'Timing'],
-      ['/risk/operativa', 'Risk'],
-      ['/execution/operativa', 'Execution'],
-      ['/fiscal', 'G3 Fiscal'],
-      ['/disaster-recovery', 'G6 Recovery'],
-      ['/tail-risk', 'G7 Tail Risk'],
-      ['/counterparty-risk', 'G8 Counterparty'],
-      ['/multi-broker', 'G13 Multi-Broker'],
-    ],
-  },
-  {
-    title: 'Aprendizaje',
-    items: [
-      ['/journal', 'Journal'],
-      ['/performance', 'Performance'],
-      ['/backtest', 'Backtest'],
-      ['/scenario-library', 'Scenarios'],
-      ['/capital-allocation', 'Capital'],
-      ['/behavioral-finance', 'G9 Behavioral'],
-      ['/model-governance', 'G15 Governance'],
-      ['/decision-log', 'G16 Decision Log'],
-      ['/knowledge-transfer', 'G17 Knowledge'],
-      ['/external-validation', 'G18 Validation'],
-    ],
-  },
-  {
-    title: 'Data',
-    items: [
-      ['/data', 'Data Hub'],
-      ['/data/raw', 'Raw'],
-      ['/data/coverage-matrix', 'Coverage'],
-      ['/data/history', 'History'],
-      ['/data/economic-calendar', 'Calendar'],
-      ['/data/notifications', 'Notifications'],
-    ],
-  },
-]
+const appMapDiagram = `flowchart TD
+  APP["Polaris App"]
 
-const coreFlow = [
-  ['/world-view', 'World View'],
-  ['/endogenous', 'Endogenous'],
-  ['/exogenous/operativa', 'Exogenous'],
-  ['/timing/operativa', 'Timing'],
-  ['/risk/operativa', 'Risk'],
-  ['/execution/operativa', 'Execution'],
-  ['/journal', 'Self-Awareness'],
-]
+  APP --> PUBLIC["Publico"]
+  PUBLIC --> LOGIN["/login<br/>Login"]
 
-const layers = [
-  {
-    title: 'Core FX Macro',
-    nodes: [
-      ['/world-view', 'World View'],
-      ['/endogenous', 'Endogenous'],
-      ['/exogenous/operativa', 'Exogenous'],
-    ],
-  },
-  {
-    title: 'Capas',
-    nodes: [
-      ['/fx-trend-layer', 'G10 FX Trend'],
-      ['/equities-macro-layer', 'G11 Equities Macro'],
-      ['/macro-nowcasting', 'G12 Nowcasting'],
-    ],
-  },
-  {
-    title: 'Riesgo / Operativa',
-    nodes: [
-      ['/fiscal', 'G3 Fiscal'],
-      ['/disaster-recovery', 'G6 Recovery'],
-      ['/tail-risk', 'G7 Tail Risk'],
-      ['/counterparty-risk', 'G8 Counterparty'],
-      ['/multi-broker', 'G13 Multi-Broker'],
-    ],
-  },
-  {
-    title: 'Gobierno',
-    nodes: [
-      ['/behavioral-finance', 'G9 Behavioral'],
-      ['/model-governance', 'G15 Governance'],
-      ['/decision-log', 'G16 Decision Log'],
-      ['/knowledge-transfer', 'G17 Knowledge'],
-      ['/external-validation', 'G18 Validation'],
-    ],
-  },
-]
+  APP --> PROTECTED["Area protegida"]
+  PROTECTED --> HUB["Hub"]
+  PROTECTED --> ANALYSIS["Analisis Macro"]
+  PROTECTED --> EXECUTION["Ejecucion, Riesgo y Continuidad"]
+  PROTECTED --> LEARNING["Aprendizaje, Gobierno y Validacion"]
+  PROTECTED --> SETTINGS["/settings<br/>Settings"]
 
-function NodeLink({ to, children, tone = 'default' }) {
-  const tones = {
-    default: 'border-[#333] text-[#ddd] hover:border-[#ecd987] hover:text-[#ecd987]',
-    core: 'border-[#ecd987] text-[#ecd987]',
-    data: 'border-[#60a5fa] text-[#60a5fa]',
-  }
+  APP --> ADMIN["Admin / Data"]
+
+  HUB --> ROOT["/<br/>Redirect a /dashboard"]
+  HUB --> DASH["/dashboard<br/>Dashboard de modulos"]
+
+  ANALYSIS --> GENERAL["/general<br/>Pais en una pantalla"]
+  ANALYSIS --> WV["/world-view<br/>World View"]
+  ANALYSIS --> ENDO["/endogenous<br/>Endogenous Drivers"]
+  ANALYSIS --> INPUTS["/model-inputs<br/>Model Inputs"]
+  ANALYSIS --> ZSCORES["/endogenous/zscores<br/>Z-Scores"]
+  ANALYSIS --> BETAS["/endogenous/betas<br/>Betas"]
+  ANALYSIS --> EXO["/exogenous/operativa<br/>Exogenous Drivers"]
+  ANALYSIS --> EM["/emerging-markets<br/>Emerging Markets"]
+  ANALYSIS --> TRADE["/trade<br/>Global Trade Monitor"]
+  ANALYSIS --> G10["/fx-trend-layer<br/>G10 FX Trend Layer"]
+  ANALYSIS --> G11["/equities-macro-layer<br/>G11 Equities Macro Layer"]
+  ANALYSIS --> G12["/macro-nowcasting<br/>G12 Macro Nowcasting"]
+
+  EXECUTION --> TIMING["/timing/operativa<br/>Timing"]
+  EXECUTION --> RISK["/risk/operativa<br/>Risk Management"]
+  EXECUTION --> EXEC["/execution/operativa<br/>Execution & Costs"]
+  EXECUTION --> G3["/fiscal<br/>G3 Modulo Fiscal"]
+  EXECUTION --> G6["/disaster-recovery<br/>G6 Disaster Recovery"]
+  EXECUTION --> G7["/tail-risk<br/>G7 Hedging / Tail Risk"]
+  EXECUTION --> G8["/counterparty-risk<br/>G8 Counterparty Risk"]
+  EXECUTION --> G13["/multi-broker<br/>G13 Multi-Broker"]
+
+  LEARNING --> JOURNAL["/journal<br/>Trade Journal"]
+  LEARNING --> PERF["/performance<br/>Performance"]
+  LEARNING --> BACKTEST["/backtest<br/>Backtest"]
+  LEARNING --> SCENARIOS["/scenario-library<br/>Scenario Library"]
+  LEARNING --> CAPITAL["/capital-allocation<br/>Capital Allocation"]
+  LEARNING --> G9["/behavioral-finance<br/>G9 Behavioral Finance"]
+  LEARNING --> G15["/model-governance<br/>G15 Model Governance"]
+  LEARNING --> G16["/decision-log<br/>G16 Decision Log"]
+  LEARNING --> G17["/knowledge-transfer<br/>G17 Knowledge Transfer"]
+  LEARNING --> G18["/external-validation<br/>G18 External Validation"]
+
+  ADMIN --> ADMIN_PAGE["/admin<br/>Admin Panel"]
+  ADMIN --> DATA["/data<br/>Data Hub"]
+  DATA --> RAW["/data/raw<br/>Raw Data"]
+  DATA --> COVERAGE["/data/coverage-matrix<br/>Coverage Matrix"]
+  DATA --> HISTORY["/data/history<br/>History"]
+  DATA --> HISTORY_DETAIL["/data/history/:sourceId<br/>History Series"]
+  DATA --> CALENDAR["/data/economic-calendar<br/>Economic Calendar"]
+  DATA --> NOTIFICATIONS["/data/notifications<br/>Notifications"]`
+
+const frameworkFlowDiagram = `flowchart LR
+  WV["World View<br/>/world-view"]
+  ENDO["Endogenous<br/>/endogenous"]
+  EXO["Exogenous<br/>/exogenous/operativa"]
+  TIMING["Timing<br/>/timing/operativa"]
+  RISK["Risk<br/>/risk/operativa"]
+  EXEC["Execution<br/>/execution/operativa"]
+  JOURNAL["Self-Awareness<br/>/journal"]
+
+  WV --> ENDO
+  WV --> EXO
+  ENDO --> TIMING
+  EXO --> TIMING
+  TIMING --> RISK
+  RISK --> EXEC
+  EXEC --> JOURNAL
+  JOURNAL -. feedback .-> WV
+  JOURNAL -. feedback .-> ENDO
+  JOURNAL -. feedback .-> RISK`
+
+const layersDiagram = `flowchart TB
+  CORE["Core FX Macro Framework"]
+
+  CORE --> L1["Capa 1<br/>World View + Endogenous + Exogenous"]
+  CORE --> L2["Capa 2<br/>G10 FX Trend Layer"]
+  CORE --> L3["Capa 3<br/>G11 Equities Macro Layer"]
+
+  CORE --> RISKOPS["Riesgo / Operativa"]
+  RISKOPS --> FISCAL["G3 Fiscal"]
+  RISKOPS --> DR["G6 Disaster Recovery"]
+  RISKOPS --> TAIL["G7 Tail Risk"]
+  RISKOPS --> COUNTER["G8 Counterparty"]
+  RISKOPS --> MULTI["G13 Multi-Broker"]
+
+  CORE --> GOVERNANCE["Gobierno / Mejora"]
+  GOVERNANCE --> BEHAVIOR["G9 Behavioral Finance"]
+  GOVERNANCE --> NOWCAST["G12 Macro Nowcasting"]
+  GOVERNANCE --> MODEL["G15 Model Governance"]
+  GOVERNANCE --> DECISION["G16 Decision Log"]
+  GOVERNANCE --> KNOWLEDGE["G17 Knowledge Transfer"]
+  GOVERNANCE --> VALIDATION["G18 External Validation"]`
+
+const treeMap = `Polaris App
+|
++-- Publico
+|   \`-- /login                         Login
+|
++-- Protegido
+|   |
+|   +-- Hub
+|   |   +-- /                           Redirect a /dashboard
+|   |   +-- /dashboard                  Dashboard de modulos
+|   |   \`-- /settings                   Settings
+|   |
+|   +-- Analisis Macro
+|   |   +-- /general                    Pais en una pantalla
+|   |   +-- /world-view                 World View
+|   |   +-- /endogenous                 Endogenous Drivers
+|   |   +-- /model-inputs               Model Inputs
+|   |   +-- /endogenous/zscores         Z-Scores
+|   |   +-- /endogenous/betas           Betas
+|   |   +-- /exogenous/operativa        Exogenous Drivers
+|   |   +-- /emerging-markets           Emerging Markets
+|   |   +-- /trade                      Global Trade Monitor
+|   |   +-- /fx-trend-layer             G10 FX Trend Layer
+|   |   +-- /equities-macro-layer       G11 Equities Macro Layer
+|   |   \`-- /macro-nowcasting           G12 Macro Nowcasting Avanzado
+|   |
+|   +-- Ejecucion, Riesgo y Continuidad
+|   |   +-- /timing/operativa           Timing
+|   |   +-- /risk/operativa             Risk Management
+|   |   +-- /execution/operativa        Execution & Costs
+|   |   +-- /fiscal                     G3 Modulo Fiscal
+|   |   +-- /disaster-recovery          G6 Disaster Recovery / BCP
+|   |   +-- /tail-risk                  G7 Hedging / Tail Risk
+|   |   +-- /counterparty-risk          G8 Counterparty Risk
+|   |   \`-- /multi-broker               G13 Multi-Broker / Multi-Account
+|   |
+|   \`-- Aprendizaje, Gobierno y Validacion
+|       +-- /journal                    Trade Journal
+|       +-- /performance                Performance
+|       +-- /backtest                   Backtest
+|       +-- /scenario-library           Scenario Library
+|       +-- /capital-allocation         Capital Allocation
+|       +-- /behavioral-finance         G9 Behavioral Finance
+|       +-- /model-governance           G15 Model Governance / Audit Trail
+|       +-- /decision-log               G16 Decision Log estrategico
+|       +-- /knowledge-transfer         G17 Knowledge Transfer Protocol
+|       \`-- /external-validation        G18 External Validation Framework
+|
+\`-- Admin / Data
+    +-- /admin                          Admin Panel
+    \`-- /data                           Data Hub
+        +-- /data/raw                   Raw Data
+        +-- /data/coverage-matrix       Coverage Matrix
+        +-- /data/history               History
+        +-- /data/history/:sourceId     History Series
+        +-- /data/economic-calendar     Economic Calendar
+        \`-- /data/notifications         Notifications`
+
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'dark',
+  securityLevel: 'loose',
+  flowchart: {
+    htmlLabels: true,
+    curve: 'basis',
+  },
+  themeVariables: {
+    background: '#050505',
+    primaryColor: '#0a0a0a',
+    primaryTextColor: '#f8f8f8',
+    primaryBorderColor: '#ecd987',
+    lineColor: '#777777',
+    secondaryColor: '#111111',
+    tertiaryColor: '#000000',
+    fontFamily: 'Inter, ui-sans-serif, system-ui',
+  },
+})
+
+function MermaidDiagram({ chart }) {
+  const id = useId().replaceAll(':', '')
+  const ref = useRef(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let mounted = true
+
+    async function renderDiagram() {
+      try {
+        setError('')
+        const { svg } = await mermaid.render(`mermaid-${id}`, chart)
+        if (mounted && ref.current) ref.current.innerHTML = svg
+      } catch (err) {
+        if (mounted) setError(err?.message || 'Mermaid render error')
+      }
+    }
+
+    renderDiagram()
+    return () => {
+      mounted = false
+    }
+  }, [chart, id])
 
   return (
-    <Link
-      to={to}
-      className={`block border bg-black px-3 py-2 text-center text-xs font-bold uppercase tracking-wider transition-colors ${
-        tones[tone] || tones.default
-      }`}
-    >
-      {children}
-    </Link>
+    <div className="overflow-auto border border-[#222] bg-[#050505] p-4">
+      {error ? (
+        <pre className="whitespace-pre-wrap font-mono text-xs text-red-300">{chart}</pre>
+      ) : (
+        <div ref={ref} className="min-w-[900px] [&_svg]:mx-auto [&_svg]:max-w-none" />
+      )}
+    </div>
   )
 }
 
 function Section({ title, children }) {
   return (
-    <section className="border-2 border-[#333] bg-[#050505]">
+    <section className="border-2 border-[#333] bg-black">
       <header className="border-b-2 border-[#333] px-4 py-3">
         <h2 className="text-sm font-black uppercase tracking-widest text-white">{title}</h2>
       </header>
@@ -139,64 +231,28 @@ export default function InfoPage() {
   return (
     <main className="min-h-screen bg-black pt-16 text-white">
       <div className="mx-auto max-w-7xl px-4 py-6">
-        <header className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b-2 border-[#333] pb-4">
-          <div>
-            <p className="font-mono text-xs uppercase tracking-widest text-[#777]">Mapa visual</p>
-            <h1 className="mt-1 text-3xl font-black uppercase tracking-wider">Info</h1>
-          </div>
-          <NodeLink to="/dashboard" tone="core">Dashboard</NodeLink>
+        <header className="mb-6 border-b-2 border-[#333] pb-4">
+          <p className="font-mono text-xs uppercase tracking-widest text-[#777]">Mapa visual</p>
+          <h1 className="mt-1 text-3xl font-black uppercase tracking-wider">Info</h1>
         </header>
 
         <div className="space-y-6">
           <Section title="Mapa De La App">
-            <div className="grid gap-4 lg:grid-cols-4">
-              {navigationGroups.map((group) => (
-                <div key={group.title} className="border border-[#222] bg-black p-3">
-                  <div className="mb-3 border-b border-[#222] pb-2 text-center text-xs font-black uppercase tracking-widest text-[#ecd987]">
-                    {group.title}
-                  </div>
-                  <div className="grid gap-2">
-                    {group.items.map(([to, label]) => (
-                      <NodeLink key={to} to={to} tone={group.title === 'Data' ? 'data' : 'default'}>
-                        {label}
-                      </NodeLink>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <MermaidDiagram chart={appMapDiagram} />
           </Section>
 
-          <Section title="Flujo Principal">
-            <div className="grid items-center gap-2 md:grid-cols-[repeat(13,minmax(0,1fr))]">
-              {coreFlow.map(([to, label], index) => (
-                <div key={to} className="contents">
-                  <NodeLink to={to} tone={index === 0 ? 'core' : 'default'}>
-                    {label}
-                  </NodeLink>
-                  {index < coreFlow.length - 1 && (
-                    <div className="hidden text-center font-mono text-lg text-[#555] md:block">-&gt;</div>
-                  )}
-                </div>
-              ))}
-            </div>
+          <Section title="Arbol De Navegacion">
+            <pre className="overflow-auto border border-[#222] bg-[#050505] p-4 font-mono text-xs leading-5 text-[#d7d7d7]">
+              {treeMap}
+            </pre>
           </Section>
 
-          <Section title="Capas Y Modulos">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {layers.map((layer) => (
-                <div key={layer.title} className="border border-[#222] bg-black p-3">
-                  <div className="mb-3 border-b border-[#222] pb-2 text-center text-xs font-black uppercase tracking-widest text-[#888]">
-                    {layer.title}
-                  </div>
-                  <div className="grid gap-2">
-                    {layer.nodes.map(([to, label]) => (
-                      <NodeLink key={to} to={to}>{label}</NodeLink>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+          <Section title="Flujo Principal Del Framework">
+            <MermaidDiagram chart={frameworkFlowDiagram} />
+          </Section>
+
+          <Section title="Capas Y Extensiones">
+            <MermaidDiagram chart={layersDiagram} />
           </Section>
         </div>
       </div>
