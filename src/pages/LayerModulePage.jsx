@@ -432,7 +432,6 @@ function LayerModulePage({ moduleKey }) {
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="mb-4 flex flex-col gap-3 border-b-2 border-[#333] pb-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className={`mb-1 text-[10px] font-bold uppercase tracking-[0.28em] ${mod.accent}`}>{mod.code}</div>
             <h1 className="text-2xl font-bold uppercase tracking-widest">{mod.title}</h1>
             <p className="mt-1 max-w-4xl text-sm text-[#888]">{mod.subtitle}</p>
           </div>
