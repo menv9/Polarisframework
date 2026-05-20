@@ -1,243 +1,198 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Activity,
   Banknote,
-  BriefcaseBusiness,
+  BarChart3,
   ChevronDown,
-  Factory,
+  Database,
+  ExternalLink,
+  Gauge,
   Globe2,
+  History,
   Landmark,
   LineChart,
-  PackageOpen,
   ShieldAlert,
-  TrendingUp,
-  Users,
 } from 'lucide-react'
+import { getStatus } from '../data/dataSources'
+import { useModelStore } from '../store/ModelDataContext'
 
 const COUNTRIES = [
-  {
-    code: 'US',
-    flag: 'US',
-    name: 'United States',
-    currency: 'USD',
-    region: 'North America',
-    capital: 'Washington, D.C.',
-    population: '335.9M',
-    gdp: '$27.4T',
-    gdpGrowth: '2.7%',
-    inflation: '3.1%',
-    policyRate: '5.50%',
-    unemployment: '3.9%',
-    fiscalBalance: '-6.3%',
-    debt: '123%',
-    currentAccount: '-3.0%',
-    sovereignRating: 'AA+',
-    fxBias: 'Moderately bullish USD',
-    regime: 'Late-cycle resilience',
-    risk: 'Election/fiscal premium',
-    trade: 'Services surplus, goods deficit',
-    momentum: 72,
-    stress: 44,
-    indicators: [
-      ['Real GDP', '% y/y', '2.1', '2.9', '3.2', '2.8', '2.7'],
-      ['Core CPI', '% y/y', '3.8', '3.4', '3.2', '3.1', '3.0'],
-      ['Unemployment', '%', '3.8', '3.9', '4.0', '4.0', '4.1'],
-      ['Retail sales', '% y/y', '2.7', '3.1', '3.6', '3.4', '3.0'],
-      ['Industrial production', '% y/y', '-0.2', '0.4', '1.1', '1.3', '1.0'],
-      ['Current account', '% GDP', '-3.1', '-3.0', '-2.9', '-2.9', '-2.8'],
-    ],
-    narrative: [
-      'Growth remains above most developed-market peers despite restrictive rates.',
-      'Inflation is cooling slowly, keeping the reaction function asymmetric.',
-      'Fiscal impulse supports demand but adds term-premium and debt sustainability noise.',
-    ],
-    tabs: {
-      macro: [
-        ['Growth mix', 'Consumption still leads, capex is selective and inventory contribution is fading.'],
-        ['Labour market', 'Hiring has cooled without a sharp break in income growth.'],
-        ['Inflation pulse', 'Services inflation is the sticky component to monitor.'],
-      ],
-      markets: [
-        ['Rates', 'Front-end remains policy anchored; long-end reacts to issuance and fiscal risk.'],
-        ['FX', 'USD benefits when growth and real-rate differentials widen.'],
-        ['Equities', 'Earnings breadth matters more than index-level momentum.'],
-      ],
-      risks: [
-        ['Fiscal', 'Large deficits can lift term premium even in soft-landing scenarios.'],
-        ['Policy', 'Premature easing could reprice inflation expectations.'],
-        ['External', 'Global slowdown would hit export volumes less than risk appetite.'],
-      ],
-    },
-  },
-  {
-    code: 'EU',
-    flag: 'EU',
-    name: 'Euro Area',
-    currency: 'EUR',
-    region: 'Europe',
-    capital: 'Brussels / Frankfurt',
-    population: '347.0M',
-    gdp: '$15.5T',
-    gdpGrowth: '0.9%',
-    inflation: '2.4%',
-    policyRate: '4.00%',
-    unemployment: '6.5%',
-    fiscalBalance: '-3.2%',
-    debt: '88%',
-    currentAccount: '2.1%',
-    sovereignRating: 'AA-',
-    fxBias: 'Neutral EUR',
-    regime: 'Weak recovery',
-    risk: 'Fragmentation risk',
-    trade: 'External surplus recovering',
-    momentum: 46,
-    stress: 52,
-    indicators: [
-      ['Real GDP', '% y/y', '0.4', '0.6', '0.8', '0.9', '1.1'],
-      ['Core CPI', '% y/y', '3.0', '2.8', '2.6', '2.4', '2.3'],
-      ['Unemployment', '%', '6.5', '6.5', '6.6', '6.6', '6.7'],
-      ['Retail sales', '% y/y', '-0.6', '0.1', '0.4', '0.7', '0.9'],
-      ['Industrial production', '% y/y', '-2.3', '-1.4', '-0.6', '0.2', '0.6'],
-      ['Current account', '% GDP', '1.9', '2.0', '2.1', '2.2', '2.2'],
-    ],
-    narrative: [
-      'Disinflation is progressing, but growth impulse remains shallow.',
-      'Manufacturing is the main drag; services are stabilising the floor.',
-      'EUR needs either stronger activity data or a softer USD backdrop.',
-    ],
-    tabs: {
-      macro: [
-        ['Growth mix', 'Domestic demand is improving gradually from a low base.'],
-        ['Labour market', 'Employment resilience limits recession risk but wage data matters.'],
-        ['Inflation pulse', 'Goods disinflation is advanced; services are slower.'],
-      ],
-      markets: [
-        ['Rates', 'Curve is sensitive to ECB easing expectations and peripheral spreads.'],
-        ['FX', 'EUR rallies when global growth improves without renewed energy stress.'],
-        ['Equities', 'Cyclicals need PMIs and Chinese demand to recover.'],
-      ],
-      risks: [
-        ['Energy', 'Supply shocks would hit real income and trade terms.'],
-        ['Politics', 'Fiscal negotiations can widen country spreads.'],
-        ['China', 'Export channel remains exposed to weak external demand.'],
-      ],
-    },
-  },
-  {
-    code: 'JP',
-    flag: 'JP',
-    name: 'Japan',
-    currency: 'JPY',
-    region: 'Asia',
-    capital: 'Tokyo',
-    population: '124.5M',
-    gdp: '$4.2T',
-    gdpGrowth: '0.7%',
-    inflation: '2.6%',
-    policyRate: '0.10%',
-    unemployment: '2.5%',
-    fiscalBalance: '-4.1%',
-    debt: '255%',
-    currentAccount: '3.6%',
-    sovereignRating: 'A+',
-    fxBias: 'JPY sensitive to yields',
-    regime: 'Policy normalisation',
-    risk: 'Yield-control exit path',
-    trade: 'Income surplus dominates',
-    momentum: 39,
-    stress: 58,
-    indicators: [
-      ['Real GDP', '% y/y', '1.2', '0.8', '0.5', '0.7', '0.9'],
-      ['Core CPI', '% y/y', '2.8', '2.7', '2.6', '2.5', '2.3'],
-      ['Unemployment', '%', '2.6', '2.5', '2.5', '2.5', '2.6'],
-      ['Retail sales', '% y/y', '2.1', '1.8', '1.4', '1.6', '1.7'],
-      ['Industrial production', '% y/y', '-1.1', '-0.7', '0.3', '0.8', '1.0'],
-      ['Current account', '% GDP', '3.3', '3.4', '3.5', '3.6', '3.7'],
-    ],
-    narrative: [
-      'Japan is transitioning from deflation psychology to wage-led reflation.',
-      'JPY valuation is cheap, but rate differentials still dominate timing.',
-      'External income balance supports the structural account.',
-    ],
-    tabs: {
-      macro: [
-        ['Growth mix', 'Real wages are the key bridge from inflation to domestic demand.'],
-        ['Labour market', 'Tight labour supply supports wage negotiations.'],
-        ['Inflation pulse', 'Services and wage pass-through decide policy confidence.'],
-      ],
-      markets: [
-        ['Rates', 'Small policy changes can have large FX effects through hedging costs.'],
-        ['FX', 'JPY strengthens when US yields fall or BoJ confidence rises.'],
-        ['Equities', 'Weak yen helps exporters, but domestic demand is a second leg.'],
-      ],
-      risks: [
-        ['Policy', 'A cautious BoJ can extend currency weakness.'],
-        ['Energy', 'Import prices remain relevant for real income.'],
-        ['Global yields', 'JPY remains vulnerable when foreign yields rise.'],
-      ],
-    },
-  },
+  { code: 'usa', label: 'United States', short: 'US', ccy: 'USD', wvGrowthId: 'wv_gdp_usa' },
+  { code: 'eur', label: 'Euro Area', short: 'EU', ccy: 'EUR', wvGrowthId: 'wv_gdp_eur' },
+  { code: 'jpn', label: 'Japan', short: 'JP', ccy: 'JPY', wvGrowthId: 'wv_gdp_jpn' },
+  { code: 'gbr', label: 'United Kingdom', short: 'UK', ccy: 'GBP' },
+  { code: 'che', label: 'Switzerland', short: 'CH', ccy: 'CHF' },
+  { code: 'can', label: 'Canada', short: 'CA', ccy: 'CAD' },
+  { code: 'aus', label: 'Australia', short: 'AU', ccy: 'AUD' },
+  { code: 'nzl', label: 'New Zealand', short: 'NZ', ccy: 'NZD' },
+  { code: 'swe', label: 'Sweden', short: 'SE', ccy: 'SEK' },
+  { code: 'nor', label: 'Norway', short: 'NO', ccy: 'NOK' },
 ]
 
 const TABS = [
-  { id: 'macro', label: 'Macro' },
-  { id: 'markets', label: 'Markets' },
-  { id: 'risks', label: 'Risks' },
+  { id: 'indicators', label: 'Indicators' },
+  { id: 'sources', label: 'Sources' },
+  { id: 'history', label: 'History' },
 ]
 
-function MetricCard({ icon: Icon, label, value, sublabel, tone = 'default' }) {
+const KEY_METRICS = [
+  { key: 'real_2y', label: 'Real rate 2Y', icon: Banknote, tone: 'info' },
+  { key: 'policy', label: 'Policy rate', icon: Landmark, tone: 'default' },
+  { key: 'cpi', label: 'CPI YoY', icon: Activity, tone: 'warning' },
+  { key: 'core_cpi', label: 'Core CPI YoY', icon: Gauge, tone: 'warning' },
+  { key: 'pmi', label: 'PMI / ISM', icon: LineChart, tone: 'positive' },
+  { key: 'nfp', label: 'Employment', icon: BarChart3, tone: 'default' },
+  { key: 'debt', label: 'Govt debt/GDP', icon: ShieldAlert, tone: 'negative' },
+  { key: 'ca_gdp', label: 'Current account/GDP', icon: Globe2, tone: 'info' },
+]
+
+function sourceIdFor(countryCode, metricKey) {
+  const suffix = metricKey === 'nfp' && countryCode !== 'usa' ? 'empl' : metricKey
+  return `endo_${countryCode}_${suffix}`
+}
+
+function fmtValue(value) {
+  if (!Number.isFinite(value)) return 'NO DATA'
+  const abs = Math.abs(value)
+  if (abs >= 1000) return value.toLocaleString('en-US', { maximumFractionDigits: 0 })
+  if (abs >= 100) return value.toFixed(1)
+  return value.toFixed(2)
+}
+
+function fmtDate(value) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toISOString().slice(0, 10)
+}
+
+function latestPoint(entry) {
+  const series = entry?.series
+  if (!Array.isArray(series) || series.length === 0) return null
+  return series[series.length - 1]
+}
+
+function MetricCard({ metric }) {
+  const Icon = metric.icon
   const toneClass = {
     positive: 'text-[#4ade80]',
     warning: 'text-[#f59e0b]',
     negative: 'text-[#ef4444]',
     info: 'text-[#60a5fa]',
     default: 'text-white',
-  }[tone]
+  }[metric.tone]
 
   return (
-    <div className="border border-[#222] bg-[#050505] p-3 min-h-[92px]">
+    <Link
+      to={`/data/raw?highlight=${encodeURIComponent(metric.sourceId)}`}
+      className="block min-h-[104px] border border-[#222] bg-[#050505] p-3 transition-colors hover:border-[#555] hover:bg-[#0a0a0a]"
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-[#555]">{label}</div>
-          <div className={`mt-1 font-mono text-xl font-bold ${toneClass}`}>{value}</div>
+          <div className="text-[10px] uppercase tracking-widest text-[#555]">{metric.label}</div>
+          <div className={`mt-1 font-mono text-xl font-bold ${metric.hasValue ? toneClass : 'text-[#333]'}`}>
+            {metric.displayValue}
+          </div>
         </div>
         <Icon size={18} className="text-[#555] shrink-0" />
       </div>
-      <div className="mt-2 text-[11px] leading-snug text-[#777]">{sublabel}</div>
-    </div>
+      <div className="mt-2 flex items-center justify-between gap-2 text-[10px] uppercase tracking-wider">
+        <span className={metric.status.color}>{metric.status.label}</span>
+        <span className="text-[#555]">{metric.date}</span>
+      </div>
+      <div className="mt-1 truncate text-[10px] text-[#555]">{metric.sourceName}</div>
+    </Link>
   )
 }
 
-function ScoreBar({ label, value, tone }) {
-  const color = tone === 'stress' ? 'bg-[#f59e0b]' : 'bg-[#4ade80]'
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-widest text-[#555]">
-        <span>{label}</span>
-        <span className="font-mono text-[#888]">{value}/100</span>
-      </div>
-      <div className="h-2 border border-[#222] bg-black">
-        <div className={`h-full ${color}`} style={{ width: `${value}%` }} />
-      </div>
-    </div>
-  )
+function StatusPill({ source }) {
+  const status = getStatus(source)
+  return <span className={`text-[10px] font-bold uppercase tracking-wider ${status.color}`}>{status.label}</span>
 }
 
 export default function GeneralPage() {
-  const [countryCode, setCountryCode] = useState(COUNTRIES[0].code)
-  const [activeTab, setActiveTab] = useState('macro')
+  const { dataSources, features, history, zscores } = useModelStore()
+  const [countryCode, setCountryCode] = useState('usa')
+  const [activeTab, setActiveTab] = useState('indicators')
 
-  const country = useMemo(
-    () => COUNTRIES.find((item) => item.code === countryCode) ?? COUNTRIES[0],
-    [countryCode],
+  const sourceById = useMemo(
+    () => new Map(dataSources.map((source) => [source.id, source])),
+    [dataSources],
   )
+
+  const country = COUNTRIES.find((item) => item.code === countryCode) ?? COUNTRIES[0]
+
+  const countrySources = useMemo(
+    () => dataSources.filter((source) => source.id.startsWith(`endo_${countryCode}_`)),
+    [dataSources, countryCode],
+  )
+
+  const metrics = useMemo(() => (
+    KEY_METRICS.map((item) => {
+      const sourceId = sourceIdFor(countryCode, item.key)
+      const source = sourceById.get(sourceId)
+      const value = features.valuesBySourceId[sourceId]
+      const raw = features.rawBySourceId[sourceId]
+      const point = latestPoint(history[sourceId])
+      const zKey = `${countryCode}_${item.key}`
+      const z = zscores[zKey]
+      const status = source ? getStatus(source) : { label: 'MISSING', color: 'text-[#ef4444]' }
+      return {
+        ...item,
+        sourceId,
+        source,
+        sourceName: source?.primarySource || source?.scraper || 'Missing source',
+        value,
+        raw,
+        z,
+        latestPoint: point,
+        hasValue: Number.isFinite(value),
+        displayValue: fmtValue(value),
+        date: fmtDate(source?._lastScrape?.date || point?.date || source?.lastUpdate),
+        status,
+      }
+    })
+  ), [countryCode, sourceById, features, history, zscores])
+
+  const availableCount = metrics.filter((metric) => metric.hasValue).length
+  const historyCount = countrySources.filter((source) => history[source.id]?.series?.length > 0).length
+  const refreshableCount = countrySources.filter((source) => source.apiPath || source.fredSeriesId).length
+  const staleCount = countrySources.filter((source) => getStatus(source).code === 'stale').length
+  const latestUpdate = countrySources
+    .map((source) => source._lastScrape?.date || source.lastUpdate)
+    .filter(Boolean)
+    .sort()
+    .at(-1)
+
+  const tableRows = useMemo(() => (
+    countrySources.map((source) => {
+      const value = features.valuesBySourceId[source.id]
+      const raw = features.rawBySourceId[source.id]
+      const entry = history[source.id]
+      const point = latestPoint(entry)
+      const suffix = source.id.replace(`endo_${countryCode}_`, '')
+      const zKey = `${countryCode}_${suffix === 'empl' ? 'nfp' : suffix}`
+      return {
+        source,
+        value,
+        raw,
+        latestPoint: point,
+        historyPoints: entry?.series?.length ?? 0,
+        z: zscores[zKey],
+        transform: features.metaBySourceId[source.id]?.transform || 'identity',
+      }
+    })
+  ), [countrySources, countryCode, features, history, zscores])
 
   return (
     <div className="pt-12 min-h-screen">
       <div className="mx-auto max-w-7xl px-4 py-4">
         <div className="mb-4 flex flex-col gap-3 border-b-2 border-[#333] pb-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.28em] text-[#555]">Country intelligence</div>
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.28em] text-[#555]">
+              Data-driven country view
+            </div>
             <h1 className="text-2xl font-bold uppercase tracking-widest">General</h1>
           </div>
 
@@ -248,177 +203,205 @@ export default function GeneralPage() {
                 value={countryCode}
                 onChange={(event) => {
                   setCountryCode(event.target.value)
-                  setActiveTab('macro')
+                  setActiveTab('indicators')
                 }}
-                className="h-9 min-w-[210px] appearance-none border border-[#333] bg-black px-3 pr-9 text-sm font-bold text-white outline-none focus:border-[#ecd987]"
+                className="h-9 min-w-[230px] appearance-none border border-[#333] bg-black px-3 pr-9 text-sm font-bold text-white outline-none focus:border-[#ecd987]"
               >
                 {COUNTRIES.map((item) => (
                   <option key={item.code} value={item.code}>
-                    [{item.flag}] {item.name}
+                    [{item.short}] {item.label}
                   </option>
                 ))}
               </select>
               <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#777]" />
             </label>
-            <div className="border border-[#333] px-3 py-2 text-[10px] uppercase tracking-widest text-[#777]">
-              Snapshot modelado
-            </div>
+            <Link
+              to={`/data/raw?module=Endogenous&highlight=${encodeURIComponent(sourceIdFor(countryCode, 'real_2y'))}`}
+              className="border border-[#333] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#777] hover:border-[#ecd987] hover:text-[#ecd987]"
+            >
+              Actualizar datos
+            </Link>
           </div>
         </div>
 
-        <section className="mb-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <section className="mb-4 grid gap-4 xl:grid-cols-[280px_1fr]">
           <div className="border-2 border-[#333]">
             <div className="bg-[#1a1a0d] border-b border-[#333] px-3 py-1.5">
-              <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Resumen del pais</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Pais</span>
             </div>
-            <div className="grid gap-0 md:grid-cols-[260px_1fr]">
-              <div className="border-b border-[#222] p-4 md:border-b-0 md:border-r">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="inline-flex h-14 w-14 items-center justify-center border-2 border-[#333] font-mono text-xl font-bold text-[#ecd987]">
-                      {country.flag}
-                    </div>
-                    <h2 className="mt-3 text-xl font-bold uppercase tracking-widest text-white">{country.name}</h2>
-                    <div className="mt-1 text-xs uppercase tracking-widest text-[#777]">
-                      {country.region} / {country.currency}
-                    </div>
+            <div className="p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="inline-flex h-14 w-14 items-center justify-center border-2 border-[#333] font-mono text-xl font-bold text-[#ecd987]">
+                    {country.short}
                   </div>
-                  <Globe2 size={24} className="text-[#555]" />
+                  <h2 className="mt-3 text-xl font-bold uppercase tracking-widest text-white">{country.label}</h2>
+                  <div className="mt-1 text-xs uppercase tracking-widest text-[#777]">{country.ccy}</div>
                 </div>
+                <Database size={22} className="text-[#555]" />
+              </div>
 
-                <div className="mt-5 space-y-3">
-                  <ScoreBar label="Momentum macro" value={country.momentum} />
-                  <ScoreBar label="Stress monitor" value={country.stress} tone="stress" />
+              <div className="mt-5 grid grid-cols-2 gap-2 text-[11px]">
+                <div className="border border-[#222] p-2">
+                  <div className="uppercase tracking-widest text-[#555]">Valores</div>
+                  <div className="mt-1 font-mono text-[#ecd987]">{availableCount}/{metrics.length}</div>
                 </div>
-
-                <div className="mt-5 grid grid-cols-2 gap-2 text-[11px]">
-                  <div className="border border-[#222] p-2">
-                    <div className="uppercase tracking-widest text-[#555]">Capital</div>
-                    <div className="mt-1 text-[#aaa]">{country.capital}</div>
-                  </div>
-                  <div className="border border-[#222] p-2">
-                    <div className="uppercase tracking-widest text-[#555]">Rating</div>
-                    <div className="mt-1 font-mono text-[#ecd987]">{country.sovereignRating}</div>
-                  </div>
+                <div className="border border-[#222] p-2">
+                  <div className="uppercase tracking-widest text-[#555]">Historico</div>
+                  <div className="mt-1 font-mono text-[#ecd987]">{historyCount}/{countrySources.length}</div>
+                </div>
+                <div className="border border-[#222] p-2">
+                  <div className="uppercase tracking-widest text-[#555]">Endpoints</div>
+                  <div className="mt-1 font-mono text-[#ecd987]">{refreshableCount}</div>
+                </div>
+                <div className="border border-[#222] p-2">
+                  <div className="uppercase tracking-widest text-[#555]">Stale</div>
+                  <div className={`mt-1 font-mono ${staleCount > 0 ? 'text-[#ef4444]' : 'text-[#4ade80]'}`}>{staleCount}</div>
                 </div>
               </div>
 
-              <div className="grid gap-0 sm:grid-cols-2 lg:grid-cols-4">
-                <MetricCard icon={Banknote} label="GDP nominal" value={country.gdp} sublabel="Tamano aproximado de la economia." tone="info" />
-                <MetricCard icon={TrendingUp} label="GDP real" value={country.gdpGrowth} sublabel="Crecimiento anual estimado." tone="positive" />
-                <MetricCard icon={Activity} label="Inflacion" value={country.inflation} sublabel="Presion de precios general." tone="warning" />
-                <MetricCard icon={Landmark} label="Policy rate" value={country.policyRate} sublabel="Ancla de tipos oficiales." />
-                <MetricCard icon={BriefcaseBusiness} label="Paro" value={country.unemployment} sublabel="Slack laboral observado." />
-                <MetricCard icon={Users} label="Poblacion" value={country.population} sublabel="Base demografica." />
-                <MetricCard icon={ShieldAlert} label="Balance fiscal" value={country.fiscalBalance} sublabel="Deficit/superavit sobre GDP." tone="negative" />
-                <MetricCard icon={PackageOpen} label="Cuenta corriente" value={country.currentAccount} sublabel={country.trade} tone="info" />
+              <div className="mt-4 border border-[#222] p-3">
+                <div className="text-[10px] uppercase tracking-widest text-[#555]">Ultima actualizacion</div>
+                <div className="mt-1 font-mono text-sm text-white">{fmtDate(latestUpdate)}</div>
               </div>
             </div>
           </div>
 
           <div className="border-2 border-[#333]">
             <div className="bg-[#1a1a0d] border-b border-[#333] px-3 py-1.5">
-              <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Lectura operativa</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Datos representativos reales</span>
             </div>
-            <div className="p-4">
-              <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                {[
-                  ['Regimen', country.regime, LineChart],
-                  ['FX bias', country.fxBias, Banknote],
-                  ['Riesgo clave', country.risk, ShieldAlert],
-                ].map(([label, value, Icon]) => (
-                  <div key={label} className="border border-[#222] p-3">
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                      <div className="text-[10px] uppercase tracking-widest text-[#555]">{label}</div>
-                      <Icon size={16} className="text-[#555]" />
-                    </div>
-                    <div className="text-sm font-bold uppercase tracking-wider text-white">{value}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 border border-[#222]">
-                <div className="border-b border-[#222] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#777]">
-                  Narrative checks
-                </div>
-                <div className="divide-y divide-[#111]">
-                  {country.narrative.map((item) => (
-                    <div key={item} className="flex gap-3 px-3 py-2 text-xs leading-relaxed text-[#aaa]">
-                      <span className="mt-1 h-1.5 w-1.5 shrink-0 bg-[#ecd987]" />
-                      <span>{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <div className="grid gap-0 sm:grid-cols-2 lg:grid-cols-4">
+              {metrics.map((metric) => (
+                <MetricCard key={metric.sourceId} metric={metric} />
+              ))}
             </div>
           </div>
         </section>
 
-        <section className="grid gap-4 xl:grid-cols-[1fr_360px]">
-          <div className="border-2 border-[#333]">
-            <div className="bg-[#1a1a0d] border-b border-[#333] px-3 py-1.5">
-              <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Indicadores principales</span>
+        {availableCount === 0 && (
+          <div className="mb-4 border border-[#ef4444] bg-[#1a0000] px-3 py-2 text-[11px] font-mono text-[#ef4444]">
+            SIN VALORES REALES PARA {country.ccy}. Refresca fuentes automaticas o importa historicos; esta pantalla no usa fallback modelado.
+          </div>
+        )}
+
+        <section className="border-2 border-[#333]">
+          <div className="bg-[#1a1a0d] border-b border-[#333] px-3 py-1.5">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Detalle</span>
+          </div>
+          <div className="border-b border-[#222] p-2">
+            <div className="grid max-w-xl grid-cols-3 gap-2">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-2 py-2 text-[10px] font-bold uppercase tracking-widest ${
+                    activeTab === tab.id
+                      ? 'border border-[#ecd987] text-[#ecd987]'
+                      : 'border border-[#222] text-[#666] hover:border-[#555] hover:text-white'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
+          </div>
+
+          {activeTab === 'indicators' && (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] table-fixed text-sm">
+              <table className="w-full min-w-[920px] table-fixed text-sm">
                 <thead>
                   <tr className="bg-[#111] text-left">
-                    <th className="w-[28%] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">Indicator</th>
-                    <th className="w-[12%] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">Units</th>
-                    {['Q2 25', 'Q3 25', 'Q4 25', 'Q1 26', 'Q2 26'].map((quarter) => (
-                      <th key={quarter} className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[#555]">{quarter}</th>
-                    ))}
+                    <th className="w-[22%] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">Indicator</th>
+                    <th className="w-[12%] px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[#555]">Value</th>
+                    <th className="w-[10%] px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[#555]">Raw</th>
+                    <th className="w-[10%] px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[#555]">Z</th>
+                    <th className="w-[12%] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">Date</th>
+                    <th className="w-[12%] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">Status</th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">Source</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {country.indicators.map(([name, units, ...values]) => (
-                    <tr key={name} className="border-t border-[#111] hover:bg-[#0a0a0a]">
-                      <td className="px-3 py-2 font-bold text-[#ddd]">{name}</td>
-                      <td className="px-3 py-2 font-mono text-[#777]">{units}</td>
-                      {values.map((value, index) => (
-                        <td key={`${name}-${index}`} className="px-3 py-2 text-right font-mono text-white">{value}</td>
-                      ))}
+                  {tableRows.map((row) => (
+                    <tr key={row.source.id} className="border-t border-[#111] hover:bg-[#0a0a0a]">
+                      <td className="px-3 py-2">
+                        <Link to={`/data/raw?highlight=${encodeURIComponent(row.source.id)}`} className="font-bold text-[#ddd] hover:text-[#ecd987]">
+                          {row.source.indicator}
+                        </Link>
+                        <div className="mt-0.5 text-[10px] uppercase tracking-wider text-[#444]">{row.source.category} / {row.transform}</div>
+                      </td>
+                      <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(row.value) ? 'text-white' : 'text-[#333]'}`}>{fmtValue(row.value)}</td>
+                      <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(row.raw) ? 'text-[#aaa]' : 'text-[#333]'}`}>{fmtValue(row.raw)}</td>
+                      <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(row.z) ? row.z > 0 ? 'text-[#4ade80]' : row.z < 0 ? 'text-[#ef4444]' : 'text-[#555]' : 'text-[#333]'}`}>
+                        {Number.isFinite(row.z) ? `${row.z >= 0 ? '+' : ''}${row.z.toFixed(2)}` : 'NO DATA'}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-[#777]">{fmtDate(row.source._lastScrape?.date || row.latestPoint?.date || row.source.lastUpdate)}</td>
+                      <td className="px-3 py-2"><StatusPill source={row.source} /></td>
+                      <td className="px-3 py-2 text-xs text-[#777]">{row.source.primarySource || row.source.scraper || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
+          )}
 
-          <div className="border-2 border-[#333]">
-            <div className="bg-[#1a1a0d] border-b border-[#333] px-3 py-1.5">
-              <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Detalle por tabs</span>
-            </div>
-            <div className="border-b border-[#222] p-2">
-              <div className="grid grid-cols-3 gap-2">
-                {TABS.map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`px-2 py-2 text-[10px] font-bold uppercase tracking-widest ${
-                      activeTab === tab.id
-                        ? 'border border-[#ecd987] text-[#ecd987]'
-                        : 'border border-[#222] text-[#666] hover:border-[#555] hover:text-white'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="divide-y divide-[#111]">
-              {country.tabs[activeTab].map(([label, text]) => (
-                <div key={label} className="p-3">
-                  <div className="mb-1 flex items-center gap-2">
-                    <Factory size={14} className="text-[#555]" />
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-[#ecd987]">{label}</div>
+          {activeTab === 'sources' && (
+            <div className="grid gap-0 md:grid-cols-2 xl:grid-cols-3">
+              {countrySources.map((source) => (
+                <div key={source.id} className="border-b border-r border-[#222] p-3">
+                  <div className="mb-2 flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-bold text-white">{source.indicator}</div>
+                      <div className="mt-0.5 font-mono text-[10px] text-[#555]">{source.id}</div>
+                    </div>
+                    <StatusPill source={source} />
                   </div>
-                  <p className="text-xs leading-relaxed text-[#aaa]">{text}</p>
+                  <div className="space-y-1 text-[11px] text-[#777]">
+                    <div>Fit: <span className="font-mono text-[#ecd987]">{source.dataFit || '-'}</span></div>
+                    <div>Access: <span className="font-mono text-[#aaa]">{source.accessMode || '-'}</span></div>
+                    <div>Frequency: <span className="font-mono text-[#aaa]">{source.frequency || '-'}</span></div>
+                    <div>Endpoint: <span className="font-mono text-[#aaa]">{source.apiPath || source.fredSeriesId || 'manual'}</span></div>
+                  </div>
+                  {source.scrapeUrl && (
+                    <a href={source.scrapeUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">
+                      Fuente <ExternalLink size={12} />
+                    </a>
+                  )}
                 </div>
               ))}
             </div>
-          </div>
+          )}
+
+          {activeTab === 'history' && (
+            <div className="grid gap-0 md:grid-cols-2 xl:grid-cols-3">
+              {tableRows.map((row) => (
+                <div key={row.source.id} className="border-b border-r border-[#222] p-3">
+                  <div className="mb-2 flex items-center gap-2">
+                    <History size={15} className="text-[#555]" />
+                    <div className="text-xs font-bold text-white">{row.source.indicator}</div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-[11px]">
+                    <div className="border border-[#222] p-2">
+                      <div className="uppercase tracking-widest text-[#555]">Points</div>
+                      <div className="mt-1 font-mono text-[#ecd987]">{row.historyPoints}</div>
+                    </div>
+                    <div className="border border-[#222] p-2">
+                      <div className="uppercase tracking-widest text-[#555]">Latest</div>
+                      <div className="mt-1 font-mono text-[#aaa]">{fmtValue(Number(row.latestPoint?.value))}</div>
+                    </div>
+                    <div className="border border-[#222] p-2">
+                      <div className="uppercase tracking-widest text-[#555]">Date</div>
+                      <div className="mt-1 font-mono text-[#aaa]">{fmtDate(row.latestPoint?.date)}</div>
+                    </div>
+                  </div>
+                  <Link to={`/data/history/${row.source.id}`} className="mt-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#555] hover:text-[#ecd987]">
+                    Abrir serie <ExternalLink size={12} />
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </div>
