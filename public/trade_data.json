@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-05-20T17:24:34.836401Z",
+  "updated_at": "2026-05-20T17:28:52.569267Z",
   "maritime": {
     "bdi": {
       "current": 12.15,
@@ -368,8 +368,8 @@
       ]
     },
     "aud": {
-      "current": 0.7156,
-      "change_pct": -0.23,
+      "current": 0.7157,
+      "change_pct": -0.22,
       "history": [
         [
           1768435200000,
@@ -729,13 +729,13 @@
         ],
         [
           1779235200000,
-          0.7156
+          0.7157
         ]
       ]
     },
     "cad": {
-      "current": 0.7272,
-      "change_pct": -0.1,
+      "current": 0.7279,
+      "change_pct": 0.16,
       "history": [
         [
           1768435200000,
@@ -1092,16 +1092,12 @@
         [
           1779148800000,
           0.7279
-        ],
-        [
-          1779235200000,
-          0.7272
         ]
       ]
     },
     "nok": {
       "current": 0.1079,
-      "change_pct": -0.17,
+      "change_pct": -0.16,
       "history": [
         [
           1768435200000,
@@ -1466,8 +1462,8 @@
       ]
     },
     "oil": {
-      "current": 97.52,
-      "change_pct": -9.51,
+      "current": 97.11,
+      "change_pct": -9.89,
       "history": [
         [
           1770076800000,
@@ -1767,7 +1763,7 @@
         ],
         [
           1779235200000,
-          97.52
+          97.11
         ]
       ]
     },
@@ -1785,42 +1781,90 @@
         "origin": "FRA",
         "destination": "SIN",
         "min_price_usd": 392.0,
+        "avg_price_usd": 392.0,
+        "vs_avg_pct": 0.0,
         "date_queried": "2026-06-19",
+        "price_history": [
+          [
+            "2026-06-19",
+            392.0
+          ]
+        ],
         "error": null
       },
       {
         "origin": "JFK",
         "destination": "LHR",
         "min_price_usd": 492.0,
+        "avg_price_usd": 492.0,
+        "vs_avg_pct": 0.0,
         "date_queried": "2026-06-19",
+        "price_history": [
+          [
+            "2026-06-19",
+            492.0
+          ]
+        ],
         "error": null
       },
       {
         "origin": "DXB",
         "destination": "HKG",
         "min_price_usd": 353.0,
+        "avg_price_usd": 353.0,
+        "vs_avg_pct": 0.0,
         "date_queried": "2026-06-19",
+        "price_history": [
+          [
+            "2026-06-19",
+            353.0
+          ]
+        ],
         "error": null
       },
       {
         "origin": "LAX",
         "destination": "NRT",
         "min_price_usd": 909.0,
+        "avg_price_usd": 909.0,
+        "vs_avg_pct": 0.0,
         "date_queried": "2026-06-19",
+        "price_history": [
+          [
+            "2026-06-19",
+            909.0
+          ]
+        ],
         "error": null
       },
       {
         "origin": "FRA",
         "destination": "JNB",
         "min_price_usd": 427.0,
+        "avg_price_usd": 427.0,
+        "vs_avg_pct": 0.0,
         "date_queried": "2026-06-19",
+        "price_history": [
+          [
+            "2026-06-19",
+            427.0
+          ]
+        ],
         "error": null
       },
       {
         "origin": "GRU",
         "destination": "MIA",
         "min_price_usd": 382.0,
+        "avg_price_usd": 382.0,
+        "vs_avg_pct": 0.0,
         "date_queried": "2026-06-19",
+        "price_history": [
+          [
+            "2026-06-19",
+            382.0
+          ]
+        ],
         "error": null
       }
     ],
@@ -2261,7 +2305,7 @@
       [
         1779235200000,
         12.15,
-        0.7156
+        0.7157
       ]
     ],
     "bdi_vs_cad": [
@@ -2694,11 +2738,6 @@
         1779148800000,
         12.65,
         0.7279
-      ],
-      [
-        1779235200000,
-        12.15,
-        0.7272
       ]
     ]
   }

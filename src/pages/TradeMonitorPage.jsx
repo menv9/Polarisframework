@@ -166,6 +166,21 @@ function OverlayChart({ data, bdiKey, fxKey, fxLabel, fxColor }) {
   )
 }
 
+function vsAvgColor(pct) {
+  if (pct == null) return 'text-[#555]'
+  if (pct <= -10) return 'text-[#4ade80]'   // cheap
+  if (pct <= -3)  return 'text-[#86efac]'   // slightly cheap
+  if (pct < 3)    return 'text-[#a3a3a3]'   // neutral
+  if (pct < 10)   return 'text-[#fbbf24]'   // slightly expensive
+  return 'text-[#ef4444]'                   // expensive
+}
+
+function vsAvgLabel(pct, nSamples) {
+  if (pct == null) return nSamples > 0 ? 'building baseline' : '—'
+  const sign = pct >= 0 ? '+' : ''
+  return `${sign}${pct.toFixed(1)}% vs avg`
+}
+
 function AviationTable({ routes, iataNote }) {
   return (
     <div>
@@ -173,35 +188,42 @@ function AviationTable({ routes, iataNote }) {
         <thead>
           <tr className="border-b border-[#222]">
             <th className="text-left px-3 py-2 text-[10px] text-[#555] uppercase tracking-wider font-normal">Route</th>
-            <th className="text-right px-3 py-2 text-[10px] text-[#555] uppercase tracking-wider font-normal">Min Price</th>
-            <th className="text-right px-3 py-2 text-[10px] text-[#555] uppercase tracking-wider font-normal">Date (+30d)</th>
-            <th className="text-right px-3 py-2 text-[10px] text-[#555] uppercase tracking-wider font-normal">Status</th>
+            <th className="text-right px-3 py-2 text-[10px] text-[#555] uppercase tracking-wider font-normal">Now</th>
+            <th className="text-right px-3 py-2 text-[10px] text-[#555] uppercase tracking-wider font-normal">Avg</th>
+            <th className="text-right px-3 py-2 text-[10px] text-[#555] uppercase tracking-wider font-normal">vs Avg</th>
+            <th className="text-right px-3 py-2 text-[10px] text-[#555] uppercase tracking-wider font-normal">Samples</th>
+            <th className="text-right px-3 py-2 text-[10px] text-[#555] uppercase tracking-wider font-normal">Date</th>
           </tr>
         </thead>
         <tbody>
-          {routes.map((r, i) => (
-            <tr key={i} className="border-b border-[#111] hover:bg-[#0a0a0a]">
-              <td className="px-3 py-2 text-[#e5e5e5]">
-                {r.origin} <span className="text-[#444]">→</span> {r.destination}
-              </td>
-              <td className="px-3 py-2 text-right">
-                {r.min_price_usd != null
-                  ? <span className="text-[#4ade80]">${r.min_price_usd.toLocaleString()}</span>
-                  : <span className="text-[#555]">—</span>}
-              </td>
-              <td className="px-3 py-2 text-right text-[#666]">{r.date_queried ?? '—'}</td>
-              <td className="px-3 py-2 text-right">
-                {r.error
-                  ? <span className="text-[#f59e0b] text-[10px]">{r.error}</span>
-                  : r.min_price_usd == null
-                    ? <span className="text-[#555] text-[10px]">manual</span>
-                    : <span className="text-[#4ade80] text-[10px]">OK</span>}
-              </td>
-            </tr>
-          ))}
+          {routes.map((r, i) => {
+            const n = r.price_history?.length ?? 0
+            return (
+              <tr key={i} className="border-b border-[#111] hover:bg-[#0a0a0a]">
+                <td className="px-3 py-2 text-[#e5e5e5]">
+                  {r.origin} <span className="text-[#444]">→</span> {r.destination}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  {r.min_price_usd != null
+                    ? <span className="text-[#e5e5e5]">${r.min_price_usd.toLocaleString()}</span>
+                    : <span className="text-[#555]">—</span>}
+                </td>
+                <td className="px-3 py-2 text-right text-[#666]">
+                  {r.avg_price_usd != null ? `$${r.avg_price_usd.toLocaleString()}` : '—'}
+                </td>
+                <td className={`px-3 py-2 text-right font-bold ${vsAvgColor(r.vs_avg_pct)}`}>
+                  {r.error
+                    ? <span className="text-[#f59e0b] font-normal text-[10px]">error</span>
+                    : vsAvgLabel(r.vs_avg_pct, n)}
+                </td>
+                <td className="px-3 py-2 text-right text-[#444]">{n > 0 ? n : '—'}</td>
+                <td className="px-3 py-2 text-right text-[#555]">{r.date_queried ?? '—'}</td>
+              </tr>
+            )
+          })}
           {routes.length === 0 && (
             <tr>
-              <td colSpan={4} className="px-3 py-4 text-center text-[#333]">
+              <td colSpan={6} className="px-3 py-4 text-center text-[#333]">
                 Run update_trade.py to fetch aviation data
               </td>
             </tr>

@@ -99,16 +99,47 @@ def fetch_fbx():
     }
 
 
+def _load_existing_routes():
+    """Return existing route rows keyed by (origin, dest) to preserve price_history."""
+    try:
+        with open(OUTPUT_PATH) as f:
+            existing = json.load(f)
+        return {
+            (r["origin"], r["destination"]): r
+            for r in existing.get("aviation", {}).get("routes", [])
+        }
+    except Exception:
+        return {}
+
+
+def _update_history(existing_row, new_price, date_queried):
+    """Append new price to history (max 90 entries), return updated history + stats."""
+    history = list(existing_row.get("price_history", [])) if existing_row else []
+    if new_price is not None:
+        history.append([date_queried, new_price])
+    history = history[-90:]  # keep last 90 data points
+
+    prices = [p for _, p in history]
+    avg = round(sum(prices) / len(prices), 2) if prices else None
+    vs_avg_pct = None
+    if avg and new_price:
+        vs_avg_pct = round((new_price - avg) / avg * 100, 1)
+
+    return history, avg, vs_avg_pct
+
+
 def fetch_aviation():
     if not FLI_AVAILABLE:
         print("  Warning: 'flights' package not installed — pip install flights")
         return _default_aviation()
 
+    existing_routes = _load_existing_routes()
     search = SearchFlights()
     target_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
     results = []
 
     for origin_code, dest_code in RUTAS:
+        existing = existing_routes.get((origin_code, dest_code))
         try:
             filters = FlightSearchFilters(
                 passenger_info=PassengerInfo(adults=1),
@@ -123,21 +154,31 @@ def fetch_aviation():
             )
             flights = search.search(filters)
             min_price = min((f.price for f in flights if f.price), default=None)
+            history, avg, vs_avg_pct = _update_history(existing, min_price, target_date)
             results.append({
                 "origin": origin_code,
                 "destination": dest_code,
                 "min_price_usd": min_price,
+                "avg_price_usd": avg,
+                "vs_avg_pct": vs_avg_pct,
                 "date_queried": target_date,
+                "price_history": history,
                 "error": None,
             })
-            print(f"  {origin_code}->{dest_code}: ${min_price}")
+            vs_str = f" ({vs_avg_pct:+.1f}% vs avg)" if vs_avg_pct is not None else " (building baseline)"
+            print(f"  {origin_code}->{dest_code}: ${min_price}{vs_str}")
         except Exception as e:
             print(f"  Warning: {origin_code}->{dest_code} failed — {e}")
+            history = existing.get("price_history", []) if existing else []
+            avg = existing.get("avg_price_usd") if existing else None
             results.append({
                 "origin": origin_code,
                 "destination": dest_code,
                 "min_price_usd": None,
+                "avg_price_usd": avg,
+                "vs_avg_pct": None,
                 "date_queried": target_date,
+                "price_history": history,
                 "error": str(e),
             })
 
@@ -147,7 +188,11 @@ def fetch_aviation():
 def _default_aviation():
     return {
         "routes": [
-            {"origin": o, "destination": d, "min_price_usd": None, "date_queried": None, "error": None}
+            {
+                "origin": o, "destination": d,
+                "min_price_usd": None, "avg_price_usd": None, "vs_avg_pct": None,
+                "date_queried": None, "price_history": [], "error": None,
+            }
             for o, d in RUTAS
         ],
         "iata_note": "Datos IATA con lag ~6 semanas",
