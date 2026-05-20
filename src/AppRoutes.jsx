@@ -13,6 +13,7 @@ import HistorySeriesPage from './pages/HistorySeriesPage'
 import EconomicCalendarPage from './pages/EconomicCalendarPage'
 import NotificationsPage from './pages/NotificationsPage'
 import DashboardPage from './pages/DashboardPage'
+import GeneralPage from './pages/GeneralPage'
 import EndogenousOpsPage from './pages/EndogenousOpsPage'
 import ModelInputsPage from './pages/ModelInputsPage'
 import EndogenousBetasPage from './pages/EndogenousBetasPage'
@@ -58,6 +59,7 @@ export default function AppRoutes() {
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/general" element={<GeneralPage />} />
         <Route path="/world-view" element={<WorldViewOpsPage />} />
         <Route path="/endogenous" element={<EndogenousOpsPage />} />
         <Route path="/model-inputs" element={<ModelInputsPage />} />

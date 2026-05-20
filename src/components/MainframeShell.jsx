@@ -10,6 +10,7 @@ const TAB_GROUPS = [
     key: '2', label: 'ANÁLISIS', to: '/world-view',
     items: [
       { to: '/dashboard',           label: 'HUB',        desc: 'Dashboard' },
+      { to: '/general',             label: 'GENERAL',    desc: 'Country snapshot' },
       { to: '/world-view',label: 'WORLD VIEW', desc: 'World View' },
       { to: '/endogenous',          label: 'ENDOGENOUS', desc: 'Endogenous' },
       { to: '/exogenous/operativa', label: 'EXOGENOUS',  desc: 'Exogenous' },

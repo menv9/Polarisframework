@@ -23,6 +23,7 @@ const GROUPS = [
     label: 'Análisis',
     items: [
       { to: '/dashboard',           label: 'Hub',  desc: 'Dashboard' },
+      { to: '/general',             label: 'General', desc: 'Country General' },
       { to: '/world-view',label: 'WV',   desc: 'World View' },
       { to: '/endogenous',          label: 'Endo', desc: 'Endogenous' },
       { to: '/exogenous/operativa', label: 'Exo',  desc: 'Exogenous' },

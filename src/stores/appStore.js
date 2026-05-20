@@ -4,7 +4,7 @@ const THEME_KEY = 'polaris_theme'
 function loadTheme() {
   try {
     const t = localStorage.getItem(THEME_KEY)
-    if (t === 'mainframe' || t === 'default') return t
+    if (t === 'mainframe' || t === 'default' || t === 'terminal') return t
   } catch { /* ignore */ }
   return 'default'
 }

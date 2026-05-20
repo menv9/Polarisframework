@@ -35,6 +35,23 @@ const THEMES = [
       font: 'IBM Plex Mono, monospace',
     },
   },
+  {
+    id: 'terminal',
+    name: 'Terminal',
+    desc: 'Warm black · purple accent · JetBrains Mono',
+    preview: {
+      bg: '#030303',
+      panel: '#050505',
+      border: '#343434',
+      text: '#e8e2d6',
+      textDim: '#777777',
+      accent: '#b779ff',
+      positive: '#42e66f',
+      negative: '#ff4545',
+      info: '#54a7ff',
+      font: 'JetBrains Mono, monospace',
+    },
+  },
 ]
 
 function ThemeCard({ theme, active, onSelect }) {
@@ -151,7 +168,7 @@ export default function SettingsPage() {
           <div className="text-[10px] font-bold uppercase tracking-widest text-[#555] border-b border-[#1a1a1a] pb-2 mb-5">
             Display Theme
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {THEMES.map(t => (
               <ThemeCard
                 key={t.id}

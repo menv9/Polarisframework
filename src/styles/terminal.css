@@ -1,0 +1,398 @@
+/* =====================================================================
+ * POLARIS — Terminal Theme  [data-theme="terminal"]
+ * Source of truth: macro_terminal_mockup.html
+ * Zero reference to mainframe.css or default theme.
+ * ===================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900&display=swap');
+
+/* ─── Design tokens — extracted verbatim from mockup ─────────────────── */
+[data-theme='terminal'] {
+  --tm-bg:          #030303;
+  --tm-bg-panel:    #050505;
+  --tm-bg-soft:     #111204;   /* olive-tinted dark panel (active rows) */
+  --tm-bg-content:  #020202;
+  --tm-bg-topbar:   #040404;
+
+  --tm-line:        #343434;   /* main border */
+  --tm-line-soft:   #1d1d1d;   /* subtle border */
+
+  --tm-text:        #e8e2d6;   /* warm white */
+  --tm-muted:       #777777;
+
+  --tm-purple:      #b779ff;   /* primary accent */
+  --tm-orange:      #ffad27;   /* active / warning */
+  --tm-green:       #42e66f;   /* positive */
+  --tm-red:         #ff4545;   /* negative */
+  --tm-blue:        #54a7ff;   /* info / links */
+  --tm-yellow:      #ffd166;   /* notes / highlight */
+}
+
+/* ─── Base ────────────────────────────────────────────────────────────── */
+html[data-theme='terminal'],
+html[data-theme='terminal'] body {
+  margin: 0;
+  background: var(--tm-bg) !important;
+  color: var(--tm-text) !important;
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', Consolas, monospace !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 2px rgba(232, 226, 214, 0.18);
+  -webkit-font-smoothing: antialiased;
+}
+
+html[data-theme='terminal'] * {
+  font-family: inherit !important;
+  border-radius: 0 !important;
+}
+
+/* ─── Scanlines — white, faint (from mockup) ─────────────────────────── */
+html[data-theme='terminal'] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.025) 0,
+    rgba(255, 255, 255, 0.025) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  opacity: 0.28;
+}
+
+/* ─── Selection ───────────────────────────────────────────────────────── */
+html[data-theme='terminal'] ::selection {
+  background: var(--tm-purple);
+  color: #000;
+}
+
+/* ─── Scrollbar ───────────────────────────────────────────────────────── */
+html[data-theme='terminal'] ::-webkit-scrollbar       { width: 4px; height: 4px; }
+html[data-theme='terminal'] ::-webkit-scrollbar-track { background: var(--tm-bg); }
+html[data-theme='terminal'] ::-webkit-scrollbar-thumb { background: var(--tm-line); }
+html[data-theme='terminal'] ::-webkit-scrollbar-thumb:hover { background: var(--tm-purple); }
+
+/* ─── Navbar (maps to mockup .topbar) ────────────────────────────────── */
+html[data-theme='terminal'] [data-app-navbar] {
+  background: var(--tm-bg-topbar) !important;
+  border-bottom: 1px solid var(--tm-line) !important;
+}
+/* Logo → purple, bold, tight tracking */
+html[data-theme='terminal'] [data-app-navbar] .text-white {
+  color: var(--tm-purple) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.5px !important;
+  text-shadow: 0 0 12px rgba(183, 121, 255, 0.4) !important;
+}
+/* Inactive nav items */
+html[data-theme='terminal'] [data-app-navbar] .text-\[\#666\]  { color: #d6d6d6 !important; text-shadow: none !important; }
+html[data-theme='terminal'] [data-app-navbar] .text-\[\#555\]  { color: var(--tm-muted) !important; text-shadow: none !important; }
+html[data-theme='terminal'] [data-app-navbar] .text-\[\#222\]  { color: var(--tm-line) !important; }
+/* Active nav → purple with underline */
+html[data-theme='terminal'] [data-app-navbar] .text-\[\#ecd987\]              { color: var(--tm-purple) !important; text-shadow: none !important; }
+html[data-theme='terminal'] [data-app-navbar] .hover\:text-\[\#ecd987\]:hover { color: var(--tm-purple) !important; }
+html[data-theme='terminal'] [data-app-navbar] .hover\:text-white:hover        { color: var(--tm-text) !important; }
+/* Dropdown */
+html[data-theme='terminal'] [data-app-navbar] .bg-black,
+html[data-theme='terminal'] [data-app-navbar] .bg-\[\#0a0a0a\],
+html[data-theme='terminal'] [data-app-navbar] .bg-\[\#111\]    { background: var(--tm-bg-panel) !important; }
+html[data-theme='terminal'] [data-app-navbar] [class*='border-'] { border-color: var(--tm-line) !important; }
+html[data-theme='terminal'] [data-app-navbar] .hover\:bg-\[\#0a0a0a\]:hover,
+html[data-theme='terminal'] [data-app-navbar] .hover\:bg-\[\#111\]:hover      { background: var(--tm-bg-soft) !important; }
+/* Dropdown active item */
+html[data-theme='terminal'] [data-app-navbar] .bg-\[\#111\].text-\[\#ecd987\] {
+  background: var(--tm-bg-soft) !important;
+  color: var(--tm-orange) !important;
+  box-shadow: inset 3px 0 0 var(--tm-orange) !important;
+}
+
+/* ─── Theme toggle button ─────────────────────────────────────────────── */
+html[data-theme='terminal'] .theme-toggle-btn {
+  background: var(--tm-bg-content) !important;
+  border: 1px solid var(--tm-line) !important;
+  color: var(--tm-text) !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  letter-spacing: 0.05em !important;
+  text-shadow: none !important;
+}
+html[data-theme='terminal'] .theme-toggle-btn:hover {
+  border-color: var(--tm-purple) !important;
+  color: var(--tm-purple) !important;
+}
+html[data-theme='terminal'] .theme-toggle-btn .dot {
+  background: var(--tm-purple) !important;
+  box-shadow: 0 0 6px var(--tm-purple) !important;
+}
+
+/* ─── Page backgrounds ────────────────────────────────────────────────── */
+html[data-theme='terminal'] .bg-black,
+html[data-theme='terminal'] .bg-\[\#000\],
+html[data-theme='terminal'] .bg-\[\#000000\]   { background: var(--tm-bg) !important; }
+
+html[data-theme='terminal'] .bg-\[\#0a0a0a\],
+html[data-theme='terminal'] .bg-\[\#111\],
+html[data-theme='terminal'] .bg-\[\#111111\],
+html[data-theme='terminal'] .bg-\[\#1a1a1a\]   { background: var(--tm-bg-panel) !important; }
+
+html[data-theme='terminal'] .bg-\[\#0f0f0f\]   { background: var(--tm-bg-panel) !important; }
+
+/* olive-tint panels (active menu items, section elevated rows) */
+html[data-theme='terminal'] .bg-\[\#1a1a0d\],
+html[data-theme='terminal'] .bg-\[\#1a1505\]   { background: var(--tm-bg-soft) !important; }
+
+html[data-theme='terminal'] .hover\:bg-\[\#0a0a0a\]:hover,
+html[data-theme='terminal'] .hover\:bg-\[\#111\]:hover,
+html[data-theme='terminal'] .hover\:bg-\[\#111111\]:hover,
+html[data-theme='terminal'] .hover\:bg-\[\#1a1a1a\]:hover { background: var(--tm-bg-soft) !important; }
+
+/* ─── Borders ─────────────────────────────────────────────────────────── */
+html[data-theme='terminal'] [class*='border-\[\#']  { border-color: var(--tm-line) !important; }
+html[data-theme='terminal'] .border-\[\#111\],
+html[data-theme='terminal'] .border-\[\#1a1a1a\],
+html[data-theme='terminal'] .border-\[\#222\]       { border-color: var(--tm-line-soft) !important; }
+html[data-theme='terminal'] .border-\[\#333\],
+html[data-theme='terminal'] .border-\[\#444\]       { border-color: var(--tm-line) !important; }
+html[data-theme='terminal'] .border-\[\#ecd987\]    { border-color: var(--tm-purple) !important; }
+html[data-theme='terminal'] .border-white           { border-color: var(--tm-line) !important; }
+html[data-theme='terminal'] .border-\[\#4ade80\]    { border-color: var(--tm-green) !important; }
+html[data-theme='terminal'] .border-\[\#ef4444\]    { border-color: var(--tm-red) !important; }
+html[data-theme='terminal'] .border-\[\#f59e0b\]    { border-color: var(--tm-orange) !important; }
+html[data-theme='terminal'] .border-\[\#60a5fa\]    { border-color: var(--tm-blue) !important; }
+html[data-theme='terminal'] .border-2  { border-width: 1px !important; border-color: var(--tm-line) !important; }
+html[data-theme='terminal'] .border-b-2 { border-bottom-width: 1px !important; border-color: var(--tm-line) !important; }
+html[data-theme='terminal'] .border-t-2 { border-top-width: 1px !important; border-color: var(--tm-line) !important; }
+
+/* ─── Text ────────────────────────────────────────────────────────────── */
+html[data-theme='terminal'] .text-white,
+html[data-theme='terminal'] .text-\[\#e5e5e5\],
+html[data-theme='terminal'] .text-\[\#eee\],
+html[data-theme='terminal'] .text-\[\#ddd\]    { color: var(--tm-text) !important; }
+
+html[data-theme='terminal'] .text-\[\#aaa\],
+html[data-theme='terminal'] .text-\[\#999\],
+html[data-theme='terminal'] .text-\[\#888\]    { color: var(--tm-muted) !important; }
+
+html[data-theme='terminal'] .text-\[\#777\],
+html[data-theme='terminal'] .text-\[\#666\]    { color: var(--tm-muted) !important; }
+
+html[data-theme='terminal'] .text-\[\#555\],
+html[data-theme='terminal'] .text-\[\#444\],
+html[data-theme='terminal'] .text-\[\#333\]    { color: #444 !important; }
+
+/* Gold → purple (primary accent mapping) */
+html[data-theme='terminal'] .text-\[\#ecd987\] {
+  color: var(--tm-purple) !important;
+  text-shadow: 0 0 10px rgba(183, 121, 255, 0.4) !important;
+}
+html[data-theme='terminal'] .hover\:text-\[\#ecd987\]:hover { color: var(--tm-purple) !important; }
+html[data-theme='terminal'] .hover\:text-white:hover        { color: var(--tm-text) !important; }
+
+/* Semantic value colours */
+html[data-theme='terminal'] .text-\[\#4ade80\],
+html[data-theme='terminal'] .text-\[\#86efac\] { color: var(--tm-green) !important; text-shadow: 0 0 6px rgba(66,230,111,0.3) !important; }
+html[data-theme='terminal'] .text-\[\#ef4444\],
+html[data-theme='terminal'] .text-\[\#f87171\] { color: var(--tm-red) !important;   text-shadow: 0 0 6px rgba(255,69,69,0.3) !important; }
+html[data-theme='terminal'] .text-\[\#f59e0b\],
+html[data-theme='terminal'] .text-\[\#fbbf24\] { color: var(--tm-orange) !important; }
+html[data-theme='terminal'] .text-\[\#60a5fa\] { color: var(--tm-blue) !important;   text-shadow: 0 0 6px rgba(84,167,255,0.3) !important; }
+html[data-theme='terminal'] .text-\[\#a3a3a3\] { color: var(--tm-muted) !important; }
+
+/* Semantic BG badges */
+html[data-theme='terminal'] .bg-\[\#4ade80\] { background: var(--tm-green)  !important; color: #000 !important; }
+html[data-theme='terminal'] .bg-\[\#ef4444\] { background: var(--tm-red)    !important; color: #000 !important; }
+html[data-theme='terminal'] .bg-\[\#f59e0b\] { background: var(--tm-orange) !important; color: #000 !important; }
+html[data-theme='terminal'] .bg-\[\#60a5fa\] { background: var(--tm-blue)   !important; color: #000 !important; }
+html[data-theme='terminal'] .bg-\[\#ecd987\] { background: var(--tm-purple) !important; color: #000 !important; }
+
+/* ─── Section header bars (bg-[#1a1a0d] pattern — .section-title in mockup) ── */
+html[data-theme='terminal'] .bg-\[\#1a1a0d\] {
+  background: transparent !important;
+  border-left: none !important;
+  border-bottom: 1px dashed var(--tm-line) !important;
+  padding: 0 0 10px 0 !important;
+  margin-bottom: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+  color: var(--tm-purple) !important;
+  font-weight: 800 !important;
+}
+/* ┌─  prefix */
+html[data-theme='terminal'] .bg-\[\#1a1a0d\]::before {
+  content: '┌─ ' !important;
+  color: var(--tm-purple) !important;
+  font-weight: 800 !important;
+  width: auto !important;
+  height: auto !important;
+  background: none !important;
+  box-shadow: none !important;
+  display: inline !important;
+  font-size: inherit !important;
+  text-shadow: none !important;
+  flex-shrink: 0 !important;
+}
+/* ─────── suffix */
+html[data-theme='terminal'] .bg-\[\#1a1a0d\]::after {
+  content: ' ─────────────────────' !important;
+  color: #333 !important;
+  font-weight: 400 !important;
+  flex: 1 !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  font-size: 12px !important;
+  letter-spacing: -0.05em !important;
+  opacity: 1 !important;
+  display: inline !important;
+}
+/* Title text inside header */
+html[data-theme='terminal'] .bg-\[\#1a1a0d\] > span {
+  color: var(--tm-purple) !important;
+  text-shadow: none !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+}
+
+/* ─── Tables ──────────────────────────────────────────────────────────── */
+html[data-theme='terminal'] table {
+  border-collapse: collapse;
+  background: transparent;
+  font-variant-numeric: tabular-nums;
+}
+html[data-theme='terminal'] table.w-full { border: none; }
+
+html[data-theme='terminal'] table.w-full thead tr {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+}
+html[data-theme='terminal'] table.w-full th {
+  color: var(--tm-purple) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  text-align: left !important;
+  padding: 9px 12px !important;
+  background: transparent !important;
+  text-shadow: none !important;
+}
+html[data-theme='terminal'] table.w-full tbody tr {
+  border-bottom: 1px solid var(--tm-line-soft) !important;
+}
+html[data-theme='terminal'] table.w-full td {
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: var(--tm-text) !important;
+  background: transparent !important;
+  text-shadow: 0 0 2px rgba(232,226,214,.12) !important;
+}
+html[data-theme='terminal'] table.w-full tbody tr:hover td { opacity: 0.92 !important; }
+
+/* ─── Inputs ──────────────────────────────────────────────────────────── */
+html[data-theme='terminal'] input,
+html[data-theme='terminal'] select,
+html[data-theme='terminal'] textarea {
+  background: var(--tm-bg-content) !important;
+  color: var(--tm-text) !important;
+  border: 1px solid var(--tm-line) !important;
+  font-family: inherit !important;
+  font-size: 13px !important;
+  caret-color: var(--tm-purple);
+  text-shadow: none !important;
+}
+html[data-theme='terminal'] input:focus,
+html[data-theme='terminal'] select:focus,
+html[data-theme='terminal'] textarea:focus {
+  outline: none !important;
+  border-color: var(--tm-purple) !important;
+}
+
+/* ─── Buttons (maps to .button-terminal in mockup) ───────────────────── */
+html[data-theme='terminal'] button {
+  font-family: inherit !important;
+}
+html[data-theme='terminal'] button:not(.theme-toggle-btn) {
+  background: var(--tm-bg-content) !important;
+  border: 1px solid var(--tm-line) !important;
+  color: var(--tm-text) !important;
+  font-size: 12px !important;
+  letter-spacing: 0.02em !important;
+  text-shadow: none !important;
+}
+html[data-theme='terminal'] button:not(.theme-toggle-btn):hover {
+  border-color: var(--tm-purple) !important;
+  color: var(--tm-purple) !important;
+}
+
+/* ─── Active sidebar / menu items (inset orange left border) ─────────── */
+html[data-theme='terminal'] .bg-\[\#111\].text-\[\#ecd987\],
+html[data-theme='terminal'] .text-\[\#ecd987\].bg-\[\#111\] {
+  background: var(--tm-bg-soft) !important;
+  color: var(--tm-orange) !important;
+  box-shadow: inset 3px 0 0 var(--tm-orange) !important;
+  text-shadow: none !important;
+}
+
+/* ─── Typography scale ────────────────────────────────────────────────── */
+html[data-theme='terminal'] .text-7xl,
+html[data-theme='terminal'] .text-5xl  { font-size: 22px !important; font-weight: 900 !important; }
+html[data-theme='terminal'] .text-3xl  { font-size: 18px !important; font-weight: 900 !important; }
+html[data-theme='terminal'] .text-2xl  { font-size: 16px !important; }
+html[data-theme='terminal'] .text-xl   { font-size: 15px !important; }
+html[data-theme='terminal'] .text-lg   { font-size: 14px !important; }
+html[data-theme='terminal'] .text-base { font-size: 14px !important; }
+html[data-theme='terminal'] .text-sm   { font-size: 13px !important; }
+html[data-theme='terminal'] .text-xs   { font-size: 12px !important; }
+
+/* ─── Spacing ─────────────────────────────────────────────────────────── */
+html[data-theme='terminal'] .p-6  { padding: 18px !important; }
+html[data-theme='terminal'] .p-4  { padding: 12px !important; }
+html[data-theme='terminal'] .p-3  { padding: 8px !important; }
+html[data-theme='terminal'] .px-4 { padding-left: 14px !important; padding-right: 14px !important; }
+html[data-theme='terminal'] .py-4 { padding-top: 9px !important; padding-bottom: 9px !important; }
+html[data-theme='terminal'] .gap-4 { gap: 4px !important; }
+html[data-theme='terminal'] .gap-6 { gap: 6px !important; }
+html[data-theme='terminal'] .mb-6  { margin-bottom: 22px !important; }
+html[data-theme='terminal'] .mb-4  { margin-bottom: 12px !important; }
+html[data-theme='terminal'] .mt-4  { margin-top: 10px !important; }
+
+/* ─── Links ───────────────────────────────────────────────────────────── */
+html[data-theme='terminal'] a { text-decoration: none; }
+html[data-theme='terminal'] a:hover { color: var(--tm-purple) !important; }
+
+/* ─── Misc ────────────────────────────────────────────────────────────── */
+html[data-theme='terminal'] .rounded-full { border-radius: 0 !important; }
+
+/* Sidebar sections */
+html[data-theme='terminal'] .bg-\[\#0f0f0f\] {
+  background: var(--tm-bg-panel) !important;
+}
+html[data-theme='terminal'] .bg-\[\#0a0a0a\].border-b {
+  background: var(--tm-bg) !important;
+}
+
+/* Contribution/z-score bars */
+html[data-theme='terminal'] .w-20.h-2.bg-\[\#1a1a1a\],
+html[data-theme='terminal'] .w-16.h-1\.5.bg-\[\#1a1a1a\] {
+  background: #242424 !important;
+}
+
+/* Footer title style */
+html[data-theme='terminal'] .footer-title { color: var(--tm-purple) !important; font-weight: 900 !important; }
+
+/* Panel headers — [ brackets ] */
+html[data-theme='terminal'] .border-b-2.border-\[\#333\] {
+  border-bottom: 1px dashed var(--tm-line) !important;
+}
+
+/* Hide mainframe chrome, keep navbar */
+html[data-theme='terminal'] .mf-chrome    { display: none !important; }
+html[data-theme='terminal'] [data-app-navbar] { display: flex !important; }
+html[data-theme='terminal'] body { padding-top: 0 !important; padding-bottom: 0 !important; }
