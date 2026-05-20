@@ -66,6 +66,7 @@ REBALANCE_FREQ          = 3     # rebalance every N months (3 = quarterly)
 HYSTERESIS_THRESHOLD    = 0.02  # minimum |signed-weight change| to execute a trade
 MIN_INDICATORS          = 3     # skip pair when fewer valid rolling/Kalman betas available
 CARRY_MIN_DIFFERENTIAL  = 0.50  # minimum annual rate differential (%) to trade carry fallback
+SPOT_VOL_WINDOW         = 3     # months of realized FX spot vol used for Risk Parity sizing
 
 
 def _log(msg: str) -> None:
@@ -129,20 +130,31 @@ def _risk_parity_weights(
     returns_history: dict[str, list[float]],
     pairs: list[str],
     min_obs: int = 12,
+    spot_vols: dict[str, float] | None = None,
 ) -> dict[str, float]:
-    """Inverse-volatility weights, falling back to equal weight."""
+    """Inverse-volatility weights, falling back to equal weight.
+
+    spot_vols (optional): realized annualised vol of the FX spot price computed
+    from df_aligned over the last SPOT_VOL_WINDOW months.  When provided it is
+    preferred over the model's own P&L history because:
+      - it is based on the directly observable price series (more stable),
+      - the P&L history is short and noisy early in the backtest,
+      - it is look-ahead free (computed from prices up to t_open).
+    Pairs absent from spot_vols fall back to the P&L-based estimate.
+    """
     vols = {}
     for p in pairs:
-        hist = returns_history.get(p, [])
-        if len(hist) >= min_obs:
-            vols[p] = float(np.std(hist[-36:]))  # rolling 36-month vol
+        if spot_vols and p in spot_vols and spot_vols[p] > 1e-8:
+            vols[p] = spot_vols[p]
+        else:
+            hist = returns_history.get(p, [])
+            if len(hist) >= min_obs:
+                vols[p] = float(np.std(hist[-36:]))  # rolling 36-month P&L vol
     if not vols or all(v < 1e-8 for v in vols.values()):
-        # Fallback: equal weight
         n = len(pairs)
         return {p: 1.0 / n for p in pairs} if n > 0 else {}
     inv_vol = {p: 1.0 / max(v, 1e-8) for p, v in vols.items()}
     total = sum(inv_vol.values())
-    # pairs without enough history get equal share of remaining weight
     n_missing = len(pairs) - len(inv_vol)
     missing_w = (1.0 / len(pairs)) if n_missing > 0 else 0.0
     return {
@@ -238,12 +250,27 @@ def simulate(
         print(f"  Hysteresis:  {hysteresis * 100:.1f}% minimum weight change")
 
     dates = df_trans.index
+
+    # ── Cross-pair coverage validation ───────────────────────────────────────
+    if verbose:
+        total_months = len(dates)
+        for pair in fx_pairs:
+            if pair not in df_aligned.columns:
+                _log(f"Coverage: {pair} absent from df_aligned — will be skipped")
+                continue
+            available = int(df_aligned[pair].dropna().shape[0])
+            pct = available / total_months if total_months > 0 else 0.0
+            if pct < 0.90:
+                _log(f"Coverage warning: {pair}  {available}/{total_months} months ({pct:.0%})")
+
     trades: list[Trade] = []
     monthly_pnl: dict[pd.Timestamp, float] = {}
     preds: list[float] = []
 
     pair_return_history: dict[str, list[float]] = {p: [] for p in fx_pairs}
     pred_history: dict[str, list[float]] = {p: [] for p in fx_pairs}
+    pair_trade_count: dict[str, int] = {p: 0 for p in fx_pairs}   # months with active position
+    pair_skip_count:  dict[str, int] = {p: 0 for p in fx_pairs}   # months skipped (no data)
     # Signed weights: positive = LONG, negative = SHORT, absent = flat
     current_weights: dict[str, float] = {}
     rebalance_counter = 0
@@ -341,9 +368,19 @@ def simulate(
                     raw_signals[pair] = pred
 
             # Compute candidate signed weights via Risk Parity
+            # Use realized spot vol (last SPOT_VOL_WINDOW months) as the denominator —
+            # more stable than the model's own P&L history early in the backtest.
             candidate_weights: dict[str, float] = {}
             if active_for_rp:
-                rp_w = _risk_parity_weights(pair_return_history, active_for_rp)
+                spot_vols: dict[str, float] = {}
+                for p in active_for_rp:
+                    if p in df_aligned.columns:
+                        px = df_aligned[p].loc[:t_open].dropna()
+                        if len(px) > SPOT_VOL_WINDOW:
+                            rv = px.pct_change().dropna().iloc[-SPOT_VOL_WINDOW:]
+                            if len(rv) >= SPOT_VOL_WINDOW:
+                                spot_vols[p] = float(rv.std()) * np.sqrt(12)  # annualised
+                rp_w = _risk_parity_weights(pair_return_history, active_for_rp, spot_vols=spot_vols)
                 for pair in active_for_rp:
                     sign = 1.0 if raw_signals[pair] > 0 else -1.0
                     candidate_weights[pair] = sign * rp_w.get(pair, 1.0 / len(active_for_rp))
@@ -375,7 +412,9 @@ def simulate(
         for pair, w in current_weights.items():
             prices = df_aligned[pair]
             if t_open not in prices.index or t_close not in prices.index:
+                pair_skip_count[pair] = pair_skip_count.get(pair, 0) + 1
                 continue
+            pair_trade_count[pair] = pair_trade_count.get(pair, 0) + 1
 
             entry  = prices.loc[t_open]
             exit_  = prices.loc[t_close]
@@ -419,6 +458,14 @@ def simulate(
             p = pd.Series(preds)
             _log(f"Predicción media: {p.mean():.4f} (std {p.std():.4f}, range [{p.min():.4f}, {p.max():.4f}])")
         _log(f"Periodos: {len(trades)}  |  Meses activos: {len(monthly_returns)}")
+        # Per-pair activity summary — highlights cross pairs with low coverage
+        _log("Actividad por par:")
+        for pair in fx_pairs:
+            n_t = pair_trade_count.get(pair, 0)
+            n_s = pair_skip_count.get(pair, 0)
+            total = n_t + n_s
+            flag = "  [data gaps]" if n_s > 0 else ""
+            _log(f"  {pair:<10} {n_t:>3} meses operados  {n_s:>3} saltados{flag}")
 
     return BacktestResult(trades=trades, equity=equity, monthly_returns=monthly_returns)
 
