@@ -19,11 +19,32 @@ function ThemeToggle() {
   )
 }
 
-const EXTENSION_ITEMS = briefExtensionModules.map((module) => ({
-  to: module.route,
-  label: module.part,
-  desc: module.name,
-}))
+function moduleItems(ids) {
+  return ids
+    .map((id) => briefExtensionModules.find((module) => module.id === id))
+    .filter(Boolean)
+    .map((module) => ({
+      to: module.route,
+      label: module.part,
+      desc: module.name,
+    }))
+}
+
+const ANALYSIS_EXTENSION_ITEMS = moduleItems(['macro-nowcasting'])
+const EXECUTION_EXTENSION_ITEMS = moduleItems([
+  'fiscal',
+  'disaster-recovery',
+  'tail-risk',
+  'counterparty-risk',
+  'multi-broker',
+])
+const LEARNING_EXTENSION_ITEMS = moduleItems([
+  'behavioral-finance',
+  'model-governance',
+  'decision-log',
+  'knowledge-transfer',
+  'external-validation',
+])
 
 const GROUPS = [
   {
@@ -38,11 +59,8 @@ const GROUPS = [
       { to: '/trade',               label: 'Trade', desc: 'Global Trade Monitor' },
       { to: '/fx-trend-layer',       label: 'G10', desc: 'FX Trend Layer' },
       { to: '/equities-macro-layer', label: 'G11', desc: 'Equities Macro' },
+      ...ANALYSIS_EXTENSION_ITEMS,
     ],
-  },
-  {
-    label: 'Extensiones',
-    items: EXTENSION_ITEMS,
   },
   {
     label: 'Ejecución',
@@ -50,6 +68,7 @@ const GROUPS = [
       { to: '/timing/operativa',    label: 'Timing',    desc: 'Timing' },
       { to: '/risk/operativa',      label: 'Risk',      desc: 'Risk Mgmt' },
       { to: '/execution/operativa', label: 'Exec',      desc: 'Execution' },
+      ...EXECUTION_EXTENSION_ITEMS,
     ],
   },
   {
@@ -60,6 +79,7 @@ const GROUPS = [
       { to: '/backtest',    label: 'Backtest',  desc: 'Backtest' },
       { to: '/scenario-library', label: 'Scenarios', desc: 'Scenario Library' },
       { to: '/capital-allocation', label: 'Capital', desc: 'Capital Allocation' },
+      ...LEARNING_EXTENSION_ITEMS,
     ],
   },
 ]

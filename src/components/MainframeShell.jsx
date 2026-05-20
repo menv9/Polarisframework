@@ -3,11 +3,32 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAppStore } from '../stores/appStore'
 import { briefExtensionModules } from '../data/modules'
 
-const EXTENSION_ITEMS = briefExtensionModules.map((module) => ({
-  to: module.route,
-  label: module.part,
-  desc: module.name,
-}))
+function moduleItems(ids) {
+  return ids
+    .map((id) => briefExtensionModules.find((module) => module.id === id))
+    .filter(Boolean)
+    .map((module) => ({
+      to: module.route,
+      label: module.part,
+      desc: module.name,
+    }))
+}
+
+const ANALYSIS_EXTENSION_ITEMS = moduleItems(['macro-nowcasting'])
+const EXECUTION_EXTENSION_ITEMS = moduleItems([
+  'fiscal',
+  'disaster-recovery',
+  'tail-risk',
+  'counterparty-risk',
+  'multi-broker',
+])
+const LEARNING_EXTENSION_ITEMS = moduleItems([
+  'behavioral-finance',
+  'model-governance',
+  'decision-log',
+  'knowledge-transfer',
+  'external-validation',
+])
 
 const TAB_GROUPS = [
   {
@@ -23,29 +44,28 @@ const TAB_GROUPS = [
       { to: '/exogenous/operativa', label: 'EXOGENOUS',  desc: 'Exogenous' },
       { to: '/fx-trend-layer',       label: 'G10 TREND',  desc: 'FX Trend Layer' },
       { to: '/equities-macro-layer', label: 'G11 EQ',     desc: 'Equities Macro' },
+      ...ANALYSIS_EXTENSION_ITEMS,
     ],
   },
   {
-    key: '3', label: 'EXTENSIONES', to: '/fiscal',
-    items: EXTENSION_ITEMS,
-  },
-  {
-    key: '4', label: 'EJECUCIÓN', to: '/execution/operativa',
+    key: '3', label: 'EJECUCIÓN', to: '/execution/operativa',
     items: [
       { to: '/timing/operativa',    label: 'TIMING',    desc: 'Timing' },
       { to: '/risk/operativa',      label: 'RISK',      desc: 'Risk Mgmt' },
       { to: '/execution/operativa', label: 'EXECUTION', desc: 'Execution' },
+      ...EXECUTION_EXTENSION_ITEMS,
     ],
   },
   {
-    key: '5', label: 'APRENDIZAJE', to: '/journal',
+    key: '4', label: 'APRENDIZAJE', to: '/journal',
     items: [
       { to: '/journal',     label: 'JOURNAL',    desc: 'Trade Journal' },
       { to: '/performance', label: 'PERFORMANCE',desc: 'Performance' },
+      ...LEARNING_EXTENSION_ITEMS,
     ],
   },
   {
-    key: '6', label: 'DATA', to: '/data',
+    key: '5', label: 'DATA', to: '/data',
     items: [
       { to: '/data',                      label: 'HUB',           desc: 'Data Hub' },
       { to: '/data/raw',                  label: 'RAW',           desc: 'Raw Data' },
@@ -56,7 +76,7 @@ const TAB_GROUPS = [
     ],
   },
   {
-    key: '7', label: 'ADMIN', to: '/admin', adminOnly: true,
+    key: '6', label: 'ADMIN', to: '/admin', adminOnly: true,
   },
 ]
 
