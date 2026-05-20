@@ -262,9 +262,14 @@ export default function Navbar() {
     <nav data-app-navbar className={`fixed top-0 left-0 right-0 z-50 border-b-2 border-[#333] bg-black ${scrolled ? 'border-white' : ''}`}>
       <div className="w-full px-4 h-12 flex items-center relative">
         {/* Logo — izquierda */}
-        <Link to="/" className="flex items-center flex-none">
-          <span className="text-sm font-bold tracking-widest text-white">POLARIS</span>
-        </Link>
+        <div className="flex flex-none items-center gap-4">
+          <Link to="/" className="flex items-center">
+            <span className="text-sm font-bold tracking-widest text-white">POLARIS</span>
+          </Link>
+          <div className="hidden md:block">
+            <NavbarSearch isAdmin={isAdmin} />
+          </div>
+        </div>
 
         {/* Nav links — centrado sobre el ancho total del viewport */}
         <div className="hidden md:flex items-center gap-5 absolute left-1/2 -translate-x-1/2">
@@ -322,7 +327,6 @@ export default function Navbar() {
 
         {/* Derecha — email + salir + UI toggle, pegados al borde */}
         <div className="hidden md:flex items-center gap-3 flex-none ml-auto">
-          <NavbarSearch isAdmin={isAdmin} />
           {user && (
             <div className="flex items-center gap-3">
               <span className="text-xs text-[#555] max-w-[140px] truncate">{user.email}</span>
