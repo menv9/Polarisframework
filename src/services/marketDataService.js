@@ -77,6 +77,69 @@ export function getLastUpdateTime() {
   })
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Nasdaq Data Link helpers
+// Docs: https://docs.data.nasdaq.com/docs/getting-started
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Fetch a time-series dataset from Nasdaq Data Link.
+ * @param {string} database  e.g. "FRED", "WIKI", "CBOE"
+ * @param {string} dataset   e.g. "GDP", "VIX"
+ * @param {{ rows?: number, start_date?: string, end_date?: string, column_index?: number }} [opts]
+ * @returns {Promise<{ database: string, dataset: string, column_names: string[], data: any[][] }>}
+ */
+export async function fetchNasdaqDataset(database, dataset, opts = {}) {
+  const params = new URLSearchParams()
+  if (opts.rows) params.set('rows', String(opts.rows))
+  if (opts.start_date) params.set('start_date', opts.start_date)
+  if (opts.end_date) params.set('end_date', opts.end_date)
+  if (opts.column_index) params.set('column_index', String(opts.column_index))
+  const qs = params.toString()
+  const res = await fetch(`${API_BASE}/api/nasdaq/${database}/${dataset}${qs ? `?${qs}` : ''}`)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || `Nasdaq fetch failed for ${database}/${dataset}`)
+  }
+  return res.json()
+}
+
+/**
+ * Fetch only the most recent value from a Nasdaq Data Link time-series.
+ * @param {string} database
+ * @param {string} dataset
+ * @param {number} [columnIndex=1]  1-based column index (after the date column)
+ * @returns {Promise<{ database: string, dataset: string, date: string, value: number, column_names: string[] }>}
+ */
+export async function fetchNasdaqLatest(database, dataset, columnIndex = 1) {
+  const res = await fetch(
+    `${API_BASE}/api/nasdaq/${database}/${dataset}/latest?column_index=${columnIndex}`,
+  )
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || `Nasdaq latest failed for ${database}/${dataset}`)
+  }
+  return res.json()
+}
+
+/**
+ * Query a Nasdaq Datatables endpoint (tick data, fundamentals, options, etc.).
+ * @param {string} datatable  e.g. "SHARADAR/SF1"
+ * @param {Record<string, string>} [filters]  any datatable-specific filter params
+ * @returns {Promise<{ datatable: string, columns: any[], data: any[][], meta: object }>}
+ */
+export async function fetchNasdaqTable(datatable, filters = {}) {
+  const params = new URLSearchParams(filters)
+  const qs = params.toString()
+  const res = await fetch(`${API_BASE}/api/nasdaq-table/${datatable}${qs ? `?${qs}` : ''}`)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || `Nasdaq table failed for ${datatable}`)
+  }
+  return res.json()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Fallback mock data con variaciones aleatorias
 function fetchMockData() {
   return new Promise((resolve) => {

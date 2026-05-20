@@ -2646,6 +2646,132 @@ app.delete('/api/auth/users/:userId', async (req, res) => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Nasdaq Data Link (formerly Quandl) proxy endpoints
+// Docs: https://docs.data.nasdaq.com/docs/getting-started
+// Dataset URL pattern: /api/nasdaq/:database/:dataset
+// Example: GET /api/nasdaq/FRED/GDP?rows=5
+// Example: GET /api/nasdaq/WIKI/AAPL/latest
+// ─────────────────────────────────────────────────────────────────────────────
+
+const NASDAQ_BASE = 'https://data.nasdaq.com/api/v3/datasets'
+const NASDAQ_TABLES_BASE = 'https://data.nasdaq.com/api/v3/datatables'
+const NASDAQ_API_KEY = process.env.NASDAQ_DATA_LINK_API_KEY
+
+// GET /api/nasdaq/:database/:dataset — serie de tiempo completa o filtrada
+// Query params opcionales: rows, start_date (YYYY-MM-DD), end_date (YYYY-MM-DD), column_index (1-based)
+app.get('/api/nasdaq/:database/:dataset', async (req, res) => {
+  if (!NASDAQ_API_KEY || NASDAQ_API_KEY === 'your_key_here') {
+    return res.status(503).json({ error: 'NASDAQ_DATA_LINK_API_KEY not configured' })
+  }
+  const { database, dataset } = req.params
+  const { rows, start_date, end_date, column_index } = req.query
+  const cacheKey = `nasdaq:${database}:${dataset}:${rows || ''}:${start_date || ''}:${end_date || ''}:${column_index || ''}`
+  const cached = getCached(cacheKey)
+  if (cached) return res.json(cached)
+
+  try {
+    const params = { api_key: NASDAQ_API_KEY }
+    if (rows) params.rows = Math.min(parseInt(rows, 10), 1000)
+    if (start_date) params.start_date = start_date
+    if (end_date) params.end_date = end_date
+    if (column_index) params.column_index = parseInt(column_index, 10)
+
+    const url = `${NASDAQ_BASE}/${database}/${dataset}/data.json`
+    const { data } = await getWithRetry(url, { params }, 3, `NASDAQ ${database}/${dataset}`)
+    const result = {
+      database,
+      dataset,
+      column_names: data.dataset_data?.column_names ?? [],
+      data: data.dataset_data?.data ?? [],
+    }
+    setCached(cacheKey, result)
+    res.json(result)
+  } catch (err) {
+    console.error(`[NASDAQ] Error fetching ${database}/${dataset}:`, err.message)
+    const status = err.response?.status
+    if (status === 403) return res.status(403).json({ error: 'Invalid or unauthorized Nasdaq Data Link API key' })
+    if (status === 404) return res.status(404).json({ error: `Dataset ${database}/${dataset} not found` })
+    res.status(502).json({ error: 'Nasdaq Data Link fetch failed', message: err.message })
+  }
+})
+
+// GET /api/nasdaq/:database/:dataset/latest — valor mas reciente de una columna
+// Query params: column_index (default 1, 1-based after the date column)
+app.get('/api/nasdaq/:database/:dataset/latest', async (req, res) => {
+  if (!NASDAQ_API_KEY || NASDAQ_API_KEY === 'your_key_here') {
+    return res.status(503).json({ error: 'NASDAQ_DATA_LINK_API_KEY not configured' })
+  }
+  const { database, dataset } = req.params
+  const colIndex = Math.max(1, parseInt(req.query.column_index || '1', 10))
+  const cacheKey = `nasdaq:latest:${database}:${dataset}:${colIndex}`
+  const cached = getCached(cacheKey)
+  if (cached) return res.json(cached)
+
+  try {
+    const { data } = await getWithRetry(
+      `${NASDAQ_BASE}/${database}/${dataset}/data.json`,
+      { params: { api_key: NASDAQ_API_KEY, rows: 1 } },
+      3,
+      `NASDAQ ${database}/${dataset}/latest`,
+    )
+    const row = data.dataset_data?.data?.[0]
+    if (!row) return res.status(404).json({ error: `No data for ${database}/${dataset}` })
+    const result = {
+      database,
+      dataset,
+      date: row[0],
+      value: row[colIndex] ?? null,
+      column_names: data.dataset_data?.column_names ?? [],
+    }
+    setCached(cacheKey, result)
+    res.json(result)
+  } catch (err) {
+    console.error(`[NASDAQ] Error fetching latest ${database}/${dataset}:`, err.message)
+    const status = err.response?.status
+    if (status === 403) return res.status(403).json({ error: 'Invalid or unauthorized Nasdaq Data Link API key' })
+    if (status === 404) return res.status(404).json({ error: `Dataset ${database}/${dataset} not found` })
+    res.status(502).json({ error: 'Nasdaq Data Link latest failed', message: err.message })
+  }
+})
+
+// GET /api/nasdaq-table/:datatable — Datatables API (tick data, options, fundamentals)
+// Query params: any Nasdaq Datatables filter params plus optional ticker, date_from, date_to, per_page
+app.get('/api/nasdaq-table/:datatable', async (req, res) => {
+  if (!NASDAQ_API_KEY || NASDAQ_API_KEY === 'your_key_here') {
+    return res.status(503).json({ error: 'NASDAQ_DATA_LINK_API_KEY not configured' })
+  }
+  const { datatable } = req.params
+  const params = { ...req.query, api_key: NASDAQ_API_KEY }
+  if (params.per_page) params['qopts.per_page'] = Math.min(parseInt(params.per_page, 10), 1000)
+  const cacheKey = `nasdaq-table:${datatable}:${JSON.stringify(req.query)}`
+  const cached = getCached(cacheKey)
+  if (cached) return res.json(cached)
+
+  try {
+    const { data } = await getWithRetry(
+      `${NASDAQ_TABLES_BASE}/${datatable}.json`,
+      { params },
+      3,
+      `NASDAQ TABLE ${datatable}`,
+    )
+    const result = {
+      datatable,
+      columns: data.datatable?.columns ?? [],
+      data: data.datatable?.data ?? [],
+      meta: data.meta ?? {},
+    }
+    setCached(cacheKey, result)
+    res.json(result)
+  } catch (err) {
+    console.error(`[NASDAQ TABLE] Error fetching ${datatable}:`, err.message)
+    const status = err.response?.status
+    if (status === 403) return res.status(403).json({ error: 'Invalid or unauthorized Nasdaq Data Link API key' })
+    if (status === 404) return res.status(404).json({ error: `Datatable ${datatable} not found` })
+    res.status(502).json({ error: 'Nasdaq Data Link datatable failed', message: err.message })
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Solo iniciar servidor si se ejecuta directamente (desarrollo local)
 if (require.main === module) {
@@ -2668,6 +2794,9 @@ if (require.main === module) {
     console.log(`   GET http://localhost:${PORT}/api/indicators/:country`)
     console.log(`   GET http://localhost:${PORT}/api/polaris/worldview`)
     console.log(`   POST http://localhost:${PORT}/api/scrape`)
+    console.log(`   GET http://localhost:${PORT}/api/nasdaq/:database/:dataset`)
+    console.log(`   GET http://localhost:${PORT}/api/nasdaq/:database/:dataset/latest`)
+    console.log(`   GET http://localhost:${PORT}/api/nasdaq-table/:datatable`)
   })
 }
 
