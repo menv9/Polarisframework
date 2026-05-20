@@ -51,6 +51,23 @@ export const modules = [
     color: 'blue',
   },
   {
+    id: 'emerging-markets',
+    part: 'Extensión',
+    name: 'Emerging Markets',
+    tagline: 'Extensión del framework a divisas EM con drivers específicos',
+    input: 'CDS soberanos, EMBI, reservas FX, capital controls, commodities locales',
+    output: 'Score_FX_EM con filtros de veto y sizing ajustado',
+    features: [
+      'Clasificación por Tier (1–4)',
+      'Drivers exógenos EM-específicos',
+      'Filtros VIX / DXY / Eventos',
+      'Sizing 0.5% RPT, ATR×3–4',
+      'Exposición max 30% EM agregado',
+    ],
+    downstream: 'Risk · Execution',
+    color: 'emerald',
+  },
+  {
     id: 'timing',
     part: 'Parte III',
     name: 'Timing the Market',

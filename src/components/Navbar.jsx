@@ -26,6 +26,7 @@ const GROUPS = [
       { to: '/world-view',label: 'WV',   desc: 'World View' },
       { to: '/endogenous',          label: 'Endo', desc: 'Endogenous' },
       { to: '/exogenous/operativa', label: 'Exo',  desc: 'Exogenous' },
+      { to: '/emerging-markets',    label: 'EM',   desc: 'Emerging Markets' },
     ],
   },
   {

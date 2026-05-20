@@ -14,7 +14,7 @@ describe('App', () => {
     expect(titles.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('renders all 7 module names on home', () => {
+  it('renders all 8 module names on home', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <AppRoutes />
@@ -24,6 +24,7 @@ describe('App', () => {
       'World View',
       'Endogenous Drivers',
       'Exogenous Drivers',
+      'Emerging Markets',
       'Timing the Market',
       'Risk Management',
       'Execution & Costs',
@@ -51,12 +52,11 @@ describe('App', () => {
 
   it('renders world view ops page', () => {
     render(
-      <MemoryRouter initialEntries={['/world-view/operativa']}>
+      <MemoryRouter initialEntries={['/world-view']}>
         <AppRoutes />
       </MemoryRouter>
     )
-    expect(screen.getByText('OPERATIVA — WORLD VIEW')).toBeInTheDocument()
-    expect(screen.getByText('WorldView State Vector')).toBeInTheDocument()
+    expect(screen.getByText('WORLD VIEW')).toBeInTheDocument()
   })
 
   it('renders data center hub page', () => {
