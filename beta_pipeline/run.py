@@ -159,14 +159,14 @@ def run(
 
     # ── Per-pair indicator pool (pre-filtered) ───────────────────────────────
     # Build the indicator list each pair will use for rolling and Kalman betas.
-    # Pre-filtering ensures each pair uses only its own economically relevant indicators,
-    # reducing noise and preventing irrelevant cross-country indicators from inflating
-    # static significance counts.
-    # REER: valid mean-reversion signal (overvalued REER → future depreciation) — included
-    #       by default (EXCLUDE_REER_ROLLING=False).
-    # DXY: truly circular (57% EUR + 14% JPY + 12% GBP = modelled pairs) — excluded by default.
-    # Criteria:  (1) economically relevant to the pair's countries
-    #            (2) not in _CIRCULAR_PATTERNS (DXY by default; REER if configured)
+    # Only circular indicators are excluded here — all macro/global signals are kept.
+    # Economic-relevance filtering (is_economically_relevant) applies only to the
+    # robust_beta walk-forward stage (Phase 4b), not to rolling/Kalman, because:
+    #   - Global indicators (VIX, commodities, US rates) drive all G10 pairs
+    #   - Irrelevant-country indicators have near-zero rolling betas → negligible noise
+    #   - Over-filtering shrinks each pair's indicator pool too much and hurts Sharpe
+    # REER: valid mean-reversion signal — included by default (EXCLUDE_REER_ROLLING=False).
+    # DXY: truly circular (57% EUR + 14% JPY + 12% GBP = the pairs we model) — excluded.
     _CIRCULAR_PATTERNS: list[str] = []
     if EXCLUDE_REER_ROLLING:
         _CIRCULAR_PATTERNS.append("_reer")
@@ -174,16 +174,15 @@ def run(
         _CIRCULAR_PATTERNS.append("wv_dxy")
 
     _all_indicators = [col for col in df_trans.columns if col not in active_fx]
-    pair_indicators: dict[str, list[str]] = {}
-    for _pair in active_fx:
-        pair_indicators[_pair] = [
-            col for col in _all_indicators
-            if robust_beta_mod.is_economically_relevant(_pair, col)
-            and not any(pat in col for pat in _CIRCULAR_PATTERNS)
-        ]
+    if _CIRCULAR_PATTERNS:
+        _pool = [col for col in _all_indicators if not any(pat in col for pat in _CIRCULAR_PATTERNS)]
+    else:
+        _pool = _all_indicators
+    # All pairs share the same filtered pool (no per-pair economic relevance cut here)
+    pair_indicators: dict[str, list[str]] = {_pair: _pool for _pair in active_fx}
     if verbose:
         counts_str = "  ".join(f"{p}={len(v)}" for p, v in pair_indicators.items())
-        print(f"  Pre-filtered indicator pool: {counts_str}")
+        print(f"  Indicator pool (circular excluded): {counts_str}")
 
     print(f"  Phases 2-3 time: {_elapsed(phase_start)}")
 
