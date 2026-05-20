@@ -9,7 +9,7 @@ function moduleItems(ids) {
     .filter(Boolean)
     .map((module) => ({
       to: module.route,
-      label: module.part,
+      label: module.shortLabel,
       desc: module.name,
     }))
 }
@@ -45,8 +45,8 @@ const TAB_GROUPS = [
       { to: '/world-view',label: 'WORLD VIEW', desc: 'World View' },
       { to: '/endogenous',          label: 'ENDOGENOUS', desc: 'Endogenous' },
       { to: '/exogenous/operativa', label: 'EXOGENOUS',  desc: 'Exogenous' },
-      { to: '/fx-trend-layer',       label: 'G10 TREND',  desc: 'FX Trend Layer' },
-      { to: '/equities-macro-layer', label: 'G11 EQ',     desc: 'Equities Macro' },
+      { to: '/fx-trend-layer',       label: 'FX TREND',  desc: 'FX Trend Layer' },
+      { to: '/equities-macro-layer', label: 'EQUITIES',  desc: 'Equities Macro' },
       ...ANALYSIS_EXTENSION_ITEMS,
     ],
   },

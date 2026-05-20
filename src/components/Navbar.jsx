@@ -25,7 +25,7 @@ function moduleItems(ids) {
     .filter(Boolean)
     .map((module) => ({
       to: module.route,
-      label: module.part,
+      label: module.shortLabel,
       desc: module.name,
     }))
 }
@@ -57,8 +57,8 @@ const GROUPS = [
       { to: '/exogenous/operativa', label: 'Exo',  desc: 'Exogenous' },
       { to: '/emerging-markets',    label: 'EM',   desc: 'Emerging Markets' },
       { to: '/trade',               label: 'Trade', desc: 'Global Trade Monitor' },
-      { to: '/fx-trend-layer',       label: 'G10', desc: 'FX Trend Layer' },
-      { to: '/equities-macro-layer', label: 'G11', desc: 'Equities Macro' },
+      { to: '/fx-trend-layer',       label: 'Trend',    desc: 'FX Trend Layer' },
+      { to: '/equities-macro-layer', label: 'Equities', desc: 'Equities Macro' },
       ...ANALYSIS_EXTENSION_ITEMS,
     ],
   },

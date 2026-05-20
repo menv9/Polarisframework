@@ -2,6 +2,7 @@ export const briefExtensionModules = [
   {
     id: 'fiscal',
     part: 'G3',
+    shortLabel: 'Fiscal',
     name: 'Modulo Fiscal',
     tagline: 'Fiscalidad, reporting y P&L despues de impuestos',
     input: 'Operativa, resultados, residencia fiscal, vehiculo operativo y calendario tributario',
@@ -16,6 +17,7 @@ export const briefExtensionModules = [
   {
     id: 'disaster-recovery',
     part: 'G6',
+    shortLabel: 'DR / BCP',
     name: 'Disaster Recovery / Business Continuity',
     tagline: 'Continuidad operativa ante fallos criticos',
     input: 'Brokers, cuentas, conectividad, dispositivos, accesos y protocolos de emergencia',
@@ -30,6 +32,7 @@ export const briefExtensionModules = [
   {
     id: 'tail-risk',
     part: 'G7',
+    shortLabel: 'Tail Risk',
     name: 'Hedging / Tail Risk Module',
     tagline: 'Coberturas y proteccion frente a eventos extremos',
     input: 'Exposicion agregada, volatilidad, correlaciones, escenarios de shock y coste de cobertura',
@@ -44,6 +47,7 @@ export const briefExtensionModules = [
   {
     id: 'counterparty-risk',
     part: 'G8',
+    shortLabel: 'Counterparty',
     name: 'Counterparty Risk Framework',
     tagline: 'Riesgo de broker, custodio, liquidez y contraparte',
     input: 'Brokers, custodios, saldos, garantias, condiciones de ejecucion y concentracion de cuentas',
@@ -58,6 +62,7 @@ export const briefExtensionModules = [
   {
     id: 'behavioral-finance',
     part: 'G9',
+    shortLabel: 'Behavioral',
     name: 'Behavioral Finance / Psicologia del operador',
     tagline: 'Disciplina, sesgos y control del estado del operador',
     input: 'Journal, estado emocional, errores recurrentes, drawdowns y contexto de decision',
@@ -72,6 +77,7 @@ export const briefExtensionModules = [
   {
     id: 'macro-nowcasting',
     part: 'G12',
+    shortLabel: 'Nowcasting',
     name: 'Macro Nowcasting Avanzado',
     tagline: 'Lectura macro de alta frecuencia y revision de expectativas',
     input: 'Datos adelantados, sorpresas macro, revisiones, consenso y series de alta frecuencia',
@@ -86,6 +92,7 @@ export const briefExtensionModules = [
   {
     id: 'multi-broker',
     part: 'G13',
+    shortLabel: 'Multi-Broker',
     name: 'Multi-Broker / Multi-Account Management',
     tagline: 'Gestion agregada de cuentas, brokers y capital',
     input: 'Cuentas, saldos, margen, posiciones, costes, permisos y restricciones por broker',
@@ -100,6 +107,7 @@ export const briefExtensionModules = [
   {
     id: 'model-governance',
     part: 'G15',
+    shortLabel: 'Governance',
     name: 'Model Governance / Audit Trail',
     tagline: 'Control de versiones, cambios y auditoria del modelo',
     input: 'Parametros, versiones, cambios de reglas, aprobaciones, backtests y resultados en vivo',
@@ -114,6 +122,7 @@ export const briefExtensionModules = [
   {
     id: 'decision-log',
     part: 'G16',
+    shortLabel: 'Dec. Log',
     name: 'Decision Log estrategico',
     tagline: 'Registro de decisiones estructurales del framework',
     input: 'Cambios estrategicos, hipotesis, pausas, activaciones, revisiones y lecciones aprendidas',
@@ -128,6 +137,7 @@ export const briefExtensionModules = [
   {
     id: 'knowledge-transfer',
     part: 'G17',
+    shortLabel: 'Knowledge',
     name: 'Knowledge Transfer Protocol',
     tagline: 'Documentacion, handoff y continuidad del conocimiento',
     input: 'Runbooks, decisiones, procesos, ownership, dependencias y material de onboarding',
@@ -142,6 +152,7 @@ export const briefExtensionModules = [
   {
     id: 'external-validation',
     part: 'G18',
+    shortLabel: 'Ext. Validation',
     name: 'External Validation Framework',
     tagline: 'Revision externa, benchmarks y validacion independiente',
     input: 'Resultados, metodologia, supuestos, backtests, benchmarks y revisiones de terceros',
