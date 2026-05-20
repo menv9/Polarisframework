@@ -38,6 +38,12 @@ import {
   DecisionLogPage,
   KnowledgeTransferPage,
 } from './pages/GovernanceModulesPage'
+import {
+  FiscalPage,
+  DisasterRecoveryPage,
+  TailRiskPage,
+  CounterpartyRiskPage,
+} from './pages/RiskContinuityModulesPage'
 import { briefExtensionModules } from './data/modules'
 
 function Layout({ children }) {
@@ -93,6 +99,10 @@ export default function AppRoutes() {
         <Route path="/behavioral-finance" element={<BehavioralFinancePage />} />
         <Route path="/decision-log" element={<DecisionLogPage />} />
         <Route path="/knowledge-transfer" element={<KnowledgeTransferPage />} />
+        <Route path="/fiscal" element={<FiscalPage />} />
+        <Route path="/disaster-recovery" element={<DisasterRecoveryPage />} />
+        <Route path="/tail-risk" element={<TailRiskPage />} />
+        <Route path="/counterparty-risk" element={<CounterpartyRiskPage />} />
         {briefExtensionModules.map((module) => (
           <Route
             key={module.id}
