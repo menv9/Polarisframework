@@ -144,6 +144,17 @@ export default function Navbar() {
             Data
           </Link>
 
+          <span className="text-[#222]">|</span>
+
+          <Link
+            to="/settings"
+            className={`text-xs font-bold uppercase tracking-wider transition-colors ${
+              location.pathname === '/settings' ? 'text-[#ecd987]' : 'text-[#666] hover:text-[#ecd987]'
+            }`}
+          >
+            Settings
+          </Link>
+
           {isAdmin && (
             <>
               <span className="text-[#222]">|</span>
@@ -210,7 +221,18 @@ export default function Navbar() {
               })}
             </div>
           ))}
-          <div className="px-4 pt-2 border-t border-[#222] mt-2 flex items-center justify-between">
+          <div className="px-4 py-2 border-t border-[#222] mt-2">
+            <Link
+              to="/settings"
+              className={`flex items-center justify-between px-2 py-2 text-xs font-bold uppercase tracking-wider ${
+                location.pathname === '/settings' ? 'text-[#ecd987]' : 'text-[#555]'
+              }`}
+            >
+              <span>Settings</span>
+              {location.pathname === '/settings' && <span className="text-[8px]">▶</span>}
+            </Link>
+          </div>
+          <div className="px-4 pt-1 border-t border-[#222] flex items-center justify-between">
             {user && (
               <button onClick={handleLogout}
                 className="text-xs text-[#555] hover:text-red-400 uppercase tracking-wider">

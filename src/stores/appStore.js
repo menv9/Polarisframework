@@ -2,10 +2,12 @@ import { create } from 'zustand'
 
 const THEME_KEY = 'polaris_theme'
 
+const VALID_THEMES = ['default', 'mainframe', 'terminal']
+
 function loadTheme() {
   try {
     const t = localStorage.getItem(THEME_KEY)
-    if (t === 'mainframe' || t === 'default') return t
+    if (VALID_THEMES.includes(t)) return t
   } catch { /* ignore */ }
   return 'default'
 }

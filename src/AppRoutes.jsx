@@ -27,6 +27,7 @@ import ScenarioLibraryPage from './pages/ScenarioLibraryPage'
 import CapitalAllocationPage from './pages/CapitalAllocationPage'
 import EmergingMarketsOpsPage from './pages/EmergingMarketsOpsPage'
 import TradeMonitorPage from './pages/TradeMonitorPage'
+import SettingsPage from './pages/SettingsPage'
 
 function Layout({ children }) {
   return (
@@ -73,6 +74,7 @@ export default function AppRoutes() {
         <Route path="/capital-allocation" element={<CapitalAllocationPage />} />
         <Route path="/emerging-markets" element={<EmergingMarketsOpsPage />} />
         <Route path="/trade" element={<TradeMonitorPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Route>
     </Routes>
   )
