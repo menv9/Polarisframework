@@ -35,6 +35,9 @@ const TAB_GROUPS = [
     key: '1', label: 'DASHBOARD', to: '/dashboard',
   },
   {
+    key: 'info', label: 'INFO', to: '/info',
+  },
+  {
     key: '2', label: 'ANÁLISIS', to: '/world-view',
     items: [
       { to: '/dashboard',           label: 'HUB',        desc: 'Dashboard' },

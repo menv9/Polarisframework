@@ -29,6 +29,7 @@ import CapitalAllocationPage from './pages/CapitalAllocationPage'
 import EmergingMarketsOpsPage from './pages/EmergingMarketsOpsPage'
 import TradeMonitorPage from './pages/TradeMonitorPage'
 import SettingsPage from './pages/SettingsPage'
+import InfoPage from './pages/InfoPage'
 import { FXTrendLayerPage, EquitiesMacroLayerPage } from './pages/LayerModulePage'
 import BriefExtensionModulePage from './pages/BriefExtensionModulePage'
 import { briefExtensionModules } from './data/modules'
@@ -62,6 +63,7 @@ export default function AppRoutes() {
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/info" element={<InfoPage />} />
         <Route path="/general" element={<GeneralPage />} />
         <Route path="/world-view" element={<WorldViewOpsPage />} />
         <Route path="/endogenous" element={<EndogenousOpsPage />} />

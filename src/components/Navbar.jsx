@@ -170,6 +170,17 @@ export default function Navbar() {
           <span className="text-[#222]">|</span>
 
           <Link
+            to="/info"
+            className={`text-xs font-bold uppercase tracking-wider transition-colors ${
+              location.pathname === '/info' ? 'text-[#ecd987]' : 'text-[#666] hover:text-[#ecd987]'
+            }`}
+          >
+            Info
+          </Link>
+
+          <span className="text-[#222]">|</span>
+
+          <Link
             to="/data"
             className={`text-xs font-bold uppercase tracking-wider transition-colors ${
               location.pathname.startsWith('/data') ? 'text-[#ecd987]' : 'text-[#666] hover:text-[#ecd987]'
@@ -256,6 +267,15 @@ export default function Navbar() {
             </div>
           ))}
           <div className="px-4 py-2 border-t border-[#222] mt-2">
+            <Link
+              to="/info"
+              className={`flex items-center justify-between px-2 py-2 text-xs font-bold uppercase tracking-wider ${
+                location.pathname === '/info' ? 'text-[#ecd987]' : 'text-[#555]'
+              }`}
+            >
+              <span>Info</span>
+              {location.pathname === '/info' && <span className="text-[8px]">â–¶</span>}
+            </Link>
             <Link
               to="/settings"
               className={`flex items-center justify-between px-2 py-2 text-xs font-bold uppercase tracking-wider ${
