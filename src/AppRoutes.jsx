@@ -32,8 +32,8 @@ import SettingsPage from './pages/SettingsPage'
 import InfoPage from './pages/InfoPage'
 import { FXTrendLayerPage, EquitiesMacroLayerPage } from './pages/LayerModulePage'
 import BriefExtensionModulePage from './pages/BriefExtensionModulePage'
+import MacroNowcastingPage from './pages/MacroNowcastingPage'
 import {
-  MacroNowcastingPage,
   BehavioralFinancePage,
   DecisionLogPage,
   KnowledgeTransferPage,

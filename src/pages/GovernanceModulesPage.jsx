@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
-  BarChart3,
   BookOpen,
   Brain,
   Calendar,
@@ -13,7 +12,6 @@ import {
   Route,
   ShieldAlert,
   SlidersHorizontal,
-  TrendingUp,
   Users,
 } from 'lucide-react'
 
@@ -112,65 +110,6 @@ function DataTable({ headers, rows }) {
 // ── Module data ──────────────────────────────────────────────────────────────
 
 const MODULES = {
-  macroNowcasting: {
-    code: 'G12',
-    title: 'Macro Nowcasting Avanzado',
-    subtitle: 'Lectura macro de alta frecuencia y deteccion de sorpresas frente a consenso para actualizar World View entre revisiones.',
-    status: 'Documented / not automated',
-    horizon: 'Continuo',
-    accent: 'text-[#22d3ee]',
-    border: 'border-[#22d3ee]',
-    principle: 'El nowcasting no reemplaza el analisis formal de World View; lo actualiza entre revisiones. Cuando la sorpresa acumulada diverge del consenso en >1.5 sigma, la señal macro puede cambiar antes de que el dato oficial lo confirme. Reaccionar a datos individuales sin el score agregado es una fuente sistematica de sobreajuste.',
-    input: 'PMIs flash, empleo, CPI, retail sales, jobless claims, GDP flash y datos de alta frecuencia por bloque economico (EEUU, Europa, China, EM).',
-    output: 'Nowcast_Score por bloque, flag de revision amarillo/rojo, actualizacion de sesgo de World View y registro en Decision Log cuando cambia la señal.',
-    dataSources: [
-      ['PMI Manufacturero', 'Mensual flash', 'S&P Global', '0-2 dias'],
-      ['PMI Servicios', 'Mensual flash', 'S&P Global', '0-2 dias'],
-      ['NFP / Empleo', 'Mensual', 'BLS / Eurostat', '1-4 semanas'],
-      ['CPI Adelantado', 'Mensual', 'Nacional', '2-4 semanas'],
-      ['Retail Sales', 'Mensual', 'Nacional', '2-4 semanas'],
-      ['Jobless Claims', 'Semanal', 'DOL', '1 semana'],
-      ['GDP Flash', 'Trimestral', 'Nacional', 'T+30 dias'],
-      ['Industrial Production', 'Mensual', 'Nacional', '3-4 semanas'],
-    ],
-    scoreRules: [
-      'Sorpresa_i = (Actual_i − Consenso_i) / StdDev_historico_i (ventana 24 meses)',
-      'Nowcast_Score = Σ(w_i × Sorpresa_i) agrupado por bloque: actividad, inflacion, empleo',
-      '|Score| < 1.0 sigma → verde, sin accion requerida',
-      '|Score| >= 1.0 sigma → flag amarillo, anotar en agenda de revision semanal',
-      '|Score| >= 1.5 sigma → flag rojo, revision inmediata de sesgo de World View',
-      'Revisiones de datos previos cuentan igual que el dato flash: recalcular con valor revisado',
-      'Si cambia el sesgo de World View: registrar inmediatamente en Decision Log (G16)',
-    ],
-    pipeline: [
-      'Registrar dato nuevo y consenso al publicarse el mismo dia.',
-      'Calcular Sorpresa_i normalizada con StdDev de ventana 24 meses.',
-      'Actualizar Nowcast_Score del bloque afectado (actividad, inflacion o empleo).',
-      'Evaluar flag: <1.0 verde / >=1.0 amarillo / >=1.5 rojo.',
-      'Si amarillo: anotar en agenda y revisar en el proximo ciclo semanal.',
-      'Si rojo: revision inmediata de World View y actualizacion del sesgo de regimen.',
-      'Si cambia la señal FX: registrar en Decision Log con contexto e hipotesis.',
-    ],
-    parameters: [
-      ['Umbral flag amarillo', '1.0 sigma', '0.75 - 1.25'],
-      ['Umbral flag rojo', '1.5 sigma', '1.25 - 2.0'],
-      ['Ventana StdDev historico', '24 meses', '18 - 36'],
-      ['Peso bloque actividad (PMI + IP + GDP)', '35%', '25% - 45%'],
-      ['Peso bloque empleo', '30%', '20% - 40%'],
-      ['Peso bloque inflacion', '25%', '20% - 35%'],
-      ['Peso otros (retail, sentiment)', '10%', '5% - 15%'],
-      ['Frecuencia revision formal', 'Semanal', 'Diaria - Quincenal'],
-    ],
-    errors: [
-      'Reaccionar a un dato individual sin calcular el score agregado del bloque.',
-      'Ignorar revisiones de datos anteriores — cuentan igual que el dato flash.',
-      'Cubrir solo EEUU; los bloques Europa, China y EM son igualmente necesarios.',
-      'Confundir sorpresa positiva con señal alcista sin verificar el regimen macro de fondo.',
-      'Actualizar la señal FX sin registrarlo en Decision Log.',
-      'Saltarse la revision semanal cuando no hay datos "importantes" esa semana.',
-    ],
-  },
-
   behavioralFinance: {
     code: 'G9',
     title: 'Behavioral Finance / Psicologia del Operador',
@@ -374,26 +313,6 @@ const MODULES = {
 
 // ── Module-specific content sections ────────────────────────────────────────
 
-function MacroNowcastingContent({ mod }) {
-  return (
-    <>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Section title="Fuentes de datos por bloque" icon={BarChart3}>
-          <DataTable
-            headers={['Indicador', 'Frecuencia', 'Fuente', 'Lag']}
-            rows={mod.dataSources}
-          />
-        </Section>
-        <Section title="Construccion del Nowcast Score" icon={TrendingUp}>
-          <div className="p-3">
-            <BulletList items={mod.scoreRules} />
-          </div>
-        </Section>
-      </div>
-    </>
-  )
-}
-
 function BehavioralFinanceContent({ mod }) {
   return (
     <>
@@ -521,7 +440,6 @@ function KnowledgeTransferContent({ mod }) {
 // ── Main page component ──────────────────────────────────────────────────────
 
 const CONTENT_COMPONENTS = {
-  macroNowcasting: MacroNowcastingContent,
   behavioralFinance: BehavioralFinanceContent,
   decisionLog: DecisionLogContent,
   knowledgeTransfer: KnowledgeTransferContent,
@@ -594,10 +512,6 @@ function GovernanceModulePage({ moduleKey }) {
 }
 
 // ── Named exports ────────────────────────────────────────────────────────────
-
-export function MacroNowcastingPage() {
-  return <GovernanceModulePage moduleKey="macroNowcasting" />
-}
 
 export function BehavioralFinancePage() {
   return <GovernanceModulePage moduleKey="behavioralFinance" />
