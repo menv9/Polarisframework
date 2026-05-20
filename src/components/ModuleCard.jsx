@@ -26,7 +26,7 @@ const moduleRoutes = {
 export default function ModuleCard({ module }) {
   const activeModule = useAppStore((s) => s.activeModule)
   const isActive = activeModule === module.id
-  const route = moduleRoutes[module.id]
+  const route = module.route || moduleRoutes[module.id]
   const hasPage = Boolean(route)
 
   const card = (

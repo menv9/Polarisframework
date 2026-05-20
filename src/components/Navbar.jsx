@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { supabase } from '../lib/supabase'
+import { briefExtensionModules } from '../data/modules'
 
 function ThemeToggle() {
   const toggleTheme = useAppStore((s) => s.toggleTheme)
@@ -18,6 +19,12 @@ function ThemeToggle() {
   )
 }
 
+const EXTENSION_ITEMS = briefExtensionModules.map((module) => ({
+  to: module.route,
+  label: module.part,
+  desc: module.name,
+}))
+
 const GROUPS = [
   {
     label: 'Análisis',
@@ -32,6 +39,10 @@ const GROUPS = [
       { to: '/fx-trend-layer',       label: 'G10', desc: 'FX Trend Layer' },
       { to: '/equities-macro-layer', label: 'G11', desc: 'Equities Macro' },
     ],
+  },
+  {
+    label: 'Extensiones',
+    items: EXTENSION_ITEMS,
   },
   {
     label: 'Ejecución',

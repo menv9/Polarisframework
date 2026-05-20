@@ -30,6 +30,8 @@ import EmergingMarketsOpsPage from './pages/EmergingMarketsOpsPage'
 import TradeMonitorPage from './pages/TradeMonitorPage'
 import SettingsPage from './pages/SettingsPage'
 import { FXTrendLayerPage, EquitiesMacroLayerPage } from './pages/LayerModulePage'
+import BriefExtensionModulePage from './pages/BriefExtensionModulePage'
+import { briefExtensionModules } from './data/modules'
 
 function Layout({ children }) {
   return (
@@ -79,6 +81,13 @@ export default function AppRoutes() {
         <Route path="/trade" element={<TradeMonitorPage />} />
         <Route path="/fx-trend-layer" element={<FXTrendLayerPage />} />
         <Route path="/equities-macro-layer" element={<EquitiesMacroLayerPage />} />
+        {briefExtensionModules.map((module) => (
+          <Route
+            key={module.id}
+            path={module.route}
+            element={<BriefExtensionModulePage moduleId={module.id} />}
+          />
+        ))}
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
     </Routes>

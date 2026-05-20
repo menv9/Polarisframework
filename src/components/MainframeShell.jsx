@@ -1,6 +1,13 @@
 import { useEffect, useState, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAppStore } from '../stores/appStore'
+import { briefExtensionModules } from '../data/modules'
+
+const EXTENSION_ITEMS = briefExtensionModules.map((module) => ({
+  to: module.route,
+  label: module.part,
+  desc: module.name,
+}))
 
 const TAB_GROUPS = [
   {
@@ -19,7 +26,11 @@ const TAB_GROUPS = [
     ],
   },
   {
-    key: '3', label: 'EJECUCIÓN', to: '/execution/operativa',
+    key: '3', label: 'EXTENSIONES', to: '/fiscal',
+    items: EXTENSION_ITEMS,
+  },
+  {
+    key: '4', label: 'EJECUCIÓN', to: '/execution/operativa',
     items: [
       { to: '/timing/operativa',    label: 'TIMING',    desc: 'Timing' },
       { to: '/risk/operativa',      label: 'RISK',      desc: 'Risk Mgmt' },
@@ -27,14 +38,14 @@ const TAB_GROUPS = [
     ],
   },
   {
-    key: '4', label: 'APRENDIZAJE', to: '/journal',
+    key: '5', label: 'APRENDIZAJE', to: '/journal',
     items: [
       { to: '/journal',     label: 'JOURNAL',    desc: 'Trade Journal' },
       { to: '/performance', label: 'PERFORMANCE',desc: 'Performance' },
     ],
   },
   {
-    key: '5', label: 'DATA', to: '/data',
+    key: '6', label: 'DATA', to: '/data',
     items: [
       { to: '/data',                      label: 'HUB',           desc: 'Data Hub' },
       { to: '/data/raw',                  label: 'RAW',           desc: 'Raw Data' },
@@ -45,7 +56,7 @@ const TAB_GROUPS = [
     ],
   },
   {
-    key: '6', label: 'ADMIN', to: '/admin', adminOnly: true,
+    key: '7', label: 'ADMIN', to: '/admin', adminOnly: true,
   },
 ]
 
