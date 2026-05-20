@@ -29,6 +29,8 @@ const GROUPS = [
       { to: '/exogenous/operativa', label: 'Exo',  desc: 'Exogenous' },
       { to: '/emerging-markets',    label: 'EM',   desc: 'Emerging Markets' },
       { to: '/trade',               label: 'Trade', desc: 'Global Trade Monitor' },
+      { to: '/fx-trend-layer',       label: 'G10', desc: 'FX Trend Layer' },
+      { to: '/equities-macro-layer', label: 'G11', desc: 'Equities Macro' },
     ],
   },
   {

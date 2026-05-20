@@ -29,6 +29,7 @@ import CapitalAllocationPage from './pages/CapitalAllocationPage'
 import EmergingMarketsOpsPage from './pages/EmergingMarketsOpsPage'
 import TradeMonitorPage from './pages/TradeMonitorPage'
 import SettingsPage from './pages/SettingsPage'
+import { FXTrendLayerPage, EquitiesMacroLayerPage } from './pages/LayerModulePage'
 
 function Layout({ children }) {
   return (
@@ -76,6 +77,8 @@ export default function AppRoutes() {
         <Route path="/capital-allocation" element={<CapitalAllocationPage />} />
         <Route path="/emerging-markets" element={<EmergingMarketsOpsPage />} />
         <Route path="/trade" element={<TradeMonitorPage />} />
+        <Route path="/fx-trend-layer" element={<FXTrendLayerPage />} />
+        <Route path="/equities-macro-layer" element={<EquitiesMacroLayerPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
     </Routes>

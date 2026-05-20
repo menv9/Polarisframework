@@ -8,6 +8,7 @@ const badgeColors = {
   amber: 'text-[#f59e0b] border-[#f59e0b]',
   rose: 'text-[#ef4444] border-[#ef4444]',
   violet: 'text-white border-white',
+  emerald: 'text-[#4ade80] border-[#4ade80]',
 }
 
 const moduleRoutes = {
@@ -18,6 +19,8 @@ const moduleRoutes = {
   risk: '/risk/operativa',
   execution: '/execution/operativa',
   selfawareness: '/journal',
+  'fx-trend-layer': '/fx-trend-layer',
+  'equities-macro-layer': '/equities-macro-layer',
 }
 
 export default function ModuleCard({ module }) {
@@ -43,6 +46,9 @@ export default function ModuleCard({ module }) {
         </span>
         {hasPage && (
           <span className="text-sm text-[#777] font-mono">[EXT]</span>
+        )}
+        {!hasPage && module.roadmap && (
+          <span className="text-sm text-[#777] font-mono">[ROADMAP]</span>
         )}
       </div>
 

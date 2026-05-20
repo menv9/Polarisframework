@@ -14,6 +14,8 @@ const TAB_GROUPS = [
       { to: '/world-view',label: 'WORLD VIEW', desc: 'World View' },
       { to: '/endogenous',          label: 'ENDOGENOUS', desc: 'Endogenous' },
       { to: '/exogenous/operativa', label: 'EXOGENOUS',  desc: 'Exogenous' },
+      { to: '/fx-trend-layer',       label: 'G10 TREND',  desc: 'FX Trend Layer' },
+      { to: '/equities-macro-layer', label: 'G11 EQ',     desc: 'Equities Macro' },
     ],
   },
   {

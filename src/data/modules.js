@@ -136,6 +136,42 @@ export const modules = [
     color: 'violet',
     highlight: true,
   },
+  {
+    id: 'fx-trend-layer',
+    part: 'G10',
+    name: 'FX Trend Layer',
+    tagline: 'Capa 2 para desplegar momentum tecnico sobre senales FX ya validadas',
+    input: 'Senal FX Capa 1, filtros de activacion, tendencia, volatilidad y setup tecnico',
+    output: 'Activacion Capa 2, sizing incremental, salida especifica y metricas propias',
+    features: [
+      '13 archivos de especificacion',
+      'Filtros de activacion sobre Capa 1',
+      'Setups tecnicos de entry',
+      'Position sizing Capa 2',
+      'Circuit breakers especificos',
+    ],
+    downstream: 'Risk · Execution · Self-Awareness',
+    color: 'cyan',
+    roadmap: 'Proyecto de meses',
+  },
+  {
+    id: 'equities-macro-layer',
+    part: 'G11',
+    name: 'Equities Macro Layer',
+    tagline: 'Capa 3 para extender drivers macro FX hacia exposicion equity',
+    input: 'World View, scores macro, universo equity, liquidez, costes y correlaciones',
+    output: 'Score equities, instrumento elegible, sizing Capa 3 y control de correlacion',
+    features: [
+      '14 archivos de especificacion',
+      'Universo de instrumentos equity',
+      'Mapeo driver macro a instrumento',
+      'Score macro para equities',
+      'Riesgo de correlacion triple',
+    ],
+    downstream: 'Capital Allocation · Risk · Self-Awareness',
+    color: 'emerald',
+    roadmap: 'Proyecto de meses',
+  },
 ]
 
 export const pipelineStages = [
