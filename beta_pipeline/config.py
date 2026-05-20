@@ -65,10 +65,11 @@ EXCLUDE_REER_ROLLING = os.getenv("EXCLUDE_REER_ROLLING", "True").strip().lower()
 EXCLUDE_DXY_ROLLING = os.getenv("EXCLUDE_DXY_ROLLING", "True").strip().lower() in ("true", "1", "yes")
 
 # Pairs excluded from the live backtest signal (still included in static/robust/rolling analysis).
-# EURGBP: backtest IC = -0.90 with 1-month feature lag — the signal is systematically
-# inverted (BOE hike → GBP appreciation already priced before the model reacts).
-# Override via env: BACKTEST_EXCLUDE_PAIRS=eurgbp,eurjpy  (comma-separated, lowercase)
-_exclude_env = os.getenv("BACKTEST_EXCLUDE_PAIRS", "eurgbp").strip()
+# EURGBP: backtest IC = -0.90 with 1-month feature lag — signal systematically inverted.
+# USDJPY: carry fallback always-long (USD > JPY rates), WinRate=38.5% — large losses on
+#         JPY safe-haven unwinds (2008/2020/2022) outweigh many small carry gains.
+# Override via env: BACKTEST_EXCLUDE_PAIRS=eurgbp,usdjpy  (comma-separated, lowercase)
+_exclude_env = os.getenv("BACKTEST_EXCLUDE_PAIRS", "eurgbp,usdjpy").strip()
 BACKTEST_EXCLUDE_PAIRS: list[str] = [p.strip() for p in _exclude_env.split(",") if p.strip()]
 
 CACHE_DIR = ROOT_DIR / "cache"
