@@ -4,26 +4,16 @@ Run: python update_trade.py
 Output: public/trade_data.json
 
 Dependencies: pip install yfinance requests
-Optional:     pip install fli   (aviation routes via Google Flights)
+
+Aviation routes (FRA->SIN etc.) have no reliable free API.
+Update min_price_usd manually in trade_data.json from Google Flights.
 """
 
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 
-import requests
 import yfinance as yf
-
-# ── Aviation import (optional) ────────────────────────────────────────────────
-try:
-    from fli.models import (
-        Airport, PassengerInfo, SeatType,
-        MaxStops, SortBy, FlightSearchFilters, FlightSegment,
-    )
-    from fli.search import SearchFlights
-    FLI_AVAILABLE = True
-except ImportError:
-    FLI_AVAILABLE = False
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -43,15 +33,6 @@ RUTAS = [
     ("FRA", "JNB"),
     ("GRU", "MIA"),
 ]
-
-AIRPORT_MAP = {
-    "FRA": "Airport.FRA", "SIN": "Airport.SIN",
-    "JFK": "Airport.JFK", "LHR": "Airport.LHR",
-    "DXB": "Airport.DXB", "HKG": "Airport.HKG",
-    "LAX": "Airport.LAX", "NRT": "Airport.NRT",
-    "JNB": "Airport.JNB", "GRU": "Airport.GRU",
-    "MIA": "Airport.MIA",
-}
 
 OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "public", "trade_data.json")
 
@@ -110,61 +91,23 @@ def fetch_fbx():
     }
 
 
-def fetch_aviation():
-    if not FLI_AVAILABLE:
-        return {
-            "routes": [
-                {
-                    "origin": o, "destination": d,
-                    "min_price_usd": None,
-                    "date_queried": None,
-                    "error": "fli not installed — pip install fli",
-                }
-                for o, d in RUTAS
-            ],
-            "iata_note": "Datos IATA con lag ~6 semanas",
-        }
+def load_existing_aviation():
+    """Preserve existing aviation rows from trade_data.json (manual updates)."""
+    try:
+        with open(OUTPUT_PATH) as f:
+            existing = json.load(f)
+        return existing.get("aviation", _default_aviation())
+    except Exception:
+        return _default_aviation()
 
-    search = SearchFlights()
-    target_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
-    results = []
 
-    for origin_code, dest_code in RUTAS:
-        try:
-            airport_origin = getattr(Airport, origin_code)
-            airport_dest = getattr(Airport, dest_code)
-            filters = FlightSearchFilters(
-                passenger_info=PassengerInfo(adults=1),
-                flight_segments=[FlightSegment(
-                    departure_airport=[[airport_origin, 0]],
-                    arrival_airport=[[airport_dest, 0]],
-                    travel_date=target_date,
-                )],
-                seat_type=SeatType.ECONOMY,
-                stops=MaxStops.ANY,
-                sort_by=SortBy.CHEAPEST,
-            )
-            flights = search.search(filters)
-            min_price = min([f.price for f in flights]) if flights else None
-            results.append({
-                "origin": origin_code,
-                "destination": dest_code,
-                "min_price_usd": min_price,
-                "date_queried": target_date,
-                "error": None,
-            })
-        except Exception as e:
-            results.append({
-                "origin": origin_code,
-                "destination": dest_code,
-                "min_price_usd": None,
-                "date_queried": target_date,
-                "error": str(e),
-            })
-
+def _default_aviation():
     return {
-        "routes": results,
-        "iata_note": "Datos IATA con lag ~6 semanas",
+        "routes": [
+            {"origin": o, "destination": d, "min_price_usd": None, "date_queried": None, "error": None}
+            for o, d in RUTAS
+        ],
+        "iata_note": "Datos IATA con lag ~6 semanas — update min_price_usd manually from Google Flights",
     }
 
 
@@ -191,8 +134,8 @@ def main():
     print("Fetching Freightos FBX...")
     maritime["fbx"] = fetch_fbx()
 
-    print("Fetching aviation routes...")
-    aviation = fetch_aviation()
+    print("Loading aviation routes (manual)...")
+    aviation = load_existing_aviation()
 
     print("Building macro overlay...")
     overlay = build_overlay(maritime)

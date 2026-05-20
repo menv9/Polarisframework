@@ -193,7 +193,9 @@ function AviationTable({ routes, iataNote }) {
               <td className="px-3 py-2 text-right">
                 {r.error
                   ? <span className="text-[#f59e0b] text-[10px]">{r.error}</span>
-                  : <span className="text-[#4ade80] text-[10px]">OK</span>}
+                  : r.min_price_usd == null
+                    ? <span className="text-[#555] text-[10px]">manual</span>
+                    : <span className="text-[#4ade80] text-[10px]">OK</span>}
               </td>
             </tr>
           ))}
