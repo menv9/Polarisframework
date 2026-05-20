@@ -44,6 +44,11 @@ import {
   TailRiskPage,
   CounterpartyRiskPage,
 } from './pages/RiskContinuityModulesPage'
+import {
+  MultiBrokerPage,
+  ModelGovernancePage,
+  ExternalValidationPage,
+} from './pages/ExtensionGovernancePage'
 import { briefExtensionModules } from './data/modules'
 
 function Layout({ children }) {
@@ -103,6 +108,9 @@ export default function AppRoutes() {
         <Route path="/disaster-recovery" element={<DisasterRecoveryPage />} />
         <Route path="/tail-risk" element={<TailRiskPage />} />
         <Route path="/counterparty-risk" element={<CounterpartyRiskPage />} />
+        <Route path="/multi-broker" element={<MultiBrokerPage />} />
+        <Route path="/model-governance" element={<ModelGovernancePage />} />
+        <Route path="/external-validation" element={<ExternalValidationPage />} />
         {briefExtensionModules.map((module) => (
           <Route
             key={module.id}
