@@ -32,6 +32,12 @@ import SettingsPage from './pages/SettingsPage'
 import InfoPage from './pages/InfoPage'
 import { FXTrendLayerPage, EquitiesMacroLayerPage } from './pages/LayerModulePage'
 import BriefExtensionModulePage from './pages/BriefExtensionModulePage'
+import {
+  MacroNowcastingPage,
+  BehavioralFinancePage,
+  DecisionLogPage,
+  KnowledgeTransferPage,
+} from './pages/GovernanceModulesPage'
 import { briefExtensionModules } from './data/modules'
 
 function Layout({ children }) {
@@ -83,6 +89,10 @@ export default function AppRoutes() {
         <Route path="/trade" element={<TradeMonitorPage />} />
         <Route path="/fx-trend-layer" element={<FXTrendLayerPage />} />
         <Route path="/equities-macro-layer" element={<EquitiesMacroLayerPage />} />
+        <Route path="/macro-nowcasting" element={<MacroNowcastingPage />} />
+        <Route path="/behavioral-finance" element={<BehavioralFinancePage />} />
+        <Route path="/decision-log" element={<DecisionLogPage />} />
+        <Route path="/knowledge-transfer" element={<KnowledgeTransferPage />} />
         {briefExtensionModules.map((module) => (
           <Route
             key={module.id}
