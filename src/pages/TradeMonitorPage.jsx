@@ -258,10 +258,10 @@ export default function TradeMonitorPage() {
       <div className="border-b border-[#222]">
         <div className="flex divide-x divide-[#222]">
           <KpiCard
-            label="Baltic Dry Index (BDI)"
-            value={m.bdi?.current?.toLocaleString()}
+            label="BDI Proxy (BDRY ETF)"
+            value={m.bdi?.current != null ? `$${m.bdi.current.toFixed(2)}` : null}
             changePct={m.bdi?.change_pct}
-            sub="Bulk shipping demand"
+            sub="Breakwave Dry Bulk — BDI proxy"
           />
           <KpiCard
             label="Freightos FBX"

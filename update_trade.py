@@ -28,7 +28,7 @@ except ImportError:
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 TICKERS = {
-    "bdi": "^BDI",
+    "bdi": "BDRY",      # Breakwave Dry Bulk ETF — BDI proxy (^BDI delisted on Yahoo)
     "aud": "AUDUSD=X",
     "cad": "CADUSD=X",
     "nok": "NOKUSD=X",
@@ -58,12 +58,27 @@ OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "public", "trade_data.json
 
 # ── Data fetchers ─────────────────────────────────────────────────────────────
 
+def _extract_closes(df, ticker):
+    """Handle both flat and MultiIndex column layouts across yfinance versions."""
+    import pandas as pd
+    col = df.get("Close")
+    if col is None:
+        raise ValueError("No 'Close' column")
+    # yfinance ≥0.2 returns MultiIndex (Price, Ticker) when multi_level_index=True
+    if isinstance(col, pd.DataFrame):
+        col = col.iloc[:, 0]
+    return col.dropna()
+
+
 def fetch_maritime():
     data = {}
     for key, ticker in TICKERS.items():
         try:
-            df = yf.download(ticker, period="90d", interval="1d", progress=False, auto_adjust=True)
-            closes = df["Close"].dropna()
+            df = yf.download(
+                ticker, period="90d", interval="1d",
+                progress=False, auto_adjust=True, multi_level_index=False,
+            )
+            closes = _extract_closes(df, ticker)
             if len(closes) < 2:
                 raise ValueError("Insufficient data")
             data[key] = {
@@ -76,6 +91,7 @@ def fetch_maritime():
                     for ts, v in closes.items()
                 ],
             }
+            print(f"  {key} ({ticker}): {data[key]['current']} ({data[key]['change_pct']:+.2f}%)")
         except Exception as e:
             print(f"  Warning: {key} ({ticker}) failed — {e}")
             data[key] = {"current": None, "change_pct": None, "history": []}
@@ -83,30 +99,15 @@ def fetch_maritime():
 
 
 def fetch_fbx():
-    try:
-        r = requests.get("https://fbx.freightos.com/api/v1/composite", timeout=8)
-        r.raise_for_status()
-        payload = r.json()
-        val = payload.get("composite_index") or payload.get("value")
-        prev = payload.get("previous_index") or payload.get("previous_value")
-        change_pct = None
-        if val is not None and prev:
-            change_pct = round((val - prev) / prev * 100, 2)
-        return {
-            "current": val,
-            "change_pct": change_pct,
-            "source": "Freightos FBX",
-            "updated": datetime.utcnow().strftime("%Y-%m-%d"),
-        }
-    except Exception as e:
-        print(f"  Warning: Freightos FBX failed — {e}")
-        return {
-            "current": None,
-            "change_pct": None,
-            "source": "Freightos FBX",
-            "updated": "N/A",
-            "note": "fetch failed — update manually",
-        }
+    # Freightos FBX does not expose a public JSON API.
+    # Update current/change_pct manually from https://fbx.freightos.com
+    return {
+        "current": None,
+        "change_pct": None,
+        "source": "Freightos FBX",
+        "updated": "manual",
+        "note": "No public API — update manually from fbx.freightos.com",
+    }
 
 
 def fetch_aviation():
@@ -207,7 +208,7 @@ def main():
     with open(OUTPUT_PATH, "w") as f:
         json.dump(output, f, indent=2)
 
-    print(f"Done → {OUTPUT_PATH}")
+    print(f"Done -> {OUTPUT_PATH}")
 
 
 if __name__ == "__main__":
