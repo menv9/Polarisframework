@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 const THEME_KEY = 'polaris_theme'
 
-const VALID_THEMES = ['default', 'mainframe', 'terminal']
+const VALID_THEMES = ['default', 'mainframe']
 
 function loadTheme() {
   try {

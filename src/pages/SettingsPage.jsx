@@ -35,23 +35,6 @@ const THEMES = [
       font: 'IBM Plex Mono, monospace',
     },
   },
-  {
-    id: 'terminal',
-    name: 'Terminal',
-    desc: 'Near-black · violet · JetBrains Mono',
-    preview: {
-      bg: '#090d14',
-      panel: '#0d1119',
-      border: '#1c2840',
-      text: '#8fa8bc',
-      textDim: '#3e5060',
-      accent: '#a78bfa',
-      positive: '#4ade80',
-      negative: '#f87171',
-      info: '#22d3ee',
-      font: 'JetBrains Mono, monospace',
-    },
-  },
 ]
 
 function ThemeCard({ theme, active, onSelect }) {
