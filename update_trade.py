@@ -3,17 +3,25 @@ update_trade.py — Global Trade Monitor data fetcher
 Run: python update_trade.py
 Output: public/trade_data.json
 
-Dependencies: pip install yfinance requests
-
-Aviation routes (FRA->SIN etc.) have no reliable free API.
-Update min_price_usd manually in trade_data.json from Google Flights.
+Dependencies: pip install yfinance requests flights
 """
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import yfinance as yf
+
+# ── Aviation import (pip install flights) ─────────────────────────────────────
+try:
+    from fli.models import (
+        Airport, PassengerInfo, SeatType,
+        MaxStops, SortBy, FlightSearchFilters, FlightSegment,
+    )
+    from fli.search import SearchFlights
+    FLI_AVAILABLE = True
+except ImportError:
+    FLI_AVAILABLE = False
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -91,14 +99,49 @@ def fetch_fbx():
     }
 
 
-def load_existing_aviation():
-    """Preserve existing aviation rows from trade_data.json (manual updates)."""
-    try:
-        with open(OUTPUT_PATH) as f:
-            existing = json.load(f)
-        return existing.get("aviation", _default_aviation())
-    except Exception:
+def fetch_aviation():
+    if not FLI_AVAILABLE:
+        print("  Warning: 'flights' package not installed — pip install flights")
         return _default_aviation()
+
+    search = SearchFlights()
+    target_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+    results = []
+
+    for origin_code, dest_code in RUTAS:
+        try:
+            filters = FlightSearchFilters(
+                passenger_info=PassengerInfo(adults=1),
+                flight_segments=[FlightSegment(
+                    departure_airport=[[getattr(Airport, origin_code), 0]],
+                    arrival_airport=[[getattr(Airport, dest_code), 0]],
+                    travel_date=target_date,
+                )],
+                seat_type=SeatType.ECONOMY,
+                stops=MaxStops.ANY,
+                sort_by=SortBy.CHEAPEST,
+            )
+            flights = search.search(filters)
+            min_price = min((f.price for f in flights if f.price), default=None)
+            results.append({
+                "origin": origin_code,
+                "destination": dest_code,
+                "min_price_usd": min_price,
+                "date_queried": target_date,
+                "error": None,
+            })
+            print(f"  {origin_code}->{dest_code}: ${min_price}")
+        except Exception as e:
+            print(f"  Warning: {origin_code}->{dest_code} failed — {e}")
+            results.append({
+                "origin": origin_code,
+                "destination": dest_code,
+                "min_price_usd": None,
+                "date_queried": target_date,
+                "error": str(e),
+            })
+
+    return {"routes": results, "iata_note": "Datos IATA con lag ~6 semanas"}
 
 
 def _default_aviation():
@@ -107,7 +150,7 @@ def _default_aviation():
             {"origin": o, "destination": d, "min_price_usd": None, "date_queried": None, "error": None}
             for o, d in RUTAS
         ],
-        "iata_note": "Datos IATA con lag ~6 semanas — update min_price_usd manually from Google Flights",
+        "iata_note": "Datos IATA con lag ~6 semanas",
     }
 
 
@@ -134,8 +177,8 @@ def main():
     print("Fetching Freightos FBX...")
     maritime["fbx"] = fetch_fbx()
 
-    print("Loading aviation routes (manual)...")
-    aviation = load_existing_aviation()
+    print("Fetching aviation routes...")
+    aviation = fetch_aviation()
 
     print("Building macro overlay...")
     overlay = build_overlay(maritime)

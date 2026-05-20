@@ -1,9 +1,9 @@
 {
-  "updated_at": "2026-05-20T17:19:29.955009Z",
+  "updated_at": "2026-05-20T17:24:34.836401Z",
   "maritime": {
     "bdi": {
-      "current": 12.152,
-      "change_pct": -3.94,
+      "current": 12.15,
+      "change_pct": -3.95,
       "history": [
         [
           1768176000000,
@@ -363,13 +363,13 @@
         ],
         [
           1779235200000,
-          12.152
+          12.15
         ]
       ]
     },
     "aud": {
-      "current": 0.7158,
-      "change_pct": -0.21,
+      "current": 0.7156,
+      "change_pct": -0.23,
       "history": [
         [
           1768435200000,
@@ -729,13 +729,13 @@
         ],
         [
           1779235200000,
-          0.7158
+          0.7156
         ]
       ]
     },
     "cad": {
       "current": 0.7272,
-      "change_pct": -0.09,
+      "change_pct": -0.1,
       "history": [
         [
           1768435200000,
@@ -1101,7 +1101,7 @@
     },
     "nok": {
       "current": 0.1079,
-      "change_pct": -0.13,
+      "change_pct": -0.17,
       "history": [
         [
           1768435200000,
@@ -1466,8 +1466,8 @@
       ]
     },
     "oil": {
-      "current": 97.65,
-      "change_pct": -9.39,
+      "current": 97.52,
+      "change_pct": -9.51,
       "history": [
         [
           1770076800000,
@@ -1767,7 +1767,7 @@
         ],
         [
           1779235200000,
-          97.65
+          97.52
         ]
       ]
     },
@@ -1784,44 +1784,44 @@
       {
         "origin": "FRA",
         "destination": "SIN",
-        "min_price_usd": null,
-        "date_queried": null,
-        "error": "fli not installed \u2014 pip install fli"
+        "min_price_usd": 392.0,
+        "date_queried": "2026-06-19",
+        "error": null
       },
       {
         "origin": "JFK",
         "destination": "LHR",
-        "min_price_usd": null,
-        "date_queried": null,
-        "error": "fli not installed \u2014 pip install fli"
+        "min_price_usd": 492.0,
+        "date_queried": "2026-06-19",
+        "error": null
       },
       {
         "origin": "DXB",
         "destination": "HKG",
-        "min_price_usd": null,
-        "date_queried": null,
-        "error": "fli not installed \u2014 pip install fli"
+        "min_price_usd": 353.0,
+        "date_queried": "2026-06-19",
+        "error": null
       },
       {
         "origin": "LAX",
         "destination": "NRT",
-        "min_price_usd": null,
-        "date_queried": null,
-        "error": "fli not installed \u2014 pip install fli"
+        "min_price_usd": 909.0,
+        "date_queried": "2026-06-19",
+        "error": null
       },
       {
         "origin": "FRA",
         "destination": "JNB",
-        "min_price_usd": null,
-        "date_queried": null,
-        "error": "fli not installed \u2014 pip install fli"
+        "min_price_usd": 427.0,
+        "date_queried": "2026-06-19",
+        "error": null
       },
       {
         "origin": "GRU",
         "destination": "MIA",
-        "min_price_usd": null,
-        "date_queried": null,
-        "error": "fli not installed \u2014 pip install fli"
+        "min_price_usd": 382.0,
+        "date_queried": "2026-06-19",
+        "error": null
       }
     ],
     "iata_note": "Datos IATA con lag ~6 semanas"
@@ -2260,8 +2260,8 @@
       ],
       [
         1779235200000,
-        12.152,
-        0.7158
+        12.15,
+        0.7156
       ]
     ],
     "bdi_vs_cad": [
@@ -2697,7 +2697,7 @@
       ],
       [
         1779235200000,
-        12.152,
+        12.15,
         0.7272
       ]
     ]
