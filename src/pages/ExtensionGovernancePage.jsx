@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -19,6 +19,7 @@ import {
   Trash2,
   Users,
 } from 'lucide-react'
+import { supabase } from '../lib/supabase'
 
 // ── Shared UI components ─────────────────────────────────────────────────────
 
@@ -167,6 +168,48 @@ function SupabasePending({ label }) {
           Esta pantalla actualmente muestra la referencia documental. La funcionalidad operativa se conectara a Supabase en el Grupo 1.
         </p>
       </div>
+    </div>
+  )
+}
+
+const getToday = () => new Date().toISOString().slice(0, 10)
+
+function isTableMissing(msg) {
+  return msg && (msg.includes('does not exist') || msg.includes('relation') || msg.includes('permission denied'))
+}
+
+function LoadingState() {
+  return (
+    <div className="border-2 border-[#333] p-8 text-center text-[10px] uppercase tracking-widest text-[#444]">
+      Cargando...
+    </div>
+  )
+}
+
+function SetupRequired({ sql, label, onRetry }) {
+  return (
+    <div className="space-y-3 border border-[#f59e0b]/30 bg-[#0d0900] p-4">
+      <div className="flex items-center gap-2">
+        <Database size={13} className="text-[#f59e0b]" />
+        <span className="text-xs font-bold uppercase tracking-widest text-[#f59e0b]">
+          Configuracion Supabase requerida
+        </span>
+      </div>
+      <p className="text-xs text-[#aaa]">
+        Ejecuta este SQL en Supabase para activar {label}:
+      </p>
+      <pre className="overflow-x-auto whitespace-pre-wrap border border-[#222] bg-[#050505] p-3 font-mono text-[10px] leading-relaxed text-[#777]">
+        {sql}
+      </pre>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="border border-[#f59e0b] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#f59e0b] hover:bg-[#f59e0b] hover:text-black"
+        >
+          Reintentar
+        </button>
+      )}
     </div>
   )
 }
@@ -367,6 +410,282 @@ function MultiBrokerTool() {
 }
 
 // ── Module reference data ────────────────────────────────────────────────────
+
+// ── G15/G18 Supabase tools ───────────────────────────────────────────────────
+
+const G15_SQL = `CREATE TABLE IF NOT EXISTS model_versions (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at timestamptz DEFAULT now(),
+  version_id text NOT NULL,
+  title text NOT NULL,
+  change_type text DEFAULT 'Cambio de parametro',
+  status text DEFAULT 'shadow',
+  activation_date date DEFAULT CURRENT_DATE,
+  decision_log_id text DEFAULT '',
+  backtest_result text DEFAULT '',
+  shadow_result text DEFAULT '',
+  notes text DEFAULT ''
+);`
+
+const G18_SQL = `CREATE TABLE IF NOT EXISTS external_validations (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at timestamptz DEFAULT now(),
+  date date DEFAULT CURRENT_DATE,
+  validation_type text NOT NULL,
+  benchmark text DEFAULT '',
+  result text DEFAULT '',
+  severity text DEFAULT 'media',
+  action text DEFAULT '',
+  status text DEFAULT 'open',
+  owner text DEFAULT '',
+  notes text DEFAULT ''
+);`
+
+const CHANGE_TYPES = [
+  'Cambio de parametro',
+  'Nuevo indicador',
+  'Cambio de metodologia',
+  'Nueva capa o modulo',
+  'Reversion',
+]
+
+const VERSION_STATUSES = ['shadow', 'active', 'archived', 'rejected']
+const VALIDATION_TYPES = ['Benchmark comparison', 'Challenger model', 'Stress test historico', 'Peer review', 'Audit formal']
+const VALIDATION_SEVERITIES = ['baja', 'media', 'alta', 'critica']
+const VALIDATION_STATUSES = ['open', 'monitoring', 'closed']
+
+function ModelGovernanceTool() {
+  const [versions, setVersions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [setupError, setSetupError] = useState('')
+  const [form, setForm] = useState({
+    version_id: '',
+    title: '',
+    change_type: CHANGE_TYPES[0],
+    status: 'shadow',
+    activation_date: getToday(),
+    decision_log_id: '',
+    backtest_result: '',
+    shadow_result: '',
+    notes: '',
+  })
+
+  async function loadVersions() {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('model_versions')
+      .select('*')
+      .order('activation_date', { ascending: false })
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      if (isTableMissing(error.message)) setSetupError(error.message)
+      setVersions([])
+    } else {
+      setSetupError('')
+      setVersions(data || [])
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => { loadVersions() }, [])
+
+  async function addVersion() {
+    if (!form.version_id || !form.title) return
+    const { error } = await supabase.from('model_versions').insert([form])
+    if (!error) {
+      setForm({
+        version_id: '',
+        title: '',
+        change_type: CHANGE_TYPES[0],
+        status: 'shadow',
+        activation_date: getToday(),
+        decision_log_id: '',
+        backtest_result: '',
+        shadow_result: '',
+        notes: '',
+      })
+      loadVersions()
+    } else if (isTableMissing(error.message)) {
+      setSetupError(error.message)
+    }
+  }
+
+  async function updateVersion(id, patch) {
+    const { error } = await supabase.from('model_versions').update(patch).eq('id', id)
+    if (!error) loadVersions()
+  }
+
+  async function deleteVersion(id) {
+    const { error } = await supabase.from('model_versions').delete().eq('id', id)
+    if (!error) loadVersions()
+  }
+
+  if (loading) return <LoadingState />
+  if (setupError) return <SetupRequired sql={G15_SQL} label="G15 Model Governance" onRetry={loadVersions} />
+
+  return (
+    <Section title="Audit trail de versiones" icon={GitBranch}>
+      <div className="grid gap-0 border-b border-[#222] md:grid-cols-4">
+        <input value={form.version_id} onChange={e => setForm(f => ({ ...f, version_id: e.target.value }))} placeholder="Version ID" className="border-b border-r border-[#222] bg-black px-3 py-2 text-xs text-white outline-none placeholder-[#444] focus:border-[#818cf8]" />
+        <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Titulo del cambio" className="border-b border-r border-[#222] bg-black px-3 py-2 text-xs text-white outline-none placeholder-[#444] focus:border-[#818cf8] md:col-span-2" />
+        <input type="date" value={form.activation_date} onChange={e => setForm(f => ({ ...f, activation_date: e.target.value }))} className="border-b border-[#222] bg-black px-3 py-2 font-mono text-xs text-white outline-none focus:border-[#818cf8]" />
+        <select value={form.change_type} onChange={e => setForm(f => ({ ...f, change_type: e.target.value }))} className="border-r border-[#222] bg-black px-3 py-2 text-xs text-white outline-none focus:border-[#818cf8]">
+          {CHANGE_TYPES.map(t => <option key={t}>{t}</option>)}
+        </select>
+        <input value={form.decision_log_id} onChange={e => setForm(f => ({ ...f, decision_log_id: e.target.value }))} placeholder="Decision Log ID" className="border-r border-[#222] bg-black px-3 py-2 text-xs text-white outline-none placeholder-[#444] focus:border-[#818cf8]" />
+        <input value={form.backtest_result} onChange={e => setForm(f => ({ ...f, backtest_result: e.target.value }))} placeholder="Backtest result" className="border-r border-[#222] bg-black px-3 py-2 text-xs text-white outline-none placeholder-[#444] focus:border-[#818cf8]" />
+        <button type="button" onClick={addVersion} className="bg-[#818cf8] px-3 py-2 text-xs font-bold uppercase tracking-wider text-black hover:bg-white">
+          Registrar version
+        </button>
+      </div>
+      <div className="divide-y divide-[#111]">
+        {versions.length === 0 ? (
+          <div className="p-6 text-center text-xs uppercase tracking-wider text-[#444]">Sin versiones registradas</div>
+        ) : versions.map((version) => (
+          <div key={version.id} className="grid gap-3 p-3 lg:grid-cols-[1fr_auto]">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-xs font-bold text-[#818cf8]">{version.version_id}</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-white">{version.title}</span>
+                <span className="border border-[#333] px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-[#777]">{version.change_type}</span>
+              </div>
+              <p className="mt-1 text-xs text-[#777]">
+                DL: {version.decision_log_id || 'n/a'} | Backtest: {version.backtest_result || 'n/a'} | Shadow: {version.shadow_result || 'n/a'}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select value={version.status} onChange={e => updateVersion(version.id, { status: e.target.value })} className="border border-[#333] bg-black px-2 py-1 text-xs text-white">
+                {VERSION_STATUSES.map(s => <option key={s}>{s}</option>)}
+              </select>
+              <input value={version.shadow_result || ''} onChange={e => updateVersion(version.id, { shadow_result: e.target.value })} placeholder="Shadow result" className="w-40 border border-[#333] bg-black px-2 py-1 text-xs text-white outline-none placeholder-[#444]" />
+              <button type="button" onClick={() => deleteVersion(version.id)} className="border border-[#333] p-1.5 text-[#777] hover:border-[#ef4444] hover:text-[#ef4444]">
+                <Trash2 size={13} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
+  )
+}
+
+function ExternalValidationTool() {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [setupError, setSetupError] = useState('')
+  const [form, setForm] = useState({
+    date: getToday(),
+    validation_type: VALIDATION_TYPES[0],
+    benchmark: '',
+    result: '',
+    severity: 'media',
+    action: '',
+    status: 'open',
+    owner: '',
+    notes: '',
+  })
+
+  async function loadItems() {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('external_validations')
+      .select('*')
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      if (isTableMissing(error.message)) setSetupError(error.message)
+      setItems([])
+    } else {
+      setSetupError('')
+      setItems(data || [])
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => { loadItems() }, [])
+
+  async function addItem() {
+    if (!form.validation_type || !form.result) return
+    const { error } = await supabase.from('external_validations').insert([form])
+    if (!error) {
+      setForm({
+        date: getToday(),
+        validation_type: VALIDATION_TYPES[0],
+        benchmark: '',
+        result: '',
+        severity: 'media',
+        action: '',
+        status: 'open',
+        owner: '',
+        notes: '',
+      })
+      loadItems()
+    } else if (isTableMissing(error.message)) {
+      setSetupError(error.message)
+    }
+  }
+
+  async function updateItem(id, patch) {
+    const { error } = await supabase.from('external_validations').update(patch).eq('id', id)
+    if (!error) loadItems()
+  }
+
+  async function deleteItem(id) {
+    const { error } = await supabase.from('external_validations').delete().eq('id', id)
+    if (!error) loadItems()
+  }
+
+  if (loading) return <LoadingState />
+  if (setupError) return <SetupRequired sql={G18_SQL} label="G18 External Validation" onRetry={loadItems} />
+
+  return (
+    <Section title="Registro de validacion externa" icon={ShieldCheck}>
+      <div className="grid gap-0 border-b border-[#222] md:grid-cols-4">
+        <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="border-b border-r border-[#222] bg-black px-3 py-2 font-mono text-xs text-white outline-none focus:border-[#67e8f9]" />
+        <select value={form.validation_type} onChange={e => setForm(f => ({ ...f, validation_type: e.target.value }))} className="border-b border-r border-[#222] bg-black px-3 py-2 text-xs text-white outline-none focus:border-[#67e8f9]">
+          {VALIDATION_TYPES.map(t => <option key={t}>{t}</option>)}
+        </select>
+        <input value={form.benchmark} onChange={e => setForm(f => ({ ...f, benchmark: e.target.value }))} placeholder="Benchmark" className="border-b border-r border-[#222] bg-black px-3 py-2 text-xs text-white outline-none placeholder-[#444] focus:border-[#67e8f9]" />
+        <select value={form.severity} onChange={e => setForm(f => ({ ...f, severity: e.target.value }))} className="border-b border-[#222] bg-black px-3 py-2 text-xs text-white outline-none focus:border-[#67e8f9]">
+          {VALIDATION_SEVERITIES.map(s => <option key={s}>{s}</option>)}
+        </select>
+        <input value={form.result} onChange={e => setForm(f => ({ ...f, result: e.target.value }))} placeholder="Resultado / hallazgo" className="border-r border-[#222] bg-black px-3 py-2 text-xs text-white outline-none placeholder-[#444] focus:border-[#67e8f9] md:col-span-2" />
+        <input value={form.action} onChange={e => setForm(f => ({ ...f, action: e.target.value }))} placeholder="Accion requerida" className="border-r border-[#222] bg-black px-3 py-2 text-xs text-white outline-none placeholder-[#444] focus:border-[#67e8f9]" />
+        <button type="button" onClick={addItem} className="bg-[#67e8f9] px-3 py-2 text-xs font-bold uppercase tracking-wider text-black hover:bg-white">
+          Registrar validacion
+        </button>
+      </div>
+      <div className="divide-y divide-[#111]">
+        {items.length === 0 ? (
+          <div className="p-6 text-center text-xs uppercase tracking-wider text-[#444]">Sin validaciones registradas</div>
+        ) : items.map((item) => (
+          <div key={item.id} className="grid gap-3 p-3 lg:grid-cols-[1fr_auto]">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-xs text-[#67e8f9]">{item.date}</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-white">{item.validation_type}</span>
+                <span className="border border-[#333] px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-[#777]">{item.severity}</span>
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-[#aaa]">{item.result}</p>
+              <p className="mt-1 text-xs text-[#777]">Benchmark: {item.benchmark || 'n/a'} | Accion: {item.action || 'n/a'}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select value={item.status} onChange={e => updateItem(item.id, { status: e.target.value })} className="border border-[#333] bg-black px-2 py-1 text-xs text-white">
+                {VALIDATION_STATUSES.map(s => <option key={s}>{s}</option>)}
+              </select>
+              <input value={item.owner || ''} onChange={e => updateItem(item.id, { owner: e.target.value })} placeholder="Owner" className="w-32 border border-[#333] bg-black px-2 py-1 text-xs text-white outline-none placeholder-[#444]" />
+              <button type="button" onClick={() => deleteItem(item.id)} className="border border-[#333] p-1.5 text-[#777] hover:border-[#ef4444] hover:text-[#ef4444]">
+                <Trash2 size={13} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
+  )
+}
 
 const MODULES = {
   multiBroker: {
@@ -699,9 +1018,9 @@ export function ModelGovernancePage() {
     <div className="min-h-screen pt-12">
       <div className="mx-auto max-w-7xl px-4 py-4">
         <PageHeader mod={mod} />
-        <SupabasePending label="G15 Model Governance / Audit Trail" />
-        <div className="mt-4">
-          <PrincipleIO mod={mod} />
+        <PrincipleIO mod={mod} />
+        <ModelGovernanceTool />
+        <RefToggle>
           <ModelGovernanceContent mod={mod} />
           <Section title="Pipeline operativo" icon={Route} className="mt-4">
             <Pipeline steps={mod.pipeline} accent={mod.accent} />
@@ -709,9 +1028,9 @@ export function ModelGovernancePage() {
           <Section title="Errores especificos a evitar" icon={AlertTriangle} className="mt-4">
             <div className="p-3"><BulletList items={mod.errors} /></div>
           </Section>
-        </div>
+        </RefToggle>
         <div className="mt-4 border-2 border-[#333] p-3 text-xs text-[#777]">
-          Pantalla de referencia operativa.
+          Versiones persistidas en Supabase.
           <Link to="/dashboard" className="ml-2 font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">Volver al dashboard</Link>
         </div>
       </div>
@@ -725,9 +1044,9 @@ export function ExternalValidationPage() {
     <div className="min-h-screen pt-12">
       <div className="mx-auto max-w-7xl px-4 py-4">
         <PageHeader mod={mod} />
-        <SupabasePending label="G18 External Validation Framework" />
-        <div className="mt-4">
-          <PrincipleIO mod={mod} />
+        <PrincipleIO mod={mod} />
+        <ExternalValidationTool />
+        <RefToggle>
           <ExternalValidationContent mod={mod} />
           <Section title="Pipeline operativo" icon={Route} className="mt-4">
             <Pipeline steps={mod.pipeline} accent={mod.accent} />
@@ -735,9 +1054,9 @@ export function ExternalValidationPage() {
           <Section title="Errores especificos a evitar" icon={AlertTriangle} className="mt-4">
             <div className="p-3"><BulletList items={mod.errors} /></div>
           </Section>
-        </div>
+        </RefToggle>
         <div className="mt-4 border-2 border-[#333] p-3 text-xs text-[#777]">
-          Pantalla de referencia operativa.
+          Validaciones persistidas en Supabase.
           <Link to="/dashboard" className="ml-2 font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">Volver al dashboard</Link>
         </div>
       </div>

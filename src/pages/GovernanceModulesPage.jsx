@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ClipboardList,
   Clock,
+  Database,
   FileText,
   ListChecks,
   Route,
@@ -17,8 +18,61 @@ import {
   SlidersHorizontal,
   Users,
 } from 'lucide-react'
+import { supabase } from '../lib/supabase'
 
-// ── Shared components ────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const getToday = () => new Date().toISOString().slice(0, 10)
+
+function LoadingState() {
+  return (
+    <div className="py-8 text-center text-[10px] uppercase tracking-widest text-[#444]">
+      Cargando...
+    </div>
+  )
+}
+
+function SetupRequired({ sql, label, onRetry }) {
+  return (
+    <div className="space-y-3 border border-[#f59e0b]/30 bg-[#0d0900] p-4">
+      <div className="flex items-center gap-2">
+        <Database size={13} className="text-[#f59e0b]" />
+        <span className="text-xs font-bold uppercase tracking-widest text-[#f59e0b]">
+          Configuracion Supabase requerida
+        </span>
+      </div>
+      <p className="text-xs text-[#aaa]">
+        Ejecuta el siguiente SQL en el{' '}
+        <a
+          href="https://supabase.com/dashboard"
+          target="_blank"
+          rel="noreferrer"
+          className="underline text-[#ecd987]"
+        >
+          Editor SQL de Supabase
+        </a>{' '}
+        para activar {label}:
+      </p>
+      <pre className="overflow-x-auto whitespace-pre-wrap border border-[#222] bg-[#050505] p-3 font-mono text-[10px] leading-relaxed text-[#777]">
+        {sql}
+      </pre>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="border border-[#f59e0b] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#f59e0b] hover:bg-[#f59e0b] hover:text-black"
+        >
+          Reintentar
+        </button>
+      )}
+    </div>
+  )
+}
+
+function isTableMissing(msg) {
+  return msg && (msg.includes('does not exist') || msg.includes('relation') || msg.includes('permission denied'))
+}
+
+// ── Shared UI components ─────────────────────────────────────────────────────
 
 function Section({ title, icon: Icon, children, className = '' }) {
   return (
@@ -58,31 +112,6 @@ function Pipeline({ steps, accent }) {
   )
 }
 
-function ParamTable({ rows }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[580px] table-fixed text-sm">
-        <thead>
-          <tr className="bg-[#111] text-left">
-            <th className="w-[42%] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">Parametro</th>
-            <th className="w-[24%] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">Default</th>
-            <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">Rango</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(([p, v, r]) => (
-            <tr key={p} className="border-t border-[#111]">
-              <td className="px-3 py-2 text-[#ddd]">{p}</td>
-              <td className="px-3 py-2 font-mono text-white">{v}</td>
-              <td className="px-3 py-2 font-mono text-[#777]">{r}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
 function DataTable({ headers, rows }) {
   return (
     <div className="overflow-x-auto">
@@ -110,7 +139,20 @@ function DataTable({ headers, rows }) {
   )
 }
 
-// ── G9 Tool ──────────────────────────────────────────────────────────────────
+function RefToggle({ open, onToggle }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="mt-4 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#555] transition-colors hover:text-[#ecd987]"
+    >
+      {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      {open ? 'Ocultar referencia' : 'Ver referencia completa'}
+    </button>
+  )
+}
+
+// ── G9 Behavioral Finance Tool ────────────────────────────────────────────────
 
 const G9_CHECKLIST_KEY = 'polaris_g9_checklists'
 const G9_BIAS_KEY = 'polaris_g9_bias_log'
@@ -189,10 +231,8 @@ function BehavioralTool() {
   const emotionNum = parseFloat(dayData.emotionScore) || 0
   const emotionOk = emotionNum >= 6
   const allChecked = preTradeCount === PRE_TRADE_ITEMS.length && emotionOk
-
   const emotionColor = emotionNum >= 8 ? 'text-[#4ade80]' : emotionNum >= 6 ? 'text-[#ecd987]' : emotionNum > 0 ? 'text-[#ef4444]' : 'text-[#555]'
 
-  // Monthly bias stats
   const monthKey = today.slice(0, 7)
   const monthBiases = useMemo(() => biasLog.filter(b => b.date?.startsWith(monthKey)), [biasLog, monthKey])
   const biasFreq = useMemo(() => {
@@ -203,7 +243,6 @@ function BehavioralTool() {
 
   return (
     <div className="space-y-3">
-      {/* Daily checklist */}
       <div className="border-2 border-[#a78bfa]">
         <div className="bg-[#0f0a1a] border-b border-[#a78bfa]/40 px-3 py-1.5 flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-widest text-[#a78bfa]">
@@ -218,9 +257,7 @@ function BehavioralTool() {
             className="bg-[#111] border border-[#333] text-[#777] text-xs font-mono px-2 py-0.5 focus:outline-none focus:border-[#a78bfa]"
           />
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] divide-y lg:divide-y-0 lg:divide-x divide-[#222]">
-          {/* Pre-trade */}
           <div className="p-3">
             <div className="text-[10px] font-bold uppercase tracking-widest text-[#555] mb-2">
               Pre-trade ({preTradeCount}/{PRE_TRADE_ITEMS.length})
@@ -231,9 +268,7 @@ function BehavioralTool() {
                   <div
                     onClick={() => togglePreTrade(i)}
                     className={`mt-0.5 h-4 w-4 shrink-0 border flex items-center justify-center cursor-pointer transition-colors ${
-                      dayData.preTrade[i]
-                        ? 'border-[#4ade80] bg-[#4ade80]/20'
-                        : 'border-[#444] group-hover:border-[#666]'
+                      dayData.preTrade[i] ? 'border-[#4ade80] bg-[#4ade80]/20' : 'border-[#444] group-hover:border-[#666]'
                     }`}
                   >
                     {dayData.preTrade[i] && <span className="text-[#4ade80] text-[10px] font-bold">✓</span>}
@@ -245,15 +280,12 @@ function BehavioralTool() {
               ))}
             </div>
           </div>
-
-          {/* Emotion + post-trade */}
           <div className="p-3 min-w-[220px]">
             <div className="mb-3">
               <div className="text-[10px] font-bold uppercase tracking-widest text-[#555] mb-1">Estado emocional (1-10)</div>
               <div className="flex items-center gap-2">
                 <input
-                  type="number"
-                  min="1" max="10" step="1"
+                  type="number" min="1" max="10" step="1"
                   value={dayData.emotionScore}
                   onChange={e => setEmotion(e.target.value)}
                   className="bg-[#111] border border-[#333] text-[#e5e5e5] font-mono text-lg px-2 py-1 w-16 focus:outline-none focus:border-[#a78bfa]"
@@ -264,7 +296,6 @@ function BehavioralTool() {
                 </span>
               </div>
             </div>
-
             <div className="space-y-2">
               <div className="text-[10px] font-bold uppercase tracking-widest text-[#555] mb-1">Post-trade (último)</div>
               <label className="block">
@@ -293,7 +324,6 @@ function BehavioralTool() {
         </div>
       </div>
 
-      {/* Bias log + monthly stats */}
       <div className="grid gap-3 lg:grid-cols-[1fr_260px]">
         <div className="border-2 border-[#333]">
           <div className="bg-[#1a1a0d] border-b border-[#333] px-3 py-1.5 flex items-center justify-between">
@@ -307,13 +337,9 @@ function BehavioralTool() {
               {showBiasForm ? 'Cancelar' : '+ Registrar sesgo'}
             </button>
           </div>
-
           {showBiasForm && (
             <div className="border-b border-[#222] grid grid-cols-2 sm:grid-cols-4">
-              {[
-                ['Fecha', 'date', 'date', biasForm.date],
-                ['Trade ref.', 'tradeRef', 'text', biasForm.tradeRef],
-              ].map(([label, key, type, val]) => (
+              {[['Fecha', 'date', 'date', biasForm.date], ['Trade ref.', 'tradeRef', 'text', biasForm.tradeRef]].map(([label, key, type, val]) => (
                 <label key={key} className="block p-2 border-r border-b border-[#222]">
                   <span className="block text-[9px] text-[#555] uppercase tracking-wider mb-1">{label}</span>
                   <input type={type} value={val} onChange={e => setBiasForm(f => ({ ...f, [key]: e.target.value }))}
@@ -339,11 +365,8 @@ function BehavioralTool() {
               </div>
             </div>
           )}
-
           {biasLog.length === 0 ? (
-            <div className="p-6 text-center text-[#444] text-xs uppercase tracking-wider">
-              Sin sesgos registrados
-            </div>
+            <div className="p-6 text-center text-[#444] text-xs uppercase tracking-wider">Sin sesgos registrados</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -380,8 +403,6 @@ function BehavioralTool() {
             </div>
           )}
         </div>
-
-        {/* Monthly stats */}
         <div className="border-2 border-[#333]">
           <div className="bg-[#1a1a0d] border-b border-[#333] px-3 py-1.5">
             <span className="text-xs font-bold uppercase tracking-widest text-[#ecd987]">Este mes</span>
@@ -416,7 +437,756 @@ function BehavioralTool() {
   )
 }
 
-// ── Module data ──────────────────────────────────────────────────────────────
+// ── G16 Decision Log Tool ────────────────────────────────────────────────────
+
+const G16_SQL = `CREATE TABLE IF NOT EXISTS decision_log (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at timestamptz DEFAULT now(),
+  date date NOT NULL DEFAULT CURRENT_DATE,
+  category text NOT NULL DEFAULT 'Cambio de parametro',
+  module text DEFAULT '',
+  title text NOT NULL,
+  description text DEFAULT '',
+  context text DEFAULT '',
+  hypothesis text DEFAULT '',
+  prev_value text DEFAULT '',
+  new_value text DEFAULT '',
+  review_criteria text DEFAULT '',
+  review_date date,
+  status text DEFAULT 'open',
+  outcome text DEFAULT ''
+);
+ALTER TABLE decision_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "auth_full" ON decision_log
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);`
+
+const DL_CATEGORIES = [
+  'Cambio de parametro', 'Activacion de modulo', 'Pausa de modulo',
+  'Nueva hipotesis macro', 'Cambio de universe', 'Revision metodologica', 'Override discrecional',
+]
+
+const DL_STATUS = {
+  open:       { label: 'Abierto',     color: 'text-[#4ade80]',  border: 'border-[#4ade80]' },
+  monitoring: { label: 'En revision', color: 'text-[#f59e0b]',  border: 'border-[#f59e0b]' },
+  closed:     { label: 'Cerrado',     color: 'text-[#555]',     border: 'border-[#555]' },
+}
+
+const EMPTY_DL = {
+  date: '', category: DL_CATEGORIES[0], module: '', title: '',
+  description: '', context: '', hypothesis: '',
+  prev_value: '', new_value: '', review_criteria: '', review_date: '',
+}
+
+function DLRow({ entry, isExpanded, onToggle, onUpdateStatus, onSaveOutcome, onDelete }) {
+  const [outcomeText, setOutcomeText] = useState(entry.outcome || '')
+  const status = DL_STATUS[entry.status] || DL_STATUS.open
+
+  return (
+    <Fragment>
+      <tr
+        className={`border-t border-[#111] cursor-pointer hover:bg-[#0a0a12] ${isExpanded ? 'bg-[#0a0a12]' : ''}`}
+        onClick={onToggle}
+      >
+        <td className="px-3 py-2 font-mono text-[10px] text-[#777]">{entry.date}</td>
+        <td className="px-3 py-2 text-[10px] text-[#aaa]">{entry.category}</td>
+        <td className="px-3 py-2 font-mono text-[10px] text-[#555]">{entry.module || '—'}</td>
+        <td className="px-3 py-2 text-xs font-bold text-[#ddd]">{entry.title}</td>
+        <td className="px-3 py-2 font-mono text-[10px] text-[#555]">{entry.review_date || '—'}</td>
+        <td className="px-3 py-2">
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${status.color}`}>{status.label}</span>
+        </td>
+        <td className="px-3 py-2 text-[#444]">
+          {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        </td>
+      </tr>
+      {isExpanded && (
+        <tr className="border-t border-[#818cf8]/20 bg-[#06061a]">
+          <td colSpan={7} className="px-4 py-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 mb-4">
+              {[
+                ['Descripcion (A → B)', entry.description],
+                ['Contexto', entry.context],
+                ['Hipotesis', entry.hypothesis],
+                ['Criterio de revision', entry.review_criteria],
+              ].filter(([, v]) => v).map(([label, val]) => (
+                <div key={label}>
+                  <div className="mb-0.5 text-[9px] font-bold uppercase tracking-wider text-[#555]">{label}</div>
+                  <p className="text-xs leading-relaxed text-[#aaa]">{val}</p>
+                </div>
+              ))}
+              {(entry.prev_value || entry.new_value) && (
+                <div>
+                  <div className="mb-0.5 text-[9px] font-bold uppercase tracking-wider text-[#555]">Cambio de valor</div>
+                  <p className="text-xs text-[#aaa]">
+                    <span className="text-[#f87171]">{entry.prev_value || '—'}</span>
+                    {' → '}
+                    <span className="text-[#4ade80]">{entry.new_value || '—'}</span>
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="mb-4">
+              <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-[#555]">Resultado posterior</div>
+              <div className="flex gap-2">
+                <textarea
+                  value={outcomeText}
+                  onChange={e => setOutcomeText(e.target.value)}
+                  rows={2}
+                  placeholder="Rellenar en la fecha de revision con datos reales..."
+                  className="flex-1 resize-none border border-[#333] bg-black px-2 py-1.5 text-xs text-white placeholder-[#333] focus:border-[#818cf8] focus:outline-none"
+                />
+                <button
+                  onClick={() => onSaveOutcome(entry.id, outcomeText)}
+                  className="self-start border border-[#818cf8] px-2 py-1.5 text-[10px] font-bold text-[#818cf8] hover:bg-[#818cf8] hover:text-black"
+                >
+                  Guardar
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {entry.status !== 'monitoring' && (
+                <button onClick={() => onUpdateStatus(entry.id, 'monitoring')}
+                  className="border border-[#f59e0b] px-2 py-1 text-[10px] font-bold text-[#f59e0b] hover:bg-[#f59e0b] hover:text-black">
+                  En revision
+                </button>
+              )}
+              {entry.status !== 'closed' && (
+                <button onClick={() => onUpdateStatus(entry.id, 'closed')}
+                  className="border border-[#444] px-2 py-1 text-[10px] font-bold text-[#555] hover:border-[#aaa] hover:text-[#aaa]">
+                  Cerrar
+                </button>
+              )}
+              {entry.status !== 'open' && (
+                <button onClick={() => onUpdateStatus(entry.id, 'open')}
+                  className="border border-[#333] px-2 py-1 text-[10px] font-bold text-[#444] hover:border-[#aaa] hover:text-[#aaa]">
+                  Reabrir
+                </button>
+              )}
+              <button onClick={() => onDelete(entry.id)}
+                className="ml-auto border border-[#333] px-2 py-1 text-[10px] font-bold text-[#444] hover:border-[#f87171] hover:text-[#f87171]">
+                Eliminar
+              </button>
+            </div>
+          </td>
+        </tr>
+      )}
+    </Fragment>
+  )
+}
+
+function DecisionLogTool() {
+  const [entries, setEntries] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [dbError, setDbError] = useState(null)
+  const [filter, setFilter] = useState('all')
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ ...EMPTY_DL, date: getToday() })
+  const [saving, setSaving] = useState(false)
+  const [expandedId, setExpandedId] = useState(null)
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('decision_log')
+      .select('*')
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+    if (error) setDbError(error.message)
+    else { setEntries(data || []); setDbError(null) }
+    setLoading(false)
+  }
+
+  async function addEntry() {
+    if (!form.title.trim() || !form.date) return
+    setSaving(true)
+    const { error } = await supabase.from('decision_log').insert([{
+      ...form, review_date: form.review_date || null,
+    }])
+    if (error) setDbError(error.message)
+    else { setShowForm(false); setForm({ ...EMPTY_DL, date: getToday() }); await load() }
+    setSaving(false)
+  }
+
+  async function updateStatus(id, status) {
+    const { error } = await supabase.from('decision_log').update({ status }).eq('id', id)
+    if (error) setDbError(error.message)
+    else await load()
+  }
+
+  async function saveOutcome(id, outcome) {
+    const { error } = await supabase.from('decision_log').update({ outcome }).eq('id', id)
+    if (error) setDbError(error.message)
+    else await load()
+  }
+
+  async function deleteEntry(id) {
+    const { error } = await supabase.from('decision_log').delete().eq('id', id)
+    if (error) setDbError(error.message)
+    else { setExpandedId(null); await load() }
+  }
+
+  const setF = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const filtered = entries.filter(e => filter === 'all' || e.status === filter)
+  const counts = {
+    all: entries.length,
+    open: entries.filter(e => e.status === 'open').length,
+    monitoring: entries.filter(e => e.status === 'monitoring').length,
+    closed: entries.filter(e => e.status === 'closed').length,
+  }
+
+  if (loading) return <LoadingState />
+  if (dbError && isTableMissing(dbError)) return <SetupRequired sql={G16_SQL} label="G16 Decision Log" onRetry={load} />
+
+  return (
+    <div className="border-2 border-[#818cf8]/30">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-[#333] bg-[#0a0a1a] px-3 py-1.5">
+        <span className="text-xs font-bold uppercase tracking-widest text-[#818cf8]">Decision Log Estrategico</span>
+        <button
+          onClick={() => setShowForm(v => !v)}
+          className="bg-[#818cf8] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-black hover:bg-[#a5b4fc]"
+        >
+          {showForm ? 'Cancelar' : '+ Nueva Decision'}
+        </button>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex border-b border-[#222]">
+        {[['all', 'Todos'], ['open', 'Abierto'], ['monitoring', 'En revision'], ['closed', 'Cerrado']].map(([k, label]) => (
+          <button
+            key={k}
+            onClick={() => setFilter(k)}
+            className={`border-r border-[#222] px-3 py-2 text-[10px] font-bold uppercase tracking-wider ${
+              filter === k ? 'bg-[#111] text-[#818cf8]' : 'text-[#555] hover:text-[#aaa]'
+            }`}
+          >
+            {label} ({counts[k]})
+          </button>
+        ))}
+      </div>
+
+      {/* Add form */}
+      {showForm && (
+        <div className="border-b border-[#333] bg-[#06061a] p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {[['Fecha *', 'date', 'date'], ['Titulo *', 'title', 'text'], ['Modulo', 'module', 'text']].map(([label, key, type]) => (
+              <label key={key} className="flex flex-col gap-1">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">{label}</span>
+                <input type={type} value={form[key]} onChange={e => setF(key, e.target.value)}
+                  className="border border-[#333] bg-black px-2 py-1.5 text-xs text-white focus:border-[#818cf8] focus:outline-none" />
+              </label>
+            ))}
+            <label className="flex flex-col gap-1">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">Categoria</span>
+              <select value={form.category} onChange={e => setF('category', e.target.value)}
+                className="border border-[#333] bg-black px-2 py-1.5 text-xs text-white focus:border-[#818cf8] focus:outline-none">
+                {DL_CATEGORIES.map(c => <option key={c}>{c}</option>)}
+              </select>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {[
+              ['Descripcion (que cambia de A a B)', 'description'],
+              ['Contexto (que lo detono)', 'context'],
+              ['Hipotesis (que se espera mejorar)', 'hypothesis'],
+              ['Criterio de revision', 'review_criteria'],
+            ].map(([label, key]) => (
+              <label key={key} className="flex flex-col gap-1">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">{label}</span>
+                <textarea value={form[key]} onChange={e => setF(key, e.target.value)} rows={2}
+                  className="resize-none border border-[#333] bg-black px-2 py-1.5 text-xs text-white focus:border-[#818cf8] focus:outline-none" />
+              </label>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-end gap-3">
+            {[['Valor anterior', 'prev_value', 'text'], ['Valor nuevo', 'new_value', 'text'], ['Fecha revision', 'review_date', 'date']].map(([label, key, type]) => (
+              <label key={key} className="flex flex-col gap-1">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">{label}</span>
+                <input type={type} value={form[key]} onChange={e => setF(key, e.target.value)}
+                  className="w-36 border border-[#333] bg-black px-2 py-1.5 text-xs text-white focus:border-[#818cf8] focus:outline-none" />
+              </label>
+            ))}
+            <button onClick={addEntry} disabled={saving || !form.title.trim()}
+              className="border border-[#818cf8] px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-[#818cf8] hover:bg-[#818cf8] hover:text-black disabled:opacity-40">
+              {saving ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Error banner */}
+      {dbError && !isTableMissing(dbError) && (
+        <div className="border-b border-[#f87171]/20 bg-[#150000] px-3 py-2 text-[10px] text-[#f87171]">
+          Error: {dbError}
+        </div>
+      )}
+
+      {/* Table */}
+      {filtered.length === 0 ? (
+        <div className="py-8 text-center text-xs text-[#444] uppercase tracking-widest">
+          {filter === 'all' ? 'Sin entradas. Crea la primera decision.' : `Sin entradas con estado "${filter}".`}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[680px]">
+            <thead>
+              <tr className="bg-[#0a0a0a] text-left">
+                {['Fecha', 'Categoria', 'Modulo', 'Titulo', 'Rev.', 'Estado', ''].map(h => (
+                  <th key={h} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(e => (
+                <DLRow
+                  key={e.id}
+                  entry={e}
+                  isExpanded={expandedId === e.id}
+                  onToggle={() => setExpandedId(expandedId === e.id ? null : e.id)}
+                  onUpdateStatus={updateStatus}
+                  onSaveOutcome={saveOutcome}
+                  onDelete={deleteEntry}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── G17 Knowledge Transfer Tool ──────────────────────────────────────────────
+
+const G17_SQL = `CREATE TABLE IF NOT EXISTS runbooks (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  title text NOT NULL,
+  category text DEFAULT 'Operativa',
+  description text DEFAULT '',
+  steps text DEFAULT '',
+  last_tested date,
+  status text DEFAULT 'active'
+);
+ALTER TABLE runbooks ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "auth_full" ON runbooks
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS incident_log (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at timestamptz DEFAULT now(),
+  date date NOT NULL DEFAULT CURRENT_DATE,
+  description text NOT NULL,
+  cause text DEFAULT '',
+  action_taken text DEFAULT '',
+  outcome text DEFAULT '',
+  runbook_updated boolean DEFAULT false,
+  related_module text DEFAULT '',
+  severity text DEFAULT 'low'
+);
+ALTER TABLE incident_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "auth_full" ON incident_log
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);`
+
+const RB_CATEGORIES = ['Operativa', 'Emergencia', 'Broker', 'Datos', 'Seguridad', 'Otro']
+
+const INC_SEVERITY = {
+  low:      { label: 'Bajo',    color: 'text-[#555]' },
+  medium:   { label: 'Medio',   color: 'text-[#f59e0b]' },
+  high:     { label: 'Alto',    color: 'text-[#fb923c]' },
+  critical: { label: 'Critico', color: 'text-[#f87171]' },
+}
+
+const RB_STATUS = {
+  active:   { label: 'Activo',        color: 'text-[#4ade80]' },
+  outdated: { label: 'Desactualizado', color: 'text-[#f59e0b]' },
+  archived: { label: 'Archivado',     color: 'text-[#555]' },
+}
+
+function RunbookRow({ rb, isExpanded, onToggle, onUpdate, onDelete }) {
+  const [editMode, setEditMode] = useState(false)
+  const [draft, setDraft] = useState({ title: rb.title, category: rb.category, description: rb.description, steps: rb.steps, last_tested: rb.last_tested || '', status: rb.status })
+  const [saving, setSaving] = useState(false)
+
+  async function save() {
+    setSaving(true)
+    await onUpdate(rb.id, { ...draft, updated_at: new Date().toISOString(), last_tested: draft.last_tested || null })
+    setEditMode(false)
+    setSaving(false)
+  }
+
+  const status = RB_STATUS[rb.status] || RB_STATUS.active
+
+  return (
+    <Fragment>
+      <tr
+        className={`border-t border-[#111] cursor-pointer hover:bg-[#0a0a0a] ${isExpanded ? 'bg-[#0a0a0a]' : ''}`}
+        onClick={onToggle}
+      >
+        <td className="px-3 py-2 text-xs font-bold text-[#ddd]">{rb.title}</td>
+        <td className="px-3 py-2 text-[10px] text-[#777]">{rb.category}</td>
+        <td className="px-3 py-2 font-mono text-[10px] text-[#555]">{rb.last_tested || '—'}</td>
+        <td className="px-3 py-2">
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${status.color}`}>{status.label}</span>
+        </td>
+        <td className="px-3 py-2 text-[#444]">
+          {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        </td>
+      </tr>
+      {isExpanded && (
+        <tr className="border-t border-[#60a5fa]/10 bg-[#05080f]">
+          <td colSpan={5} className="px-4 py-4">
+            {!editMode ? (
+              <>
+                {rb.description && (
+                  <div className="mb-3">
+                    <div className="mb-0.5 text-[9px] font-bold uppercase tracking-wider text-[#555]">Descripcion</div>
+                    <p className="text-xs leading-relaxed text-[#aaa]">{rb.description}</p>
+                  </div>
+                )}
+                {rb.steps && (
+                  <div className="mb-3">
+                    <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-[#555]">Pasos</div>
+                    <pre className="whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-[#aaa]">{rb.steps}</pre>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => setEditMode(true)}
+                    className="border border-[#60a5fa] px-2 py-1 text-[10px] font-bold text-[#60a5fa] hover:bg-[#60a5fa] hover:text-black">
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => onUpdate(rb.id, { status: rb.status === 'active' ? 'outdated' : 'active' })}
+                    className="border border-[#333] px-2 py-1 text-[10px] font-bold text-[#555] hover:border-[#aaa] hover:text-[#aaa]">
+                    {rb.status === 'active' ? 'Marcar desact.' : 'Marcar activo'}
+                  </button>
+                  <button onClick={() => onDelete(rb.id)}
+                    className="ml-auto border border-[#333] px-2 py-1 text-[10px] font-bold text-[#444] hover:border-[#f87171] hover:text-[#f87171]">
+                    Eliminar
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {[['Titulo', 'title', 'text'], ['Ultima prueba', 'last_tested', 'date']].map(([label, key, type]) => (
+                    <label key={key} className="flex flex-col gap-1">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">{label}</span>
+                      <input type={type} value={draft[key]} onChange={e => setDraft(d => ({ ...d, [key]: e.target.value }))}
+                        className="border border-[#333] bg-black px-2 py-1.5 text-xs text-white focus:border-[#60a5fa] focus:outline-none" />
+                    </label>
+                  ))}
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">Categoria</span>
+                    <select value={draft.category} onChange={e => setDraft(d => ({ ...d, category: e.target.value }))}
+                      className="border border-[#333] bg-black px-2 py-1.5 text-xs text-white focus:border-[#60a5fa] focus:outline-none">
+                      {RB_CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </label>
+                </div>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">Descripcion</span>
+                  <input value={draft.description} onChange={e => setDraft(d => ({ ...d, description: e.target.value }))}
+                    className="border border-[#333] bg-black px-2 py-1.5 text-xs text-white focus:border-[#60a5fa] focus:outline-none" />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">Pasos (texto libre, uno por linea)</span>
+                  <textarea value={draft.steps} onChange={e => setDraft(d => ({ ...d, steps: e.target.value }))} rows={6}
+                    className="resize-none border border-[#333] bg-black px-2 py-1.5 font-mono text-xs text-white focus:border-[#60a5fa] focus:outline-none" />
+                </label>
+                <div className="flex gap-2">
+                  <button onClick={save} disabled={saving}
+                    className="border border-[#60a5fa] px-3 py-1.5 text-[10px] font-bold text-[#60a5fa] hover:bg-[#60a5fa] hover:text-black disabled:opacity-40">
+                    {saving ? 'Guardando...' : 'Guardar'}
+                  </button>
+                  <button onClick={() => setEditMode(false)}
+                    className="border border-[#333] px-3 py-1.5 text-[10px] font-bold text-[#555] hover:border-[#aaa] hover:text-[#aaa]">
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
+    </Fragment>
+  )
+}
+
+function KnowledgeTransferTool() {
+  const [tab, setTab] = useState('runbooks')
+
+  // Runbooks
+  const [runbooks, setRunbooks] = useState([])
+  const [loadingRb, setLoadingRb] = useState(true)
+  const [dbErrorRb, setDbErrorRb] = useState(null)
+  const [showAddRb, setShowAddRb] = useState(false)
+  const [rbForm, setRbForm] = useState({ title: '', category: RB_CATEGORIES[0], description: '', steps: '', last_tested: '' })
+  const [savingRb, setSavingRb] = useState(false)
+  const [expandedRb, setExpandedRb] = useState(null)
+
+  // Incidents
+  const [incidents, setIncidents] = useState([])
+  const [loadingInc, setLoadingInc] = useState(true)
+  const [dbErrorInc, setDbErrorInc] = useState(null)
+  const [showAddInc, setShowAddInc] = useState(false)
+  const [incForm, setIncForm] = useState({
+    date: getToday(), description: '', cause: '', action_taken: '',
+    outcome: '', runbook_updated: false, related_module: '', severity: 'low',
+  })
+  const [savingInc, setSavingInc] = useState(false)
+
+  useEffect(() => { loadRunbooks(); loadIncidents() }, [])
+
+  async function loadRunbooks() {
+    setLoadingRb(true)
+    const { data, error } = await supabase.from('runbooks').select('*').order('created_at', { ascending: false })
+    if (error) setDbErrorRb(error.message)
+    else { setRunbooks(data || []); setDbErrorRb(null) }
+    setLoadingRb(false)
+  }
+
+  async function loadIncidents() {
+    setLoadingInc(true)
+    const { data, error } = await supabase.from('incident_log').select('*').order('date', { ascending: false })
+    if (error) setDbErrorInc(error.message)
+    else { setIncidents(data || []); setDbErrorInc(null) }
+    setLoadingInc(false)
+  }
+
+  async function addRunbook() {
+    if (!rbForm.title.trim()) return
+    setSavingRb(true)
+    const { error } = await supabase.from('runbooks').insert([{
+      ...rbForm, last_tested: rbForm.last_tested || null,
+    }])
+    if (error) setDbErrorRb(error.message)
+    else { setShowAddRb(false); setRbForm({ title: '', category: RB_CATEGORIES[0], description: '', steps: '', last_tested: '' }); await loadRunbooks() }
+    setSavingRb(false)
+  }
+
+  async function updateRunbook(id, patch) {
+    const { error } = await supabase.from('runbooks').update(patch).eq('id', id)
+    if (error) setDbErrorRb(error.message)
+    else await loadRunbooks()
+  }
+
+  async function deleteRunbook(id) {
+    const { error } = await supabase.from('runbooks').delete().eq('id', id)
+    if (error) setDbErrorRb(error.message)
+    else { setExpandedRb(null); await loadRunbooks() }
+  }
+
+  async function addIncident() {
+    if (!incForm.description.trim()) return
+    setSavingInc(true)
+    const { error } = await supabase.from('incident_log').insert([incForm])
+    if (error) setDbErrorInc(error.message)
+    else {
+      setShowAddInc(false)
+      setIncForm({ date: getToday(), description: '', cause: '', action_taken: '', outcome: '', runbook_updated: false, related_module: '', severity: 'low' })
+      await loadIncidents()
+    }
+    setSavingInc(false)
+  }
+
+  async function deleteIncident(id) {
+    const { error } = await supabase.from('incident_log').delete().eq('id', id)
+    if (error) setDbErrorInc(error.message)
+    else await loadIncidents()
+  }
+
+  const showSetup = (isTableMissing(dbErrorRb) || isTableMissing(dbErrorInc))
+
+  if (showSetup) {
+    return <SetupRequired sql={G17_SQL} label="G17 Knowledge Transfer" onRetry={() => { loadRunbooks(); loadIncidents() }} />
+  }
+
+  return (
+    <div className="border-2 border-[#60a5fa]/30">
+      {/* Tab bar */}
+      <div className="flex border-b border-[#333] bg-[#05080f]">
+        <div className="flex-1 flex">
+          {[['runbooks', `Runbooks (${runbooks.length})`], ['incidents', `Incidentes (${incidents.length})`]].map(([key, label]) => (
+            <button key={key} onClick={() => setTab(key)}
+              className={`px-4 py-2 text-[10px] font-bold uppercase tracking-wider border-r border-[#333] ${tab === key ? 'bg-[#111] text-[#60a5fa]' : 'text-[#555] hover:text-[#aaa]'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => tab === 'runbooks' ? setShowAddRb(v => !v) : setShowAddInc(v => !v)}
+          className="bg-[#60a5fa] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-black hover:bg-[#93c5fd]"
+        >
+          {tab === 'runbooks' ? (showAddRb ? 'Cancelar' : '+ Runbook') : (showAddInc ? 'Cancelar' : '+ Incidente')}
+        </button>
+      </div>
+
+      {/* Runbooks tab */}
+      {tab === 'runbooks' && (
+        <>
+          {showAddRb && (
+            <div className="border-b border-[#222] bg-[#05080f] p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">Titulo *</span>
+                  <input value={rbForm.title} onChange={e => setRbForm(f => ({ ...f, title: e.target.value }))}
+                    className="border border-[#333] bg-black px-2 py-1.5 text-xs text-white focus:border-[#60a5fa] focus:outline-none" />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">Categoria</span>
+                  <select value={rbForm.category} onChange={e => setRbForm(f => ({ ...f, category: e.target.value }))}
+                    className="border border-[#333] bg-black px-2 py-1.5 text-xs text-white focus:border-[#60a5fa] focus:outline-none">
+                    {RB_CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">Ultima prueba</span>
+                  <input type="date" value={rbForm.last_tested} onChange={e => setRbForm(f => ({ ...f, last_tested: e.target.value }))}
+                    className="border border-[#333] bg-black px-2 py-1.5 text-xs text-white focus:border-[#60a5fa] focus:outline-none" />
+                </label>
+              </div>
+              <label className="flex flex-col gap-1">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">Descripcion</span>
+                <input value={rbForm.description} onChange={e => setRbForm(f => ({ ...f, description: e.target.value }))}
+                  className="border border-[#333] bg-black px-2 py-1.5 text-xs text-white focus:border-[#60a5fa] focus:outline-none" />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">Pasos (texto libre, uno por linea)</span>
+                <textarea value={rbForm.steps} onChange={e => setRbForm(f => ({ ...f, steps: e.target.value }))} rows={5}
+                  className="resize-none border border-[#333] bg-black px-2 py-1.5 font-mono text-xs text-white focus:border-[#60a5fa] focus:outline-none" />
+              </label>
+              <button onClick={addRunbook} disabled={savingRb || !rbForm.title.trim()}
+                className="border border-[#60a5fa] px-4 py-1.5 text-xs font-bold text-[#60a5fa] hover:bg-[#60a5fa] hover:text-black disabled:opacity-40">
+                {savingRb ? 'Guardando...' : 'Guardar runbook'}
+              </button>
+            </div>
+          )}
+          {loadingRb ? <LoadingState /> : runbooks.length === 0 ? (
+            <div className="py-8 text-center text-xs text-[#444] uppercase tracking-widest">Sin runbooks. Crea el primero.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[500px]">
+                <thead>
+                  <tr className="bg-[#0a0a0a] text-left">
+                    {['Titulo', 'Categoria', 'Ultima prueba', 'Estado', ''].map(h => (
+                      <th key={h} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {runbooks.map(rb => (
+                    <RunbookRow key={rb.id} rb={rb}
+                      isExpanded={expandedRb === rb.id}
+                      onToggle={() => setExpandedRb(expandedRb === rb.id ? null : rb.id)}
+                      onUpdate={updateRunbook}
+                      onDelete={deleteRunbook}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Incidents tab */}
+      {tab === 'incidents' && (
+        <>
+          {showAddInc && (
+            <div className="border-b border-[#222] bg-[#05080f] p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[['Fecha *', 'date', 'date'], ['Modulo relacionado', 'related_module', 'text']].map(([label, key, type]) => (
+                  <label key={key} className="flex flex-col gap-1">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">{label}</span>
+                    <input type={type} value={incForm[key]} onChange={e => setIncForm(f => ({ ...f, [key]: e.target.value }))}
+                      className="border border-[#333] bg-black px-2 py-1.5 text-xs text-white focus:border-[#60a5fa] focus:outline-none" />
+                  </label>
+                ))}
+                <label className="flex flex-col gap-1">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">Severidad</span>
+                  <select value={incForm.severity} onChange={e => setIncForm(f => ({ ...f, severity: e.target.value }))}
+                    className="border border-[#333] bg-black px-2 py-1.5 text-xs text-white focus:border-[#60a5fa] focus:outline-none">
+                    {Object.entries(INC_SEVERITY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                  </select>
+                </label>
+                <label className="flex items-end gap-2 pb-1.5">
+                  <input type="checkbox" checked={incForm.runbook_updated}
+                    onChange={e => setIncForm(f => ({ ...f, runbook_updated: e.target.checked }))}
+                    className="accent-[#60a5fa]" />
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">Runbook actualizado</span>
+                </label>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {[
+                  ['Descripcion *', 'description'],
+                  ['Causa', 'cause'],
+                  ['Accion tomada', 'action_taken'],
+                  ['Resultado', 'outcome'],
+                ].map(([label, key]) => (
+                  <label key={key} className="flex flex-col gap-1">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#555]">{label}</span>
+                    <textarea value={incForm[key]} onChange={e => setIncForm(f => ({ ...f, [key]: e.target.value }))} rows={2}
+                      className="resize-none border border-[#333] bg-black px-2 py-1.5 text-xs text-white focus:border-[#60a5fa] focus:outline-none" />
+                  </label>
+                ))}
+              </div>
+              <button onClick={addIncident} disabled={savingInc || !incForm.description.trim()}
+                className="border border-[#60a5fa] px-4 py-1.5 text-xs font-bold text-[#60a5fa] hover:bg-[#60a5fa] hover:text-black disabled:opacity-40">
+                {savingInc ? 'Guardando...' : 'Registrar incidente'}
+              </button>
+            </div>
+          )}
+          {loadingInc ? <LoadingState /> : incidents.length === 0 ? (
+            <div className="py-8 text-center text-xs text-[#444] uppercase tracking-widest">Sin incidentes registrados.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[620px]">
+                <thead>
+                  <tr className="bg-[#0a0a0a] text-left">
+                    {['Fecha', 'Severidad', 'Descripcion', 'Modulo', 'Runbook act.', ''].map(h => (
+                      <th key={h} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {incidents.map(inc => {
+                    const sev = INC_SEVERITY[inc.severity] || INC_SEVERITY.low
+                    return (
+                      <tr key={inc.id} className="border-t border-[#111] hover:bg-[#0a0a0a] group">
+                        <td className="px-3 py-2 font-mono text-[10px] text-[#777]">{inc.date}</td>
+                        <td className={`px-3 py-2 text-[10px] font-bold ${sev.color}`}>{sev.label}</td>
+                        <td className="px-3 py-2 text-xs text-[#ddd] max-w-[280px] truncate">{inc.description}</td>
+                        <td className="px-3 py-2 font-mono text-[10px] text-[#555]">{inc.related_module || '—'}</td>
+                        <td className={`px-3 py-2 text-[10px] font-bold ${inc.runbook_updated ? 'text-[#4ade80]' : 'text-[#444]'}`}>
+                          {inc.runbook_updated ? 'Si' : 'No'}
+                        </td>
+                        <td className="px-3 py-2 opacity-0 group-hover:opacity-100">
+                          <button onClick={() => deleteIncident(inc.id)}
+                            className="text-[10px] text-[#444] hover:text-[#f87171]">✕</button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Module reference data ────────────────────────────────────────────────────
 
 const MODULES = {
   behavioralFinance: {
@@ -602,7 +1372,7 @@ const MODULES = {
   },
 }
 
-// ── Reference content ────────────────────────────────────────────────────────
+// ── Reference content sections ────────────────────────────────────────────────
 
 function BehavioralFinanceRef({ mod }) {
   return (
@@ -620,7 +1390,7 @@ function BehavioralFinanceRef({ mod }) {
   )
 }
 
-function DecisionLogContent({ mod }) {
+function DecisionLogRef({ mod }) {
   return (
     <>
       <Section title="Categorias de decision" icon={ClipboardList}>
@@ -648,7 +1418,7 @@ function DecisionLogContent({ mod }) {
   )
 }
 
-function KnowledgeTransferContent({ mod }) {
+function KnowledgeTransferRef({ mod }) {
   return (
     <>
       <Section title="Inventario documental" icon={FileText}>
@@ -688,13 +1458,14 @@ function KnowledgeTransferContent({ mod }) {
   )
 }
 
-// ── Page components ──────────────────────────────────────────────────────────
+// ── Page header ──────────────────────────────────────────────────────────────
 
 function PageHeader({ mod, children }) {
   return (
     <div className="mb-4 flex flex-col gap-3 border-b-2 border-[#333] pb-3 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <h1 className="text-2xl font-bold uppercase tracking-widest">{mod.title}</h1>
+        <p className={`font-mono text-[10px] font-bold uppercase tracking-widest ${mod.accent}`}>{mod.code}</p>
+        <h1 className="mt-0.5 text-2xl font-bold uppercase tracking-widest">{mod.title}</h1>
         <p className="mt-1 max-w-4xl text-sm text-[#888]">{mod.subtitle}</p>
       </div>
       {children}
@@ -702,16 +1473,26 @@ function PageHeader({ mod, children }) {
   )
 }
 
-function RefToggle({ open, onToggle }) {
+function PrincipleIO({ mod }) {
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#555] hover:text-[#ecd987] transition-colors mt-4"
-    >
-      {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-      {open ? 'Ocultar referencia' : 'Ver referencia completa'}
-    </button>
+    <div className="mb-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+      <div className="border-2 border-[#333] p-4">
+        <div className={`mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${mod.accent}`}>
+          <BookOpen size={15} /> Principio central
+        </div>
+        <p className="text-sm leading-relaxed text-white">{mod.principle}</p>
+      </div>
+      <div className="grid grid-rows-2 border-2 border-[#333]">
+        <div className="border-b border-[#222] p-3">
+          <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Input</div>
+          <div className="text-xs leading-relaxed text-[#aaa]">{mod.input}</div>
+        </div>
+        <div className="p-3">
+          <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Output</div>
+          <div className="text-xs leading-relaxed text-[#aaa]">{mod.output}</div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -729,32 +1510,11 @@ export function BehavioralFinancePage() {
             Operativo / {mod.horizon}
           </div>
         </PageHeader>
-
         <BehavioralTool />
-
         <RefToggle open={showRef} onToggle={() => setShowRef(v => !v)} />
-
         {showRef && (
           <div className="mt-4 space-y-4">
-            <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="border-2 border-[#333] p-4">
-                <div className={`mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${mod.accent}`}>
-                  <BookOpen size={15} />
-                  Principio central
-                </div>
-                <p className="text-sm leading-relaxed text-white">{mod.principle}</p>
-              </div>
-              <div className="grid grid-rows-2 border-2 border-[#333]">
-                <div className="border-b border-[#222] p-3">
-                  <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Input</div>
-                  <div className="text-xs leading-relaxed text-[#aaa]">{mod.input}</div>
-                </div>
-                <div className="p-3">
-                  <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Output</div>
-                  <div className="text-xs leading-relaxed text-[#aaa]">{mod.output}</div>
-                </div>
-              </div>
-            </div>
+            <PrincipleIO mod={mod} />
             <BehavioralFinanceRef mod={mod} />
             <Section title="Pipeline operativo" icon={Route}>
               <Pipeline steps={mod.pipeline} accent={mod.accent} />
@@ -764,6 +1524,10 @@ export function BehavioralFinancePage() {
             </Section>
           </div>
         )}
+        <div className="mt-4 border-2 border-[#333] p-3 text-xs text-[#777]">
+          Datos persistidos en localStorage del navegador.
+          <Link to="/dashboard" className="ml-2 font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">Dashboard</Link>
+        </div>
       </div>
     </div>
   )
@@ -771,42 +1535,34 @@ export function BehavioralFinancePage() {
 
 export function DecisionLogPage() {
   const mod = MODULES.decisionLog
+  const [showRef, setShowRef] = useState(false)
+
   return (
     <div className="min-h-screen pt-12">
       <div className="mx-auto max-w-7xl px-4 py-4">
         <PageHeader mod={mod}>
           <div className={`shrink-0 border px-3 py-2 text-[10px] font-bold uppercase tracking-widest ${mod.border} ${mod.accent}`}>
-            Supabase pendiente / {mod.horizon}
+            Operativo — Supabase / {mod.horizon}
           </div>
         </PageHeader>
-        <div className="border border-[#818cf8]/40 bg-[#0a0a1a] px-4 py-3 mb-4 text-xs text-[#818cf8]">
-          Este módulo tendrá CRUD completo con Supabase (Grupo 1). Por ahora la referencia está disponible abajo.
-        </div>
-        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] mb-4">
-          <div className="border-2 border-[#333] p-4">
-            <div className={`mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${mod.accent}`}>
-              <BookOpen size={15} /> Principio central
-            </div>
-            <p className="text-sm leading-relaxed text-white">{mod.principle}</p>
+        <DecisionLogTool />
+        <RefToggle open={showRef} onToggle={() => setShowRef(v => !v)} />
+        {showRef && (
+          <div className="mt-4 space-y-4">
+            <PrincipleIO mod={mod} />
+            <DecisionLogRef mod={mod} />
+            <Section title="Pipeline operativo" icon={Route}>
+              <Pipeline steps={mod.pipeline} accent={mod.accent} />
+            </Section>
+            <Section title="Errores especificos a evitar" icon={AlertTriangle}>
+              <div className="p-3"><BulletList items={mod.errors} /></div>
+            </Section>
           </div>
-          <div className="grid grid-rows-2 border-2 border-[#333]">
-            <div className="border-b border-[#222] p-3">
-              <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Input</div>
-              <div className="text-xs leading-relaxed text-[#aaa]">{mod.input}</div>
-            </div>
-            <div className="p-3">
-              <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Output</div>
-              <div className="text-xs leading-relaxed text-[#aaa]">{mod.output}</div>
-            </div>
-          </div>
+        )}
+        <div className="mt-4 border-2 border-[#333] p-3 text-xs text-[#777]">
+          Datos persistidos en Supabase.
+          <Link to="/dashboard" className="ml-2 font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">Dashboard</Link>
         </div>
-        <DecisionLogContent mod={mod} />
-        <Section title="Pipeline operativo" icon={Route} className="mt-4">
-          <Pipeline steps={mod.pipeline} accent={mod.accent} />
-        </Section>
-        <Section title="Errores especificos a evitar" icon={AlertTriangle} className="mt-4">
-          <div className="p-3"><BulletList items={mod.errors} /></div>
-        </Section>
       </div>
     </div>
   )
@@ -814,42 +1570,34 @@ export function DecisionLogPage() {
 
 export function KnowledgeTransferPage() {
   const mod = MODULES.knowledgeTransfer
+  const [showRef, setShowRef] = useState(false)
+
   return (
     <div className="min-h-screen pt-12">
       <div className="mx-auto max-w-7xl px-4 py-4">
         <PageHeader mod={mod}>
           <div className={`shrink-0 border px-3 py-2 text-[10px] font-bold uppercase tracking-widest ${mod.border} ${mod.accent}`}>
-            Supabase pendiente / {mod.horizon}
+            Operativo — Supabase / {mod.horizon}
           </div>
         </PageHeader>
-        <div className="border border-[#60a5fa]/40 bg-[#0a0f1a] px-4 py-3 mb-4 text-xs text-[#60a5fa]">
-          Este módulo tendrá inventario documental CRUD con Supabase (Grupo 1). Por ahora la referencia está disponible abajo.
-        </div>
-        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] mb-4">
-          <div className="border-2 border-[#333] p-4">
-            <div className={`mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${mod.accent}`}>
-              <BookOpen size={15} /> Principio central
-            </div>
-            <p className="text-sm leading-relaxed text-white">{mod.principle}</p>
+        <KnowledgeTransferTool />
+        <RefToggle open={showRef} onToggle={() => setShowRef(v => !v)} />
+        {showRef && (
+          <div className="mt-4 space-y-4">
+            <PrincipleIO mod={mod} />
+            <KnowledgeTransferRef mod={mod} />
+            <Section title="Pipeline operativo" icon={Route}>
+              <Pipeline steps={mod.pipeline} accent={mod.accent} />
+            </Section>
+            <Section title="Errores especificos a evitar" icon={AlertTriangle}>
+              <div className="p-3"><BulletList items={mod.errors} /></div>
+            </Section>
           </div>
-          <div className="grid grid-rows-2 border-2 border-[#333]">
-            <div className="border-b border-[#222] p-3">
-              <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Input</div>
-              <div className="text-xs leading-relaxed text-[#aaa]">{mod.input}</div>
-            </div>
-            <div className="p-3">
-              <div className="mb-1 text-[10px] uppercase tracking-widest text-[#555]">Output</div>
-              <div className="text-xs leading-relaxed text-[#aaa]">{mod.output}</div>
-            </div>
-          </div>
+        )}
+        <div className="mt-4 border-2 border-[#333] p-3 text-xs text-[#777]">
+          Runbooks e incidentes persistidos en Supabase.
+          <Link to="/dashboard" className="ml-2 font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">Dashboard</Link>
         </div>
-        <KnowledgeTransferContent mod={mod} />
-        <Section title="Pipeline operativo" icon={Route} className="mt-4">
-          <Pipeline steps={mod.pipeline} accent={mod.accent} />
-        </Section>
-        <Section title="Errores especificos a evitar" icon={AlertTriangle} className="mt-4">
-          <div className="p-3"><BulletList items={mod.errors} /></div>
-        </Section>
       </div>
     </div>
   )
