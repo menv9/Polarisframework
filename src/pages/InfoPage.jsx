@@ -236,6 +236,8 @@ function MermaidDiagram({ chart }) {
     async function renderDiagram() {
       try {
         setError('')
+        // Remove any stale element left by a previous render attempt (React StrictMode runs effects twice)
+        document.getElementById(`mermaid-${id}`)?.remove()
         const { svg } = await mermaid.render(`mermaid-${id}`, chart)
         if (mounted && ref.current) ref.current.innerHTML = svg
       } catch (err) {
@@ -246,6 +248,7 @@ function MermaidDiagram({ chart }) {
     renderDiagram()
     return () => {
       mounted = false
+      document.getElementById(`mermaid-${id}`)?.remove()
     }
   }, [chart, id])
 
