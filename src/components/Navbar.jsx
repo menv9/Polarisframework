@@ -5,20 +5,6 @@ import { useAppStore } from '../stores/appStore'
 import { supabase } from '../lib/supabase'
 import { briefExtensionModules } from '../data/modules'
 
-function ThemeToggle() {
-  const toggleTheme = useAppStore((s) => s.toggleTheme)
-  return (
-    <button
-      type="button"
-      onClick={toggleTheme}
-      className="theme-toggle-btn"
-      title="Switch to 1994 mainframe UI"
-    >
-      <span className="dot" />UI: MAINFRAME
-    </button>
-  )
-}
-
 function moduleItems(ids) {
   return ids
     .map((id) => briefExtensionModules.find((module) => module.id === id))
@@ -338,9 +324,6 @@ export default function Navbar() {
               </button>
             </div>
           )}
-          <div className="border-l border-[#333] pl-3">
-            <ThemeToggle />
-          </div>
         </div>
 
         {/* Mobile — hamburger */}
@@ -403,7 +386,6 @@ export default function Navbar() {
                 Salir
               </button>
             )}
-            <ThemeToggle />
           </div>
         </div>
       )}

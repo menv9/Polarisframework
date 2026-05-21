@@ -1,10 +1,12 @@
 import { create } from 'zustand'
 
 const THEME_KEY = 'polaris_theme'
+const THEMES = new Set(['default', 'dark-veil'])
+
 function loadTheme() {
   try {
-    const t = localStorage.getItem(THEME_KEY)
-    if (t === 'mainframe' || t === 'default' || t === 'terminal') return t
+    const stored = localStorage.getItem(THEME_KEY)
+    if (THEMES.has(stored)) return stored
   } catch { /* ignore */ }
   return 'default'
 }
@@ -18,7 +20,13 @@ function applyTheme(theme) {
 const initialTheme = loadTheme()
 applyTheme(initialTheme)
 
-export const useAppStore = create((set, get) => ({
+function persistTheme(theme) {
+  try {
+    localStorage.setItem(THEME_KEY, theme)
+  } catch { /* ignore */ }
+}
+
+export const useAppStore = create((set) => ({
   activeModule: null,
   setActiveModule: (id) => set({ activeModule: id }),
   clearActiveModule: () => set({ activeModule: null }),
@@ -33,13 +41,8 @@ export const useAppStore = create((set, get) => ({
 
   theme: initialTheme,
   setTheme: (theme) => {
-    try { localStorage.setItem(THEME_KEY, theme) } catch { /* ignore */ }
-    applyTheme(theme)
-    set({ theme })
-  },
-  toggleTheme: () => {
-    const next = get().theme === 'mainframe' ? 'default' : 'mainframe'
-    try { localStorage.setItem(THEME_KEY, next) } catch { /* ignore */ }
+    const next = THEMES.has(theme) ? theme : 'default'
+    persistTheme(next)
     applyTheme(next)
     set({ theme: next })
   },

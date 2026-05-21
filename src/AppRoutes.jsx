@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import Navbar from './components/Navbar'
-import MainframeShell from './components/MainframeShell'
+import ThemeBackdrop from './components/ThemeBackdrop'
 import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import AdminPage from './pages/AdminPage'
@@ -53,10 +53,12 @@ import { briefExtensionModules } from './data/modules'
 
 function Layout({ children }) {
   return (
-    <div className="min-h-screen bg-bg-primary text-text-primary antialiased">
+    <div className="relative min-h-screen bg-bg-primary text-text-primary antialiased">
+      <ThemeBackdrop />
       <Navbar />
-      <MainframeShell />
-      {children ?? <Outlet />}
+      <main className="relative z-10">
+        {children ?? <Outlet />}
+      </main>
     </div>
   )
 }

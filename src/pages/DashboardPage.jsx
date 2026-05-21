@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useModelStore } from '../store/ModelDataContext'
-import { useAppStore } from '../stores/appStore'
 import { detectInflationRegime, getConviction } from '../lib/scoring/regime'
 import { computeExogenousCurrencyScores, combineEndogenousExogenous } from '../lib/scoring/exogenous'
 import { loadPairBetas, computeCountryScore, computeCountryScoreForPair, pairLabelToId } from '../lib/pairBetas'
@@ -167,7 +166,6 @@ function exportDashboardCsv({ regime, wv, inflation, usdBias, scoreGDP, wocScore
 
 export default function DashboardPage() {
   const { worldview: wv, regime, dataSources: sources, zscores: zScores, history, features, signalHistory, recordSignalSample, activeScenario } = useModelStore()
-  const theme = useAppStore((s) => s.theme)
   const vixRaw = wv.vixRaw
   const [pairBetaData] = useState(loadPairBetas)
   const [upcomingEvents, setUpcomingEvents] = useState([])
