@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { useModelStore } from '../store/ModelDataContext'
 
 const STORAGE_KEY = 'polaris-g12-nowcasting'
 
@@ -86,6 +87,13 @@ function zColor(z) {
   return 'text-[#777]'
 }
 
+function median(values) {
+  const nums = values.filter(Number.isFinite).sort((a, b) => a - b)
+  if (!nums.length) return null
+  const mid = Math.floor(nums.length / 2)
+  return nums.length % 2 === 1 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2
+}
+
 // ── Components ────────────────────────────────────────────────────────────────
 
 const FLAG_CONFIG = {
@@ -119,6 +127,7 @@ function BlockCard({ blockKey, block, score, fillRatio }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function MacroNowcastingPage() {
+  const { setDataSources, activeScenario } = useModelStore()
   const [entries, setEntries] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
@@ -131,6 +140,7 @@ export default function MacroNowcastingPage() {
   const scores = useMemo(() => calcScores(entries), [entries])
   const flag = getFlag(scores.total, scores.filledWeight)
   const flagCfg = FLAG_CONFIG[flag]
+  const [publishState, setPublishState] = useState(null)
 
   const lastUpdated = useMemo(() => {
     const dates = Object.values(entries)
@@ -151,6 +161,38 @@ export default function MacroNowcastingPage() {
   function clearAll() {
     setEntries({})
     localStorage.removeItem(STORAGE_KEY)
+    setPublishState(null)
+  }
+
+  function applyToFramework() {
+    if (scores.filledWeight < 0.30) {
+      setPublishState({ type: 'error', text: 'Cobertura insuficiente: introduce al menos 30% de peso antes de publicar.' })
+      return
+    }
+
+    const now = new Date().toISOString().slice(0, 10)
+    const cpiActual = median(['cpi', 'corecpi'].map(id => Number(entries[id]?.actual)))
+    const updates = {
+      wv_gdp_usa_nowcast: Number(scores.total.toFixed(3)),
+      wv_gdp_usa_consensus: 0,
+    }
+    if (Number.isFinite(cpiActual)) updates.wv_cpi_usa = Number(cpiActual.toFixed(3))
+
+    setDataSources(prev => prev.map(source => (
+      Object.hasOwn(updates, source.id)
+        ? {
+            ...source,
+            _value: updates[source.id],
+            lastUpdate: now,
+            _lastScrape: new Date().toISOString(),
+            _refreshError: '',
+          }
+        : source
+    )))
+    setPublishState({
+      type: 'ok',
+      text: `Publicado en World View: USA nowcast=${updates.wv_gdp_usa_nowcast}, consensus=0${Number.isFinite(cpiActual) ? `, CPI USA=${updates.wv_cpi_usa}` : ''}.`,
+    })
   }
 
   return (
@@ -173,6 +215,12 @@ export default function MacroNowcastingPage() {
               </span>
             )}
             <button
+              onClick={applyToFramework}
+              className="flex items-center gap-1.5 border border-[#ecd987] px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[#ecd987] hover:border-white hover:text-white"
+            >
+              Aplicar al framework
+            </button>
+            <button
               onClick={clearAll}
               className="flex items-center gap-1.5 border border-[#333] px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[#555] hover:border-[#f87171] hover:text-[#f87171]"
             >
@@ -181,6 +229,22 @@ export default function MacroNowcastingPage() {
             </button>
           </div>
         </div>
+
+        {activeScenario && (
+          <div className="mb-3 border border-[#f59e0b] bg-[#1a1200] px-3 py-2 text-[11px] font-mono text-[#f59e0b]">
+            MODO ESCENARIO ACTIVO — {activeScenario.name}. El nowcast puede publicarse igualmente; el overlay de escenario sigue activo hasta desactivarlo en Scenario Library.
+          </div>
+        )}
+
+        {publishState && (
+          <div className={`mb-3 border px-3 py-2 text-[11px] font-mono ${
+            publishState.type === 'ok'
+              ? 'border-[#4ade80] bg-[#001a0b] text-[#4ade80]'
+              : 'border-[#ef4444] bg-[#1a0000] text-[#ef4444]'
+          }`}>
+            {publishState.text}
+          </div>
+        )}
 
         {/* Score summary */}
         <div className="mb-4 grid gap-3 lg:grid-cols-[160px_1fr]">

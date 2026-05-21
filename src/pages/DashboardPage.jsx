@@ -166,7 +166,7 @@ function exportDashboardCsv({ regime, wv, inflation, usdBias, scoreGDP, wocScore
 }
 
 export default function DashboardPage() {
-  const { worldview: wv, regime, dataSources: sources, zscores: zScores, history, features, signalHistory, recordSignalSample } = useModelStore()
+  const { worldview: wv, regime, dataSources: sources, zscores: zScores, history, features, signalHistory, recordSignalSample, activeScenario } = useModelStore()
   const theme = useAppStore((s) => s.theme)
   const vixRaw = wv.vixRaw
   const [pairBetaData] = useState(loadPairBetas)
@@ -340,6 +340,12 @@ export default function DashboardPage() {
               <Link to="/model-inputs" className="text-[10px] font-bold uppercase tracking-wider text-[#ecd987] hover:text-white whitespace-nowrap">
                 Importar datos →
               </Link>
+            </div>
+          )}
+
+          {activeScenario && (
+            <div className="mb-3 px-3 py-2 border border-[#f59e0b] bg-[#1a1200] text-[11px] font-mono text-[#f59e0b]">
+              MODO ESCENARIO ACTIVO — {activeScenario.name} ({activeScenario.period}). Señales derivadas con overlay de stress; datos reales intactos.
             </div>
           )}
 

@@ -10,6 +10,7 @@ export const STORAGE_KEY_ZSCORES = 'polaris_endogenous_zscores'
 export const STORAGE_KEY_SOURCES = 'polaris_data_sources'
 export const STORAGE_KEY_REGIME_STATE = 'polaris_worldview_regime_state'
 export const STORAGE_KEY_SIGNAL_HISTORY = 'polaris_signal_history'
+export const STORAGE_KEY_ACTIVE_SCENARIO = 'polaris_active_scenario'
 
 // Campos que el usuario puede editar en DataPage (se preservan al hacer merge)
 const USER_EDITABLE_FIELDS = ['lastUpdate', '_lastScrape', '_scrapedValue', '_value', '_refreshError']
@@ -135,6 +136,41 @@ function deriveWorldview(features) {
   return { ...DEFAULT_WV_DATA, ...derived }
 }
 
+function getScenarioOverlay(scenario) {
+  if (!scenario) return null
+  const sev = Number(scenario.severity) || 1
+  const riskOff = String(scenario.regime || '').toUpperCase().includes('RISK-OFF')
+  const shock = scenario.shock
+  const base = {
+    vix: Math.min(99, 55 + sev * 7),
+    vixRaw: 25 + sev * 7,
+    hyOas: Math.min(99, 65 + sev * 6),
+    sp200dma: riskOff ? 0 : 1,
+    embi: Math.min(99, 55 + sev * 7),
+    smartZ: riskOff ? -1.5 : 0.8,
+    retailZ: riskOff ? 1.2 : -0.5,
+  }
+
+  if (['growth', 'credit', 'banking', 'cycle'].includes(shock)) {
+    return { ...base, gdpUsa: -0.8, gdpEur: -1.0, gdpChn: -0.7, gdpJpn: -0.4, gdpResto: -0.9, dxy: 106, dxyRising: 1 }
+  }
+  if (['inflation', 'rates'].includes(shock)) {
+    return { ...base, gdpUsa: -0.2, gdpEur: -0.4, gdpChn: 0.0, gdpJpn: -0.1, gdpResto: -0.3, cpiG7: 5.2, breakevens: 3.1, cbPolicyStance: 1, dxy: 105, dxyRising: 1 }
+  }
+  if (['china', 'em'].includes(shock)) {
+    return { ...base, gdpUsa: 0.0, gdpEur: -0.3, gdpChn: -1.2, gdpJpn: -0.2, gdpResto: -0.8, dxy: 104, dxyRising: 1 }
+  }
+  if (shock === 'sovereign') {
+    return { ...base, gdpUsa: -0.1, gdpEur: -1.2, gdpChn: 0.1, gdpJpn: -0.1, gdpResto: -0.4, dxy: 103, dxyRising: 1 }
+  }
+  return base
+}
+
+function applyScenarioWorldview(worldview, scenario) {
+  const overlay = getScenarioOverlay(scenario)
+  return overlay ? { ...worldview, ...overlay } : worldview
+}
+
 // ── Cargadores de localStorage ────────────────────────────────────────────────
 function loadHistory() {
   try {
@@ -193,6 +229,14 @@ function loadSignalHistory() {
   return {}
 }
 
+function loadActiveScenario() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_SCENARIO)
+    if (saved) return JSON.parse(saved)
+  } catch { /* ignore */ }
+  return null
+}
+
 function normalizeSignalKey(key) {
   return String(key || '').trim().toUpperCase()
 }
@@ -206,10 +250,12 @@ export function ModelDataProvider({ children }) {
   const [dataSources, setDataSources] = useState(loadDataSources)
   const [regimeState, setRegimeState] = useState(loadRegimeState)
   const [signalHistory, setSignalHistory] = useState(loadSignalHistory)
+  const [activeScenario, setActiveScenarioState] = useState(loadActiveScenario)
 
   // Source -> History -> Features -> Framework.
   const features = useMemo(() => deriveFeatureStore(dataSources, history), [dataSources, history])
-  const worldview = useMemo(() => deriveWorldview(features), [features])
+  const liveWorldview = useMemo(() => deriveWorldview(features), [features])
+  const worldview = useMemo(() => applyScenarioWorldview(liveWorldview, activeScenario), [liveWorldview, activeScenario])
   const rawRegime = useMemo(() => detectRegime(worldview), [worldview])
 
   // Cuando cambia history, re-deriva z-scores automáticamente
@@ -233,12 +279,13 @@ export function ModelDataProvider({ children }) {
   }, [dataSources])
 
   useEffect(() => {
+    if (activeScenario) return
     setRegimeState(prev => {
       const updated = resolvePersistentRegime(rawRegime, worldview, prev)
       localStorage.setItem(STORAGE_KEY_REGIME_STATE, JSON.stringify(updated))
       return updated
     })
-  }, [rawRegime, worldview])
+  }, [rawRegime, worldview, activeScenario])
 
   const recordSignalSample = useCallback((key, value) => {
     const signal = Number(value)
@@ -260,6 +307,16 @@ export function ModelDataProvider({ children }) {
     })
   }, [])
 
+  const applyFrameworkScenario = useCallback((scenario) => {
+    setActiveScenarioState(scenario)
+    localStorage.setItem(STORAGE_KEY_ACTIVE_SCENARIO, JSON.stringify(scenario))
+  }, [])
+
+  const clearFrameworkScenario = useCallback(() => {
+    setActiveScenarioState(null)
+    localStorage.removeItem(STORAGE_KEY_ACTIVE_SCENARIO)
+  }, [])
+
   return (
     <ModelDataContext.Provider value={{
       history, setHistory,
@@ -268,10 +325,13 @@ export function ModelDataProvider({ children }) {
       features,
       worldview,
       rawRegime,
-      regime: regimeState?.current ?? rawRegime,
+      regime: activeScenario ? rawRegime : (regimeState?.current ?? rawRegime),
       regimeState,
       signalHistory,
       recordSignalSample,
+      activeScenario,
+      applyFrameworkScenario,
+      clearFrameworkScenario,
     }}>
       {children}
     </ModelDataContext.Provider>

@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -13,6 +14,166 @@ import {
   ShieldAlert,
   SlidersHorizontal,
 } from 'lucide-react'
+import { useModelStore } from '../store/ModelDataContext'
+import { getConviction } from '../lib/scoring/regime'
+import { computeExogenousCurrencyScores, combineEndogenousExogenous } from '../lib/scoring/exogenous'
+import { loadPairBetas, computeCountryScoreForPair, pairLabelToId } from '../lib/pairBetas'
+
+const FX_PAIRS = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CAD', 'USD/CHF', 'NZD/USD']
+const EQUITY_INSTRUMENTS = ['SPY', 'QQQ', 'XLF', 'XLK', 'XLE', 'XLB', 'XLI', 'XLU', 'GLD', 'TLT', 'EEM', 'FXI', 'GDX']
+
+const COUNTRIES = [
+  { label: 'USD', prefix: 'usa', ccy: 'USD', cyclical: false },
+  { label: 'EUR', prefix: 'eur', ccy: 'EUR', cyclical: true },
+  { label: 'JPY', prefix: 'jpn', ccy: 'JPY', cyclical: false },
+  { label: 'GBP', prefix: 'gbr', ccy: 'GBP', cyclical: true },
+  { label: 'CHF', prefix: 'che', ccy: 'CHF', cyclical: false },
+  { label: 'CAD', prefix: 'can', ccy: 'CAD', cyclical: true },
+  { label: 'AUD', prefix: 'aus', ccy: 'AUD', cyclical: true },
+  { label: 'NZD', prefix: 'nzl', ccy: 'NZD', cyclical: true },
+]
+
+const FX_PAIR_MAP = {
+  'EUR/USD': { base: 'eur', quote: 'usa' },
+  'GBP/USD': { base: 'gbr', quote: 'usa' },
+  'USD/JPY': { base: 'usa', quote: 'jpn' },
+  'AUD/USD': { base: 'aus', quote: 'usa' },
+  'USD/CAD': { base: 'usa', quote: 'can' },
+  'USD/CHF': { base: 'usa', quote: 'che' },
+  'NZD/USD': { base: 'nzl', quote: 'usa' },
+}
+
+const EQUITY_DRIVER_MAP = {
+  SPY: [['usa_pmi', 0.35], ['usa_nfp', 0.2], ['exo_vix', -0.25], ['usa_10y_real', -0.2]],
+  QQQ: [['usa_pmi', 0.25], ['usa_10y_real', -0.45], ['exo_vix', -0.3]],
+  XLK: [['usa_pmi', 0.2], ['usa_10y_real', -0.45], ['exo_vix', -0.35]],
+  XLF: [['usa_10y_real', 0.45], ['usa_pmi', 0.25], ['exo_vix', -0.3]],
+  XLE: [['exo_wti', 0.45], ['exo_brent', 0.35], ['exo_vix', -0.2]],
+  XLB: [['exo_copper', 0.3], ['exo_iron', 0.3], ['exo_chn_pmi', 0.2], ['exo_vix', -0.2]],
+  XLI: [['usa_pmi', 0.4], ['exo_copper', 0.2], ['exo_vix', -0.25], ['usa_10y_real', -0.15]],
+  XLU: [['exo_vix', 0.2], ['usa_10y_real', -0.55], ['usa_pmi', -0.25]],
+  GLD: [['usa_10y_real', -0.55], ['exo_gold', 0.25], ['exo_vix', 0.2]],
+  TLT: [['usa_10y_real', -0.65], ['exo_vix', 0.2], ['usa_pmi', -0.15]],
+  EEM: [['exo_vix', -0.35], ['exo_chn_pmi', 0.25], ['exo_copper', 0.2], ['usa_10y_real', -0.2]],
+  FXI: [['exo_chn_pmi', 0.45], ['exo_chn_credit', 0.35], ['exo_vix', -0.2]],
+  GDX: [['usa_10y_real', -0.45], ['exo_gold', 0.35], ['exo_vix', 0.2]],
+}
+
+const FX_ENTRY_CHECKS = [
+  'Capa 1 activa y no contradice la direccion',
+  '|Senal_FX| >= 1.0 sigma',
+  'ATR entre P30 y P80',
+  'Sesion London / NY / overlap',
+  'Sin evento Nivel 1 en proximas 24h',
+  'Setup tecnico C2 identificado',
+  'Stop, target y stop temporal definidos',
+]
+
+const FX_EXIT_CHECKS = [
+  'Stop tecnico o ATR tocado',
+  'Target 1.5R-2.5R alcanzado',
+  'Stop temporal 21 dias activado',
+  'Capa 1 invalida o cambia de direccion',
+  'Circuit breaker C2 obliga a reducir/cerrar',
+]
+
+const EQ_ENTRY_CHECKS = [
+  'Driver macro dominante identificado',
+  '|Score_Equity| >= 1.0 sigma',
+  'World View coherente con la posicion',
+  'Sin earnings proximas 2 semanas',
+  'Liquidez / ADV suficiente',
+  'Sector y exposicion agregada dentro de limites',
+  'Stop ATR y horizonte definidos',
+]
+
+const EQ_EXIT_CHECKS = [
+  'Stop ATR tocado',
+  'Target 1.5R-3R alcanzado',
+  'Stop temporal ETF/large cap activado',
+  'Driver macro se normaliza bajo 0.5 sigma',
+  'Earnings/evento invalida la tesis',
+]
+
+const LAYER_STORAGE = {
+  fxTrend: 'polaris_g10_fx_trend_history',
+  equitiesMacro: 'polaris_g11_equities_macro_history',
+}
+
+function readHistory(moduleKey) {
+  try { return JSON.parse(localStorage.getItem(LAYER_STORAGE[moduleKey]) || '[]') } catch { return [] }
+}
+
+function writeHistory(moduleKey, rows) {
+  localStorage.setItem(LAYER_STORAGE[moduleKey], JSON.stringify(rows))
+}
+
+function getDirection(score) {
+  if (score >= 1) return 'LONG'
+  if (score <= -1) return 'SHORT'
+  return 'FLAT'
+}
+
+function getSignalVerdict({ direction, entryScore, entryTotal, blockers = 0 }) {
+  if (direction === 'FLAT') return 'NO TRADE'
+  if (blockers > 0) return 'WAIT'
+  if (entryScore === entryTotal) return 'READY'
+  if (entryScore >= Math.ceil(entryTotal * 0.7)) return 'WATCH'
+  return 'WAIT'
+}
+
+function clampNumber(value, fallback = 0) {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : fallback
+}
+
+function hasSeriesData(history) {
+  return Object.values(history).some((entry) => entry?.series?.length > 0)
+}
+
+function fmtLiveScore(value) {
+  if (!Number.isFinite(value)) return 'SIN DATOS'
+  return (value >= 0 ? '+' : '') + value.toFixed(3)
+}
+
+function computeFxSignals({ zScores, regime, dataSources, history, signalHistory, pairBetaData, vixRaw }) {
+  const exogenousScores = computeExogenousCurrencyScores(dataSources, history)
+  const byPrefix = new Map(COUNTRIES.map((country) => [country.prefix, country]))
+
+  return FX_PAIRS.map((label) => {
+    const pair = FX_PAIR_MAP[label]
+    const base = byPrefix.get(pair.base)
+    const quote = byPrefix.get(pair.quote)
+    const pairId = pairLabelToId(label)
+    const baseEndo = computeCountryScoreForPair(pair.base, base.cyclical, regime, zScores, pairBetaData, pairId, vixRaw)
+    const quoteEndo = computeCountryScoreForPair(pair.quote, quote.cyclical, regime, zScores, pairBetaData, pairId, vixRaw)
+    const baseScore = combineEndogenousExogenous(baseEndo, exogenousScores[base.ccy] ?? 0, base.ccy)
+    const quoteScore = combineEndogenousExogenous(quoteEndo, exogenousScores[quote.ccy] ?? 0, quote.ccy)
+    const signal = baseScore - quoteScore
+
+    return {
+      label,
+      signal,
+      endoDiff: baseEndo - quoteEndo,
+      exoDiff: signal - (baseEndo - quoteEndo),
+      conviction: getConviction(signal, signalHistory[label]),
+    }
+  })
+}
+
+function computeEquitySignal(instrument, zScores, features) {
+  const drivers = EQUITY_DRIVER_MAP[instrument] ?? []
+  const rows = drivers.map(([key, weight]) => {
+    const zValue = zScores[key]
+    const featureValue = features.valuesBySourceId?.[key]
+    const value = Number.isFinite(zValue) ? zValue : Number.isFinite(featureValue) ? featureValue : null
+    return { key, weight, value, contribution: Number.isFinite(value) ? value * weight : null }
+  })
+  const liveRows = rows.filter((row) => Number.isFinite(row.contribution))
+  if (liveRows.length === 0) return { signal: null, coverage: '0/0', rows }
+  const signal = liveRows.reduce((sum, row) => sum + row.contribution, 0)
+  return { signal, coverage: `${liveRows.length}/${rows.length}`, rows }
+}
 
 const MODULES = {
   fxTrend: {
@@ -424,6 +585,319 @@ function EquitiesContent({ mod }) {
   )
 }
 
+function CheckGroup({ title, items, checks, setChecks, accent }) {
+  const passed = items.filter((_, i) => checks[i]).length
+  return (
+    <div className="border border-[#222]">
+      <div className="flex items-center justify-between border-b border-[#222] px-3 py-2">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[#777]">{title}</span>
+        <span className={`font-mono text-[10px] font-bold ${accent}`}>{passed}/{items.length}</span>
+      </div>
+      <div className="divide-y divide-[#111]">
+        {items.map((item, i) => (
+          <button
+            key={item}
+            type="button"
+            onClick={() => setChecks((prev) => ({ ...prev, [i]: !prev[i] }))}
+            className="flex w-full items-start gap-2 px-3 py-2 text-left text-xs text-[#aaa] hover:bg-[#0a0a0a]"
+          >
+            <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border text-[10px] ${
+              checks[i] ? 'border-[#4ade80] text-[#4ade80]' : 'border-[#444] text-transparent'
+            }`}>
+              ✓
+            </span>
+            <span>{item}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function HistoryTable({ rows, onDelete }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[760px] text-sm">
+        <thead>
+          <tr className="bg-[#111] text-left">
+            {['Fecha', 'Instrumento', 'Direccion', 'Senal', 'Veredicto', 'Size', 'Stop/Target', ''].map((h) => (
+              <th key={h} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#555]">{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={8} className="px-3 py-6 text-center text-xs uppercase tracking-wider text-[#444]">Sin historial</td>
+            </tr>
+          ) : rows.map((row) => (
+            <tr key={row.id} className="border-t border-[#111]">
+              <td className="px-3 py-2 font-mono text-xs text-[#777]">{row.date}</td>
+              <td className="px-3 py-2 font-bold text-[#ddd]">{row.instrument}</td>
+              <td className="px-3 py-2 font-mono text-xs text-white">{row.direction}</td>
+              <td className="px-3 py-2 font-mono text-xs text-[#aaa]">{row.signal}</td>
+              <td className="px-3 py-2 font-bold text-[#ecd987]">{row.verdict}</td>
+              <td className="px-3 py-2 font-mono text-xs text-[#aaa]">{row.size}</td>
+              <td className="px-3 py-2 font-mono text-xs text-[#777]">{row.stopTarget}</td>
+              <td className="px-3 py-2 text-right">
+                <button type="button" onClick={() => onDelete(row.id)} className="text-xs text-[#555] hover:text-[#ef4444]">Borrar</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function OperationalConsole({ moduleKey, mod }) {
+  const isFx = moduleKey === 'fxTrend'
+  const {
+    zscores: zScores,
+    regime,
+    dataSources,
+    history: modelHistory,
+    worldview: wv,
+    features,
+    signalHistory,
+  } = useModelStore()
+  const [pairBetaData] = useState(loadPairBetas)
+  const entryItems = isFx ? FX_ENTRY_CHECKS : EQ_ENTRY_CHECKS
+  const exitItems = isFx ? FX_EXIT_CHECKS : EQ_EXIT_CHECKS
+  const [history, setHistory] = useState(() => readHistory(moduleKey))
+  const [entryChecks, setEntryChecks] = useState({})
+  const [exitChecks, setExitChecks] = useState({})
+  const [form, setForm] = useState(() => isFx ? {
+    instrument: 'EUR/USD',
+    trendScore: '0',
+    atrPips: '',
+    capital: '100000',
+    riskPct: '0.5',
+    stopAtr: '1.75',
+    targetR: '2',
+    ddPct: '0',
+  } : {
+    instrument: 'SPY',
+    atrPct: '',
+    capital: '100000',
+    riskPct: '0.75',
+    stopAtr: '2.5',
+    targetR: '2',
+    ddPct: '0',
+  })
+  const hasRealData = hasSeriesData(modelHistory) || Object.keys(zScores).length > 0
+
+  const fxSignals = useMemo(() => computeFxSignals({
+    zScores,
+    regime,
+    dataSources,
+    history: modelHistory,
+    signalHistory,
+    pairBetaData,
+    vixRaw: wv.vixRaw,
+  }), [zScores, regime, dataSources, modelHistory, signalHistory, pairBetaData, wv.vixRaw])
+
+  const fxSignal = fxSignals.find((row) => row.label === form.instrument)
+  const equitySignal = useMemo(
+    () => computeEquitySignal(form.instrument, zScores, features),
+    [form.instrument, zScores, features]
+  )
+
+  const signal = useMemo(() => {
+    const capital = clampNumber(form.capital, 0)
+    const riskPct = clampNumber(form.riskPct, isFx ? 0.5 : 0.75)
+    const stopAtr = clampNumber(form.stopAtr, isFx ? 1.75 : 2.5)
+    const targetR = clampNumber(form.targetR, 2)
+    const ddPct = clampNumber(form.ddPct, 0)
+    const ddMult = ddPct >= (isFx ? 12 : 20) ? 0 : ddPct >= (isFx ? 8 : 15) ? 0.5 : ddPct >= 5 ? 0.75 : 1
+    const entryScore = entryItems.filter((_, i) => entryChecks[i]).length
+    const blockers = exitItems.filter((_, i) => exitChecks[i]).length
+
+    if (isFx) {
+      const macro = hasRealData && fxSignal ? fxSignal.signal : null
+      const trend = clampNumber(form.trendScore, 0)
+      const liveSignal = Number.isFinite(macro) ? +(macro + trend * 0.5).toFixed(3) : null
+      const direction = getDirection(liveSignal)
+      const atrPips = clampNumber(form.atrPips, 0)
+      const stopPips = Math.round(atrPips * stopAtr)
+      const targetPips = Math.round(stopPips * targetR)
+      const riskUsd = capital * (riskPct / 100) * ddMult
+      const pipValue = 10
+      const lots = stopPips > 0 ? riskUsd / (stopPips * pipValue) : 0
+
+      return {
+        liveSignal,
+        direction,
+        verdict: getSignalVerdict({ direction, entryScore, entryTotal: entryItems.length, blockers }),
+        riskUsd,
+        size: `${lots.toFixed(2)} lots`,
+        stopTarget: stopPips > 0 ? `${stopPips}p / ${targetPips}p` : 'ATR requerido',
+        details: [
+          ['Capa 1 real', fmtLiveScore(macro)],
+          ['Trend', trend.toFixed(2)],
+          ['Conviccion', fxSignal?.conviction ?? 'SIN DATOS'],
+          ['DD mult', ddMult.toFixed(2)],
+          ['Checklist', `${entryScore}/${entryItems.length}`],
+        ],
+      }
+    }
+
+    const macro = hasRealData ? equitySignal.signal : null
+    const liveSignal = Number.isFinite(macro) ? +macro.toFixed(3) : null
+    const direction = getDirection(liveSignal)
+    const atrPct = clampNumber(form.atrPct, 0)
+    const stopPct = +(atrPct * stopAtr).toFixed(2)
+    const targetPct = +(stopPct * targetR).toFixed(2)
+    const riskUsd = capital * (riskPct / 100) * ddMult
+    const notional = stopPct > 0 ? riskUsd / (stopPct / 100) : 0
+
+    return {
+      liveSignal,
+      direction,
+      verdict: getSignalVerdict({ direction, entryScore, entryTotal: entryItems.length, blockers }),
+      riskUsd,
+      size: `$${Math.round(notional).toLocaleString('en-US')} notional`,
+      stopTarget: stopPct > 0 ? `${stopPct}% / ${targetPct}%` : 'ATR requerido',
+      details: [
+        ['Macro real', fmtLiveScore(macro)],
+        ['Cobertura', equitySignal.coverage],
+        ['Regimen', regime],
+        ['Checklist', `${entryScore}/${entryItems.length}`],
+      ],
+    }
+  }, [entryChecks, entryItems, equitySignal, exitChecks, exitItems, form, fxSignal, hasRealData, isFx, regime])
+
+  function update(key, value) {
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function saveSignal() {
+    if (!Number.isFinite(signal.liveSignal)) return
+    const row = {
+      id: Date.now(),
+      date: new Date().toISOString().slice(0, 16).replace('T', ' '),
+      instrument: form.instrument,
+      direction: signal.direction,
+      signal: fmtLiveScore(signal.liveSignal),
+      verdict: signal.verdict,
+      size: signal.size,
+      stopTarget: signal.stopTarget,
+    }
+    const next = [row, ...history].slice(0, 50)
+    setHistory(next)
+    writeHistory(moduleKey, next)
+  }
+
+  function deleteRow(id) {
+    const next = history.filter((row) => row.id !== id)
+    setHistory(next)
+    writeHistory(moduleKey, next)
+  }
+
+  const signalColor = signal.verdict === 'READY' ? 'text-[#4ade80]' : signal.verdict === 'WATCH' ? 'text-[#ecd987]' : signal.verdict === 'WAIT' ? 'text-[#f59e0b]' : 'text-[#777]'
+
+  return (
+    <div className="mb-4 space-y-4">
+      <Section title="Senal en vivo + sizing" icon={BarChart3}>
+        {!hasRealData && (
+          <div className="border-b border-[#7f1d1d] bg-[#1a0000] px-3 py-2 text-[11px] font-mono uppercase tracking-wider text-[#ef4444]">
+            Sin datos reales cargados. Importa historicos/z-scores para activar la senal; no se muestran valores modelados.
+          </div>
+        )}
+        <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="grid gap-0 border-r border-[#222] sm:grid-cols-2">
+            <label className="border-b border-r border-[#222] p-3">
+              <span className="mb-1 block text-[10px] uppercase tracking-widest text-[#555]">Instrumento</span>
+              <select value={form.instrument} onChange={e => update('instrument', e.target.value)} className="w-full bg-black font-mono text-xs text-white outline-none">
+                {(isFx ? FX_PAIRS : EQUITY_INSTRUMENTS).map((item) => <option key={item}>{item}</option>)}
+              </select>
+            </label>
+            {(isFx ? [
+              ['trendScore', 'Trend score real/manual'],
+              ['atrPips', 'ATR pips real'],
+            ] : [
+              ['atrPct', 'ATR % real'],
+            ]).map(([key, label]) => (
+              <label key={key} className="border-b border-r border-[#222] p-3">
+                <span className="mb-1 block text-[10px] uppercase tracking-widest text-[#555]">{label}</span>
+                <input value={form[key]} onChange={e => update(key, e.target.value)} className="w-full bg-black font-mono text-xs text-white outline-none" />
+              </label>
+            ))}
+            {[
+              ['capital', 'Capital'],
+              ['riskPct', 'Risk %'],
+              ['stopAtr', 'Stop ATR'],
+              ['targetR', 'Target R'],
+              ['ddPct', 'DD %'],
+            ].map(([key, label]) => (
+              <label key={key} className="border-b border-r border-[#222] p-3">
+                <span className="mb-1 block text-[10px] uppercase tracking-widest text-[#555]">{label}</span>
+                <input value={form[key]} onChange={e => update(key, e.target.value)} className="w-full bg-black font-mono text-xs text-white outline-none" />
+              </label>
+            ))}
+          </div>
+
+          <div className="p-4">
+            <div className="grid gap-3 sm:grid-cols-4">
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-[#555]">Veredicto</div>
+                <div className={`mt-1 text-2xl font-black ${signalColor}`}>{signal.verdict}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-[#555]">Direccion</div>
+                <div className="mt-1 font-mono text-xl font-bold text-white">{signal.direction}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-[#555]">Senal</div>
+                <div className={`mt-1 font-mono text-xl font-bold ${mod.accent}`}>{fmtLiveScore(signal.liveSignal)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-[#555]">Riesgo</div>
+                <div className="mt-1 font-mono text-xl font-bold text-white">${Math.round(signal.riskUsd).toLocaleString('en-US')}</div>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <div className="border border-[#222] p-3">
+                <div className="text-[10px] uppercase tracking-widest text-[#555]">Sizing</div>
+                <div className="mt-1 font-mono text-sm text-white">{signal.size}</div>
+              </div>
+              <div className="border border-[#222] p-3">
+                <div className="text-[10px] uppercase tracking-widest text-[#555]">Stop / Target</div>
+                <div className="mt-1 font-mono text-sm text-white">{signal.stopTarget}</div>
+              </div>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-4">
+              {signal.details.map(([label, value]) => (
+                <div key={label} className="border border-[#222] px-2 py-1.5">
+                  <span className="block text-[9px] uppercase tracking-widest text-[#555]">{label}</span>
+                  <span className="font-mono text-xs text-[#aaa]">{value}</span>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={saveSignal}
+              disabled={!Number.isFinite(signal.liveSignal)}
+              className={`mt-4 border px-3 py-2 text-xs font-bold uppercase tracking-wider ${mod.border} ${mod.accent} hover:bg-white hover:text-black disabled:border-[#333] disabled:text-[#444] disabled:hover:bg-transparent`}
+            >
+              Guardar en historial
+            </button>
+          </div>
+        </div>
+      </Section>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <CheckGroup title="Checklist entrada" items={entryItems} checks={entryChecks} setChecks={setEntryChecks} accent={mod.accent} />
+        <CheckGroup title="Checklist salida / invalidacion" items={exitItems} checks={exitChecks} setChecks={setExitChecks} accent={mod.accent} />
+      </div>
+
+      <Section title="Historial operativo" icon={Clock}>
+        <HistoryTable rows={history} onDelete={deleteRow} />
+      </Section>
+    </div>
+  )
+}
+
 function LayerModulePage({ moduleKey }) {
   const mod = MODULES[moduleKey]
 
@@ -468,6 +942,8 @@ function LayerModulePage({ moduleKey }) {
           </div>
         </section>
 
+        <OperationalConsole moduleKey={moduleKey} mod={mod} />
+
         {moduleKey === 'fxTrend' ? <FxTrendContent mod={mod} /> : <EquitiesContent mod={mod} />}
 
         <Section title="Pipeline operativo" icon={Route} className="mt-4">
@@ -504,7 +980,7 @@ function LayerModulePage({ moduleKey }) {
         </div>
 
         <div className="mt-4 border-2 border-[#333] p-3 text-xs text-[#777]">
-          Pantalla operativa basada en la documentacion. No ejecuta trades ni calcula senales automaticamente todavia.
+          Pantalla operativa basada en la documentacion. No envia ordenes al broker; registra decisiones y sizing localmente.
           <Link to="/dashboard" className="ml-2 font-bold uppercase tracking-wider text-[#ecd987] hover:text-white">
             Volver al dashboard
           </Link>

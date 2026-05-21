@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, CheckSquare, Square, X } from 'lucide-react'
 import { SCENARIO_LIBRARY, SCENARIO_SHOCKS, getScenarioSummary } from '../data/scenarioLibrary'
+import { STORAGE_KEY_ACTIVE_SCENARIO, useModelStore } from '../store/ModelDataContext'
 
-const ACTIVE_SCENARIO_KEY = 'polaris_active_scenario'
+const ACTIVE_SCENARIO_KEY = STORAGE_KEY_ACTIVE_SCENARIO
 
 const severityColor = {
   5: 'text-[#ef4444]',
@@ -294,14 +295,9 @@ function ScenarioCard({ scenario, isActive, onApply }) {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ScenarioLibraryPage() {
+  const { activeScenario: frameworkScenario, applyFrameworkScenario, clearFrameworkScenario } = useModelStore()
   const [shock, setShock] = useState('all')
   const [minSeverity, setMinSeverity] = useState(1)
-  const [activeScenario, setActiveScenario] = useState(() => {
-    try {
-      const saved = localStorage.getItem(ACTIVE_SCENARIO_KEY)
-      return saved ? JSON.parse(saved) : null
-    } catch { return null }
-  })
   const [checkedItems, setCheckedItems] = useState(() => {
     try {
       const saved = localStorage.getItem(ACTIVE_SCENARIO_KEY + '_checks')
@@ -318,18 +314,16 @@ export default function ScenarioLibraryPage() {
   const summary = useMemo(() => getScenarioSummary(scenarios), [scenarios])
 
   function applyScenario(scenario) {
-    setActiveScenario(scenario)
+    applyFrameworkScenario(scenario)
     setCheckedItems(new Set())
-    localStorage.setItem(ACTIVE_SCENARIO_KEY, JSON.stringify(scenario))
     localStorage.removeItem(ACTIVE_SCENARIO_KEY + '_checks')
     // scroll to top to show the active panel
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   function deactivateScenario() {
-    setActiveScenario(null)
+    clearFrameworkScenario()
     setCheckedItems(new Set())
-    localStorage.removeItem(ACTIVE_SCENARIO_KEY)
     localStorage.removeItem(ACTIVE_SCENARIO_KEY + '_checks')
   }
 
@@ -377,9 +371,9 @@ export default function ScenarioLibraryPage() {
         </div>
 
         {/* Active scenario panel */}
-        {activeScenario && (
+        {frameworkScenario && (
           <ActiveScenarioPanel
-            scenario={activeScenario}
+            scenario={frameworkScenario}
             checkedItems={checkedItems}
             onToggle={toggleChecked}
             onDeactivate={deactivateScenario}
@@ -401,8 +395,8 @@ export default function ScenarioLibraryPage() {
 
         <div className="border border-[#333] p-3 mb-3 text-[10px] text-[#555] leading-relaxed">
           Cada escenario define el comportamiento esperado del framework en un regimen historico dificil.
-          Aplica un escenario para generar el checklist de acciones por modulo y navegar directamente a cada pantalla.
-          El estado del escenario activo persiste en esta sesion del navegador.
+          Al aplicar un escenario se activa un overlay de stress en World View/Dashboard, se genera el checklist por modulo y se puede navegar directamente a cada pantalla.
+          No reemplaza datos reales: es modo escenario.
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
@@ -410,7 +404,7 @@ export default function ScenarioLibraryPage() {
             <ScenarioCard
               key={scenario.id}
               scenario={scenario}
-              isActive={activeScenario?.id === scenario.id}
+              isActive={frameworkScenario?.id === scenario.id}
               onApply={applyScenario}
             />
           ))}

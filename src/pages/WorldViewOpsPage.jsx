@@ -57,7 +57,7 @@ function getWorldViewDecision({ regime, scoreGDP, usdBias, inflation }) {
 }
 
 export default function WorldViewOpsPage() {
-  const { worldview: data, regime, rawRegime, regimeState, dataSources } = useModelStore()
+  const { worldview: data, regime, rawRegime, regimeState, dataSources, activeScenario } = useModelStore()
   const sourceMap = new Map(dataSources.map(s => [s.id, s]))
 
   const scoreGDP  = data.gdpUsa * 0.25 + data.gdpEur * 0.18 + data.gdpChn * 0.18 + data.gdpJpn * 0.05 + data.gdpResto * 0.34
@@ -138,6 +138,12 @@ export default function WorldViewOpsPage() {
             {wocDataWarning && (
               <div className="mb-3 px-3 py-2 border border-[#ef4444] bg-[#1a0000] text-[11px] font-mono text-[#ef4444]">
                 ⚠ WOC DATO RECHAZADO — {wocDataWarning}
+              </div>
+            )}
+
+            {activeScenario && (
+              <div className="mb-3 px-3 py-2 border border-[#f59e0b] bg-[#1a1200] text-[11px] font-mono text-[#f59e0b]">
+                MODO ESCENARIO ACTIVO — {activeScenario.name} ({activeScenario.period}). World View usa overlay de stress; los datos reales no se han sobrescrito.
               </div>
             )}
 
