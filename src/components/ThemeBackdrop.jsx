@@ -8,7 +8,13 @@ export default function ThemeBackdrop() {
 
   return (
     <div className="dark-veil-backdrop" aria-hidden="true">
-      <DarkVeil speed={0.1} scanlineFrequency={0.5} resolutionScale={0.85} />
+      <DarkVeil
+        speed={0.1}
+        noiseIntensity={0}
+        scanlineFrequency={0}
+        resolutionScale={0.85}
+        warpAmount={0}
+      />
       <div className="dark-veil-scrim" />
     </div>
   )
