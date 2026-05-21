@@ -79,7 +79,7 @@ describe('App', () => {
       </MemoryRouter>
     )
     expect(screen.getByText('RAW DATA')).toBeInTheDocument()
-    expect(screen.getByText('REFRESH TODO')).toBeInTheDocument()
+    expect(screen.getByText('REFRESH REAL')).toBeInTheDocument()
   })
 })
 

@@ -11,16 +11,14 @@ export async function fetchMarketData() {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    console.warn('Proxy error, using fallback mock data:', err.message || res.statusText)
-    return fetchMockData()
+    throw new Error(err.message || res.statusText || 'Worldview fetch failed')
   }
 
   const data = await res.json()
 
   // Si el proxy devuelve fallback por scraping fallido
   if (data.fallback) {
-    console.warn('Proxy returned fallback, using mock data')
-    return fetchMockData()
+    throw new Error('Worldview proxy returned fallback instead of live data')
   }
 
   return {
@@ -140,36 +138,3 @@ export async function fetchNasdaqTable(datatable, filters = {}) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Fallback mock data con variaciones aleatorias
-function fetchMockData() {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        gdpUsa: addNoise(0.3, 0.1),
-        gdpEur: addNoise(-0.2, 0.1),
-        gdpChn: addNoise(0.5, 0.1),
-        gdpJpn: addNoise(0.1, 0.1),
-        gdpResto: addNoise(0.0, 0.05),
-        vix: addNoise(15, 0.2),
-        hyOas: addNoise(45, 0.15),
-        sp200dma: 1,
-        embi: addNoise(55, 0.15),
-        smartZ: addNoise(0.5, 0.1),
-        retailZ: addNoise(-0.8, 0.1),
-        dxy: addNoise(103.5, 0.02),
-        dxy200dma: 101.0,
-        dxyRising: 1,
-        cpiG7: addNoise(2.8, 0.05),
-        breakevens: addNoise(2.3, 0.05),
-      })
-    }, 800)
-  })
-}
-
-function addNoise(value, magnitude = 0.05) {
-  if (typeof value === 'number') {
-    const noise = (Math.random() - 0.5) * 2 * magnitude * Math.abs(value || 1)
-    return Number((value + noise).toFixed(value % 1 === 0 ? 0 : 1))
-  }
-  return value
-}

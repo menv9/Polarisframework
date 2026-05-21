@@ -98,11 +98,12 @@ async function fetchSourceData(source) {
 }
 
 export default function DataPage() {
-  const { dataSources: sources, setDataSources: setSources } = useModelStore()
+  const { dataSources: sources, setDataSources: setSources, setHistory } = useModelStore()
   const [loadingAll, setLoadingAll] = useState(false)
   const [loadingId, setLoadingId] = useState(null)
   const [lastGlobalRefresh, setLastGlobalRefresh] = useState(null)
   const [globalRefreshResult, setGlobalRefreshResult] = useState(null)
+  const [historyRefreshResult, setHistoryRefreshResult] = useState(null)
 
   const counts = useMemo(() => countByStatus(sources), [sources])
   const accessSummary = useMemo(() => getAccessSummary(sources), [sources])
@@ -192,6 +193,57 @@ export default function DataPage() {
     setCollapsed((prev) => ({ ...prev, [group]: !prev[group] }))
   }
 
+  function modelHistoryKeyForSource(sourceId) {
+    const match = String(sourceId).match(/^endo_([a-z]{3})_(.+)$/)
+    if (!match) return null
+    const [, prefix, suffix] = match
+    return `${prefix}_${suffix === 'empl' ? 'nfp' : suffix}`
+  }
+
+  function normalizeHistoryObservations(observations) {
+    return (observations || [])
+      .map((row) => ({
+        date: String(row.date || '').slice(0, 10),
+        value: Number(row.value),
+      }))
+      .filter((row) => row.date && Number.isFinite(row.value))
+  }
+
+  function writeHistoryEntry(source, series) {
+    if (!series.length) return
+    const entry = {
+      series,
+      lastImported: new Date().toISOString().split('T')[0],
+      sourceId: source.id,
+    }
+    const modelKey = modelHistoryKeyForSource(source.id)
+    setHistory((prev) => ({
+      ...prev,
+      [source.id]: entry,
+      ...(modelKey ? { [modelKey]: entry } : {}),
+    }))
+  }
+
+  async function loadHistoryForSource(source) {
+    const ingestRes = await fetch('/api/history/ingest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source }),
+    })
+    const ingestBody = await ingestRes.json().catch(() => ({}))
+    if (!ingestRes.ok || ingestBody.status === 'error') {
+      throw new Error(ingestBody.message || ingestBody.error || ingestBody.errorMessage || 'History ingest failed')
+    }
+    if (ingestBody.status === 'skipped') return { status: 'skipped', count: 0 }
+
+    const seriesRes = await fetch(`/api/history/series/${source.id}?limit=all&order=asc`)
+    const seriesBody = await seriesRes.json().catch(() => ({}))
+    if (!seriesRes.ok) throw new Error(seriesBody.message || seriesBody.error || 'History read failed')
+    const series = normalizeHistoryObservations(seriesBody.observations)
+    writeHistoryEntry(source, series)
+    return { status: 'ok', count: series.length }
+  }
+
   const refreshSource = async (id) => {
     const source = sources.find((s) => s.id === id)
     if (!source) return
@@ -218,10 +270,18 @@ export default function DataPage() {
                   _scrapedValue: scrapedLabel,
                   _value: valueOnly || s._value,
                   _refreshError: null,
+                  _historyError: null,
                 }
               : s
           )
         )
+        await loadHistoryForSource(source).catch((err) => {
+          setSources((prev) =>
+            prev.map((s) =>
+              s.id === id ? { ...s, _historyError: err.message || 'History refresh failed' } : s
+            )
+          )
+        })
       } else {
         // API/manual: solo marca como actualizado (hoy)
         setSources((prev) =>
@@ -245,11 +305,15 @@ export default function DataPage() {
   const refreshAllSources = async () => {
     setLoadingAll(true)
     setGlobalRefreshResult(null)
+    setHistoryRefreshResult(null)
     const today = new Date().toISOString().split('T')[0]
 
     const refreshableSources = sources.filter((s) => canRefresh(s))
     let okCount = 0
     let errorCount = 0
+    let historyOk = 0
+    let historySkipped = 0
+    let historyErrors = 0
     const skippedCount = sources.length - refreshableSources.length
 
     if (refreshableSources.length === 0) {
@@ -277,10 +341,23 @@ export default function DataPage() {
                   _scrapedValue: scrapedLabel,
                   _value: valueOnly || s._value,
                   _refreshError: null,
+                  _historyError: null,
                 }
               : s
           )
         )
+        try {
+          const hist = await loadHistoryForSource(source)
+          if (hist.status === 'ok') historyOk += 1
+          else historySkipped += 1
+        } catch (err) {
+          historyErrors += 1
+          setSources((prev) =>
+            prev.map((s) =>
+              s.id === source.id ? { ...s, _historyError: err.message || 'History refresh failed' } : s
+            )
+          )
+        }
       } catch (err) {
         errorCount += 1
         console.warn(`Failed to refresh ${source.id}:`, err.message)
@@ -302,6 +379,7 @@ export default function DataPage() {
       })
     )
     setGlobalRefreshResult({ ok: okCount, errors: errorCount, skipped: skippedCount })
+    setHistoryRefreshResult({ ok: historyOk, errors: historyErrors, skipped: historySkipped })
     setLoadingId(null)
     setLoadingAll(false)
   }
@@ -384,6 +462,13 @@ export default function DataPage() {
                 OK {globalRefreshResult.ok} / ERR {globalRefreshResult.errors} / SKIP {globalRefreshResult.skipped}
               </span>
             )}
+            {historyRefreshResult && (
+              <span className={`text-xs uppercase tracking-wider ${
+                historyRefreshResult.errors ? 'text-[#ef4444]' : 'text-[#60a5fa]'
+              }`}>
+                HIST {historyRefreshResult.ok} / ERR {historyRefreshResult.errors} / SKIP {historyRefreshResult.skipped}
+              </span>
+            )}
             <button
               onClick={() => exportCsv(sources)}
               className="px-3 py-1.5 text-sm font-bold uppercase tracking-wider border-2 border-[#4ade80] text-[#4ade80] hover:text-white hover:border-white"
@@ -399,7 +484,7 @@ export default function DataPage() {
                   : 'border-[#ecd987] text-[#ecd987] hover:text-white hover:border-white'
               }`}
             >
-              {loadingAll ? `ACTUALIZANDO${loadingId ? `: ${loadingId}` : '...'}` : 'REFRESH TODO'}
+              {loadingAll ? `ACTUALIZANDO${loadingId ? `: ${loadingId}` : '...'}` : 'REFRESH REAL'}
             </button>
             <Link
               to="/data"
@@ -658,6 +743,11 @@ export default function DataPage() {
                                 {source._refreshError && (
                                   <div className="text-[10px] text-[#ef4444] font-mono mb-1 break-all">
                                     ERR: {source._refreshError}
+                                  </div>
+                                )}
+                                {source._historyError && (
+                                  <div className="text-[10px] text-[#f59e0b] font-mono mb-1 break-all">
+                                    HIST: {source._historyError}
                                   </div>
                                 )}
                                 {/* Action buttons */}
